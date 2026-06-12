@@ -115,11 +115,11 @@ body {
 
 .title {
   margin: 0;
-  font-family: "UnifrakturMaguntia", "Cinzel", serif;
-  font-size: clamp(3rem, 10vw, 4.75rem);
-  font-weight: 400;
-  line-height: 1;
-  letter-spacing: 0.02em;
+  font-family: "Cinzel Decorative", "Cinzel", serif;
+  font-size: clamp(2.75rem, 9vw, 4.25rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
   color: var(--rose-pale);
   text-shadow:
     0 0 24px rgba(232, 120, 143, 0.35),
@@ -157,20 +157,6 @@ body {
   text-transform: uppercase;
   color: var(--ink);
   text-shadow: 0 1px 12px rgba(201, 75, 102, 0.45);
-}
-
-.message {
-  margin: 1.75rem 0 0;
-  font-size: 0.95rem;
-  font-weight: 400;
-  letter-spacing: 0.06em;
-  color: var(--ink-muted);
-  font-style: italic;
-}
-
-.message.error {
-  color: #ff9aaa;
-  font-style: normal;
 }
 
 @media (max-width: 480px) {
