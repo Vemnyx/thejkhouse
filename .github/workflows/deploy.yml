@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -59,6 +60,7 @@ jobs:
 
           ssh -i ~/.ssh/deploy_key "${VM_USER}@${VM_HOST}" << 'EOF'
           set -euo pipefail
+          mkdir -p /opt/thejkhouse /var/www/thejkhouse
           install -m 755 /tmp/thejkhouse-api /opt/thejkhouse/thejkhouse-api
           rsync -a --delete /tmp/thejkhouse-frontend/ /var/www/thejkhouse/
           sudo install -m 644 /tmp/thejkhouse.conf /etc/nginx/sites-available/thejkhouse
