@@ -1,0 +1,16 @@
+[Unit]
+Description=The JK House API
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/thejkhouse
+ExecStart=/opt/thejkhouse/thejkhouse-api
+Restart=always
+RestartSec=5
+Environment=PORT=8080
+
+[Install]
+WantedBy=multi-user.target

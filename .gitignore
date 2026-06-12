@@ -1,0 +1,15 @@
+# Dependencies
+frontend/node_modules/
+
+# Build outputs
+frontend/dist/
+backend/thejkhouse-api
+
+# Deploy keys (never commit)
+.deploy_key
+.deploy_key.pub
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

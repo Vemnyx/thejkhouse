@@ -1,0 +1,71 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: backend/go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build backend
+        working-directory: backend
+        run: |
+          go mod tidy
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o thejkhouse-api .
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to VM
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: deploy
+        run: |
+          scp -i ~/.ssh/deploy_key backend/thejkhouse-api "${VM_USER}@${VM_HOST}:/tmp/thejkhouse-api"
+          scp -i ~/.ssh/deploy_key -r frontend/dist/* "${VM_USER}@${VM_HOST}:/tmp/thejkhouse-frontend/"
+          scp -i ~/.ssh/deploy_key deploy/nginx/thejkhouse.conf "${VM_USER}@${VM_HOST}:/tmp/thejkhouse.conf"
+          scp -i ~/.ssh/deploy_key deploy/systemd/thejkhouse-api.service "${VM_USER}@${VM_HOST}:/tmp/thejkhouse-api.service"
+
+          ssh -i ~/.ssh/deploy_key "${VM_USER}@${VM_HOST}" << 'EOF'
+          set -euo pipefail
+          install -m 755 /tmp/thejkhouse-api /opt/thejkhouse/thejkhouse-api
+          rsync -a --delete /tmp/thejkhouse-frontend/ /var/www/thejkhouse/
+          sudo install -m 644 /tmp/thejkhouse.conf /etc/nginx/sites-available/thejkhouse
+          sudo install -m 644 /tmp/thejkhouse-api.service /etc/systemd/system/thejkhouse-api.service
+          sudo nginx -t
+          sudo systemctl daemon-reload
+          sudo systemctl restart thejkhouse-api
+          sudo systemctl reload nginx
+          rm -rf /tmp/thejkhouse-frontend /tmp/thejkhouse-api /tmp/thejkhouse.conf /tmp/thejkhouse-api.service
+          EOF
