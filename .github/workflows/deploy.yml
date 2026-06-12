@@ -62,7 +62,7 @@ jobs:
           set -euo pipefail
           mkdir -p /opt/thejkhouse /var/www/thejkhouse
           install -m 755 /tmp/thejkhouse-api /opt/thejkhouse/thejkhouse-api
-          rsync -a --delete /tmp/thejkhouse-frontend/ /var/www/thejkhouse/
+          sudo rsync -a --delete --chown=www-data:deploy /tmp/thejkhouse-frontend/ /var/www/thejkhouse/
           sudo install -m 644 /tmp/thejkhouse.conf /etc/nginx/sites-available/thejkhouse
           sudo install -m 644 /tmp/thejkhouse-api.service /etc/systemd/system/thejkhouse-api.service
           sudo nginx -t

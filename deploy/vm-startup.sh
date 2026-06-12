@@ -15,7 +15,7 @@ chown -R deploy:deploy /opt/thejkhouse /home/deploy
 install -d -m 2775 -o www-data -g deploy /var/www/thejkhouse
 
 cat > /etc/sudoers.d/deploy << 'EOF'
-deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart thejkhouse-api, /bin/systemctl reload nginx, /bin/systemctl status thejkhouse-api, /usr/sbin/nginx -t
+deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart thejkhouse-api, /bin/systemctl reload nginx, /bin/systemctl status thejkhouse-api, /usr/sbin/nginx -t, /usr/bin/rsync
 EOF
 chmod 440 /etc/sudoers.d/deploy
 
