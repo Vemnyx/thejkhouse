@@ -16,6 +16,7 @@ export default function App() {
           <span className="divider-gem">♦</span>
         </div>
         <p className="tagline">Welcome to the House of JK</p>
+        <p className="coming-soon">Coming Soon</p>
       </section>
     </main>
   );

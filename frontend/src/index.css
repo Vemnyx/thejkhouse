@@ -159,6 +159,16 @@ body {
   text-shadow: 0 1px 12px rgba(201, 75, 102, 0.45);
 }
 
+.coming-soon {
+  margin: 1.5rem 0 0;
+  font-size: clamp(0.85rem, 2.5vw, 1rem);
+  font-weight: 400;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  text-shadow: 0 0 16px rgba(232, 120, 143, 0.2);
+}
+
 @media (max-width: 480px) {
   .gothic-card {
     padding: 2.5rem 1.5rem 2.25rem;
@@ -174,5 +184,9 @@ body {
 
   .tagline {
     letter-spacing: 0.1em;
+  }
+
+  .coming-soon {
+    letter-spacing: 0.28em;
   }
 }
