@@ -1,8 +1,20 @@
 :root {
-  color: #f5f1ea;
-  background: #1f2933;
-  font-family: Georgia, "Times New Roman", serif;
-  line-height: 1.5;
+  --black: #030303;
+  --black-soft: #0a0a0a;
+  --rose-deep: #2a0810;
+  --rose-dark: #5c1528;
+  --rose-mid: #9c2d45;
+  --rose-bright: #c94b66;
+  --rose-glow: #e8788f;
+  --rose-pale: #f2b8c4;
+  --ink: #f8ecee;
+  --ink-muted: #d4a8b2;
+  --gold: #b8926a;
+
+  color: var(--ink);
+  background: var(--black);
+  font-family: "Cinzel", "Times New Roman", serif;
+  line-height: 1.6;
 }
 
 * {
@@ -12,47 +24,169 @@
 body {
   margin: 0;
   min-height: 100vh;
+  background: var(--black);
 }
 
 .page {
+  position: relative;
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 2rem;
+  padding: 2.5rem 1.5rem;
+  overflow: hidden;
   background:
-    radial-gradient(circle at top, rgba(255, 214, 153, 0.25), transparent 45%),
-    linear-gradient(180deg, #243447 0%, #111827 100%);
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(156, 45, 69, 0.18), transparent 60%),
+    radial-gradient(circle at 50% 100%, rgba(92, 21, 40, 0.22), transparent 45%),
+    linear-gradient(180deg, var(--black-soft) 0%, var(--black) 100%);
 }
 
-.card {
-  width: min(100%, 36rem);
-  padding: 2.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 1rem;
-  background: rgba(17, 24, 39, 0.85);
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+.page-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.72) 100%);
+}
+
+.gothic-card {
+  position: relative;
+  width: min(100%, 40rem);
+  padding: 3.25rem 2.75rem 3rem;
+  text-align: center;
+  background:
+    linear-gradient(165deg, rgba(92, 21, 40, 0.95) 0%, rgba(42, 8, 16, 0.98) 55%, rgba(20, 4, 8, 1) 100%);
+  border: 1px solid rgba(232, 120, 143, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.9),
+    0 0 0 4px rgba(92, 21, 40, 0.55),
+    inset 0 1px 0 rgba(242, 184, 196, 0.12),
+    inset 0 -24px 48px rgba(0, 0, 0, 0.45),
+    0 24px 64px rgba(0, 0, 0, 0.65),
+    0 0 80px rgba(156, 45, 69, 0.25);
+}
+
+.card-frame {
+  position: absolute;
+  inset: 1rem;
+  pointer-events: none;
+  border: 1px solid rgba(184, 146, 106, 0.22);
+}
+
+.corner {
+  position: absolute;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-color: var(--rose-glow);
+  border-style: solid;
+  opacity: 0.7;
+}
+
+.corner-tl {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+
+.corner-tr {
+  top: -1px;
+  right: -1px;
+  border-width: 2px 2px 0 0;
+}
+
+.corner-bl {
+  bottom: -1px;
+  left: -1px;
+  border-width: 0 0 2px 2px;
+}
+
+.corner-br {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 2px 2px 0;
 }
 
 .eyebrow {
-  margin: 0 0 0.75rem;
+  margin: 0 0 1rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.32em;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  font-size: 0.75rem;
-  color: #fbbf24;
+  color: var(--gold);
 }
 
-h1 {
-  margin: 0 0 1rem;
-  font-size: clamp(2rem, 5vw, 3rem);
+.title {
+  margin: 0;
+  font-family: "UnifrakturMaguntia", "Cinzel", serif;
+  font-size: clamp(3rem, 10vw, 4.75rem);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--rose-pale);
+  text-shadow:
+    0 0 24px rgba(232, 120, 143, 0.35),
+    0 2px 0 rgba(0, 0, 0, 0.8);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1.75rem 0 1.5rem;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  max-width: 6rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--rose-bright), transparent);
+}
+
+.divider-gem {
+  color: var(--rose-glow);
+  font-size: 0.85rem;
+  text-shadow: 0 0 12px rgba(232, 120, 143, 0.6);
+}
+
+.tagline {
+  margin: 0;
+  font-size: clamp(1.15rem, 3.5vw, 1.5rem);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-shadow: 0 1px 12px rgba(201, 75, 102, 0.45);
 }
 
 .message {
-  margin: 0;
-  font-size: 1.125rem;
-  color: #d1d5db;
+  margin: 1.75rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  font-style: italic;
 }
 
-.error {
-  margin: 0;
-  color: #fca5a5;
+.message.error {
+  color: #ff9aaa;
+  font-style: normal;
+}
+
+@media (max-width: 480px) {
+  .gothic-card {
+    padding: 2.5rem 1.5rem 2.25rem;
+  }
+
+  .card-frame {
+    inset: 0.65rem;
+  }
+
+  .eyebrow {
+    letter-spacing: 0.22em;
+  }
+
+  .tagline {
+    letter-spacing: 0.1em;
+  }
 }
