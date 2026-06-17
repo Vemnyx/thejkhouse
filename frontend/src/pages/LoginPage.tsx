@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { LOGO_URL } from "../config";
 import { useAuth } from "../context/AuthContext";
 import { registerUser } from "../lib/api";
-import { auth } from "../lib/firebaseApp";
+import { getAuthInstance } from "../lib/firebaseApp";
 
 type AuthMode = "login" | "signup";
 
@@ -32,6 +32,7 @@ export default function LoginPage() {
         await login(email, password);
       } else {
         await signup(email, password);
+        const auth = await getAuthInstance();
         const token = await auth.currentUser?.getIdToken();
         if (!token) {
           throw new Error("failed to create account");

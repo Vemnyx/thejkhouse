@@ -14,6 +14,29 @@ export type RegisterPayload = {
   lastName: string;
 };
 
+export type AuthResponse = {
+  customToken: string;
+  email: string;
+};
+
+async function publicFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`/api${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = typeof body.error === "string" ? body.error : "request failed";
+    throw new Error(message);
+  }
+
+  return body as T;
+}
+
 async function apiFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     ...init,
@@ -31,6 +54,20 @@ async function apiFetch<T>(path: string, token: string, init?: RequestInit): Pro
   }
 
   return body as T;
+}
+
+export function loginUser(email: string, password: string) {
+  return publicFetch<AuthResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function signupUser(email: string, password: string) {
+  return publicFetch<AuthResponse>("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
 }
 
 export function registerUser(token: string, payload: RegisterPayload) {

@@ -65,6 +65,7 @@ RestartSec=5
 Environment=PORT=8080
 Environment=DATABASE_URL_SECRET=projects/the-jk-house/secrets/database_url/versions/latest
 Environment=FIREBASE_PROJECT_ID=the-jk-house
+Environment=FIREBASE_API_KEY_SECRET=projects/the-jk-house/secrets/firebase_api_key/versions/latest
 
 [Install]
 WantedBy=multi-user.target

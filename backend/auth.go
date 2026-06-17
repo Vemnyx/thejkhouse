@@ -11,10 +11,13 @@ import (
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/auth"
+
+	fbidentity "github.com/Vemnyx/thejkhouse/backend/internal/firebase"
 )
 
 type authService struct {
-	client *auth.Client
+	client   *auth.Client
+	identity *fbidentity.IdentityClient
 }
 
 func newAuthService(ctx context.Context) (*authService, error) {
@@ -33,7 +36,20 @@ func newAuthService(ctx context.Context) (*authService, error) {
 		return nil, fmt.Errorf("initialize firebase auth: %w", err)
 	}
 
-	return &authService{client: client}, nil
+	identity, err := fbidentity.NewIdentityClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &authService{client: client, identity: identity}, nil
+}
+
+func (a *authService) createCustomToken(ctx context.Context, uid string) (string, error) {
+	token, err := a.client.CustomToken(ctx, uid)
+	if err != nil {
+		return "", fmt.Errorf("create custom token: %w", err)
+	}
+	return token, nil
 }
 
 func (a *authService) verifyRequestToken(r *http.Request) (*auth.Token, error) {
