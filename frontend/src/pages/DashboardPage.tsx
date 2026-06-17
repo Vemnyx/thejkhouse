@@ -1,5 +1,4 @@
 import { Navigate } from "react-router-dom";
-import { LOGO_URL } from "../config";
 import { useAuth } from "../context/AuthContext";
 
 export default function DashboardPage() {
@@ -28,7 +27,6 @@ export default function DashboardPage() {
           <span className="corner corner-br" />
         </div>
 
-        <img className="logo logo-small" src={LOGO_URL} alt="The JK House" width={512} height={512} />
         <p className="eyebrow">Signed in as {appUser.role}</p>
         <h1 className="title title-small">
           Welcome, {appUser.firstName}

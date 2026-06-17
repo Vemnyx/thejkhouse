@@ -104,15 +104,6 @@ body {
   border-width: 0 2px 2px 0;
 }
 
-.logo {
-  display: block;
-  width: min(100%, 11rem);
-  height: auto;
-  aspect-ratio: 1;
-  margin: 0 auto 1.25rem;
-  filter: drop-shadow(0 0 24px rgba(156, 45, 69, 0.45));
-}
-
 .eyebrow {
   margin: 0 0 1rem;
   font-size: 0.7rem;
@@ -176,11 +167,6 @@ body {
   text-transform: uppercase;
   color: var(--ink-muted);
   text-shadow: 0 0 16px rgba(232, 120, 143, 0.2);
-}
-
-.logo-small {
-  width: min(100%, 7rem);
-  margin-bottom: 1rem;
 }
 
 .title-small {

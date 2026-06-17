@@ -1,6 +1,5 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { LOGO_URL } from "../config";
 import { useAuth } from "../context/AuthContext";
 
 type AuthMode = "login" | "signup";
@@ -55,7 +54,6 @@ export default function LoginPage() {
           <span className="corner corner-br" />
         </div>
 
-        <img className="logo logo-small" src={LOGO_URL} alt="The JK House" width={512} height={512} />
         <h1 className="title title-small">Enter the House</h1>
 
         <div className="auth-toggle" role="tablist" aria-label="Authentication mode">

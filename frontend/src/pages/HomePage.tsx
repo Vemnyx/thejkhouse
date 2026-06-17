@@ -1,5 +1,3 @@
-import { LOGO_URL } from "../config";
-
 export default function HomePage() {
   return (
     <main className="page">
@@ -12,7 +10,6 @@ export default function HomePage() {
           <span className="corner corner-br" />
         </div>
 
-        <img className="logo" src={LOGO_URL} alt="The JK House" width={512} height={512} />
         <p className="eyebrow">Jacob &amp; Kirsten&apos;s House Party</p>
         <h1 className="title">The JK House</h1>
         <div className="divider" aria-hidden="true">

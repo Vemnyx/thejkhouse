@@ -32,7 +32,7 @@ func (s *userStore) createUser(ctx context.Context, firebaseUID, email, firstNam
 		email,
 		firstName,
 		lastName,
-		string(role),
+		int(role),
 	).Scan(
 		&user.ID,
 		&user.FirebaseUID,
