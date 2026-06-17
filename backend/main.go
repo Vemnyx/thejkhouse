@@ -54,11 +54,18 @@ func main() {
 		log.Fatal("firebase auth", "error", err)
 	}
 
+	imageUploader, err := newImageUploader(ctx)
+	if err != nil {
+		log.Fatal("image uploader", "error", err)
+	}
+	defer imageUploader.close()
+
 	log.Info("database connection established")
 
 	server := &apiServer{
-		store: store,
-		auth:  authService,
+		store:  store,
+		auth:   authService,
+		images: imageUploader,
 	}
 
 	mux := http.NewServeMux()
@@ -67,6 +74,8 @@ func main() {
 	mux.HandleFunc("/auth/login", server.handleAuthLogin)
 	mux.HandleFunc("/auth/signup", server.handleAuthSignup)
 	mux.HandleFunc("/auth/session", server.handleAuthSession)
+	mux.HandleFunc("/images", server.handleImages)
+	mux.HandleFunc("/images/", server.handleImageByID)
 	mux.HandleFunc("/users/register", server.handleRegister)
 	mux.HandleFunc("/users/me", server.handleMe)
 

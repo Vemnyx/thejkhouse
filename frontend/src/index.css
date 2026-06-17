@@ -232,6 +232,11 @@ body {
   cursor: pointer;
 }
 
+.auth-submit.dashboard-link {
+  display: inline-block;
+  text-decoration: none;
+}
+
 .auth-submit:disabled {
   opacity: 0.65;
   cursor: wait;
@@ -309,6 +314,70 @@ body {
   line-height: 1.7;
 }
 
+.host-page {
+  align-items: flex-start;
+  padding-top: 3rem;
+}
+
+.host-card {
+  width: min(100%, 64rem);
+}
+
+.host-upload-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem) auto;
+  gap: 1rem;
+  align-items: end;
+  margin: 1.5rem 0;
+  text-align: left;
+}
+
+.host-actions {
+  margin: 1rem 0 1.5rem;
+  font-size: 0.85rem;
+}
+
+.host-actions a {
+  color: var(--rose-pale);
+  text-decoration: none;
+}
+
+.host-actions a:hover {
+  color: var(--ink);
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+  text-align: left;
+}
+
+.image-grid-card {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid rgba(232, 120, 143, 0.2);
+  background: rgba(3, 3, 3, 0.35);
+  padding: 0.75rem;
+}
+
+.image-grid-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid rgba(232, 120, 143, 0.2);
+}
+
+.image-grid-meta {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  letter-spacing: normal;
+}
+
 .loading-text {
   margin: 0;
   color: var(--ink-muted);
@@ -338,6 +407,10 @@ body {
   }
 
   .auth-row {
+    grid-template-columns: 1fr;
+  }
+
+  .host-upload-form {
     grid-template-columns: 1fr;
   }
 }

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function HomePage() {
@@ -22,6 +23,11 @@ export default function HomePage() {
         <p className="dashboard-copy">
           Your dashboard is ready. More features are coming soon.
         </p>
+        {appUser?.role === "host" ? (
+          <Link className="auth-submit dashboard-link" to="/host">
+            Host Dashboard
+          </Link>
+        ) : null}
         <button className="auth-submit" type="button" onClick={() => logout()}>
           Log Out
         </button>

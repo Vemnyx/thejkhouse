@@ -69,6 +69,7 @@ jobs:
           DATABASE_URL_SECRET=projects/the-jk-house/secrets/database_url/versions/latest \
           FIREBASE_PROJECT_ID=the-jk-house \
           FIREBASE_API_KEY_SECRET=projects/the-jk-house/secrets/firebase_api_key/versions/latest \
+          IMAGE_BUCKET=thejkhouse-assets \
           /opt/thejkhouse/thejkhouse-migrate
           sudo rsync -a --delete --chown=www-data:deploy /tmp/thejkhouse-frontend/ /var/www/thejkhouse/
           sudo install -m 644 /tmp/thejkhouse.conf /etc/nginx/sites-available/thejkhouse
