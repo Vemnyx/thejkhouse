@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 type AuthMode = "login" | "signup";
@@ -72,7 +72,7 @@ export default function LoginPage() {
         </div>
 
         <h1 className="title title-small">
-          {mode === "login" ? "Enter the House" : "Create Account"}
+          {mode === "login" ? "Welcome To The House Of JK" : "Enter The House"}
         </h1>
 
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -174,9 +174,6 @@ export default function LoginPage() {
           )}
         </form>
 
-        <p className="auth-footer">
-          <Link to="/">Back to home</Link>
-        </p>
       </section>
     </main>
   );
