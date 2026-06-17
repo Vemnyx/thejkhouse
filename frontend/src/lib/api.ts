@@ -9,14 +9,14 @@ export type AppUser = {
   createdAt: string;
 };
 
-export type RegisterPayload = {
+export type SignupPayload = {
   firstName: string;
   lastName: string;
 };
 
-export type AuthResponse = {
+export type AuthSession = {
   customToken: string;
-  email: string;
+  user: AppUser;
 };
 
 async function publicFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -57,26 +57,19 @@ async function apiFetch<T>(path: string, token: string, init?: RequestInit): Pro
 }
 
 export function loginUser(email: string, password: string) {
-  return publicFetch<AuthResponse>("/auth/login", {
+  return publicFetch<AuthSession>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
 }
 
-export function signupUser(email: string, password: string) {
-  return publicFetch<AuthResponse>("/auth/signup", {
+export function signupUser(email: string, password: string, profile: SignupPayload) {
+  return publicFetch<AuthSession>("/auth/signup", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, ...profile }),
   });
 }
 
-export function registerUser(token: string, payload: RegisterPayload) {
-  return apiFetch<AppUser>("/users/register", token, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export function getCurrentUser(token: string) {
-  return apiFetch<AppUser>("/users/me", token);
+export function getSession(token: string) {
+  return apiFetch<AppUser>("/auth/session", token);
 }

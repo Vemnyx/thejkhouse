@@ -66,6 +66,7 @@ func main() {
 	mux.HandleFunc("/auth/config", server.handleAuthConfig)
 	mux.HandleFunc("/auth/login", server.handleAuthLogin)
 	mux.HandleFunc("/auth/signup", server.handleAuthSignup)
+	mux.HandleFunc("/auth/session", server.handleAuthSession)
 	mux.HandleFunc("/users/register", server.handleRegister)
 	mux.HandleFunc("/users/me", server.handleMe)
 

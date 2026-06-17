@@ -2,14 +2,12 @@ import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { LOGO_URL } from "../config";
 import { useAuth } from "../context/AuthContext";
-import { registerUser } from "../lib/api";
-import { getAuthInstance } from "../lib/firebaseApp";
 
 type AuthMode = "login" | "signup";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, signup, appUser, loading, refreshAppUser } = useAuth();
+  const { login, signup, appUser, loading } = useAuth();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,19 +29,12 @@ export default function LoginPage() {
       if (mode === "login") {
         await login(email, password);
       } else {
-        await signup(email, password);
-        const auth = await getAuthInstance();
-        const token = await auth.currentUser?.getIdToken();
-        if (!token) {
-          throw new Error("failed to create account");
-        }
-        await registerUser(token, {
+        await signup(email, password, {
           firstName: firstName.trim(),
           lastName: lastName.trim(),
         });
       }
 
-      await refreshAppUser();
       navigate("/dashboard");
     } catch (err) {
       const message = err instanceof Error ? err.message : "something went wrong";

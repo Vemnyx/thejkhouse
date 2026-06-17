@@ -71,20 +71,13 @@ func (s *apiServer) handleMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := s.auth.verifyRequestToken(r)
+	user, err := s.loadUserFromRequest(r)
 	if err != nil {
-		log.Error("me auth", "error", err)
-		writeError(w, http.StatusUnauthorized, err.Error())
-		return
-	}
-
-	user, err := s.store.getUserByFirebaseUID(r.Context(), token.UID)
-	if err != nil {
-		if isNotFound(err) {
-			writeError(w, http.StatusNotFound, "user not found")
+		if authErr, ok := err.(*authRequestError); ok {
+			writeError(w, authErr.status, authErr.message)
 			return
 		}
-		log.Error("me load user", "error", err, "firebase_uid", token.UID)
+		log.Error("me load user", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to load user")
 		return
 	}

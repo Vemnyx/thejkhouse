@@ -7,7 +7,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { AppUser, getCurrentUser, loginUser, signupUser } from "../lib/api";
+import { AppUser, SignupPayload, getSession, loginUser, signupUser } from "../lib/api";
 import { getAuthInstance, signInWithBackendToken } from "../lib/firebaseApp";
 
 type AuthContextValue = {
@@ -15,12 +15,16 @@ type AuthContextValue = {
   appUser: AppUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, profile: SignupPayload) => Promise<void>;
   logout: () => Promise<void>;
   refreshAppUser: () => Promise<AppUser | null>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+async function loadAppUserFromToken(token: string): Promise<AppUser> {
+  return getSession(token);
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
@@ -34,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const token = await user.getIdToken();
-    const profile = await getCurrentUser(token);
+    const profile = await loadAppUserFromToken(token);
     setAppUser(profile);
     return profile;
   };
@@ -54,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           try {
             const token = await user.getIdToken();
-            const profile = await getCurrentUser(token);
+            const profile = await loadAppUserFromToken(token);
             setAppUser(profile);
           } catch {
             setAppUser(null);
@@ -78,12 +82,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       appUser,
       loading,
       login: async (email, password) => {
-        const { customToken } = await loginUser(email, password);
-        await signInWithBackendToken(customToken);
+        const session = await loginUser(email, password);
+        await signInWithBackendToken(session.customToken);
+        setAppUser(session.user);
       },
-      signup: async (email, password) => {
-        const { customToken } = await signupUser(email, password);
-        await signInWithBackendToken(customToken);
+      signup: async (email, password, profile) => {
+        const session = await signupUser(email, password, profile);
+        await signInWithBackendToken(session.customToken);
+        setAppUser(session.user);
       },
       logout: async () => {
         const auth = await getAuthInstance();

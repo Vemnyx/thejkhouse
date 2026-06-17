@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -13,9 +14,16 @@ type authCredentialRequest struct {
 	Password string `json:"password"`
 }
 
-type authTokenResponse struct {
+type authSignupRequest struct {
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+}
+
+type authSessionResponse struct {
 	CustomToken string `json:"customToken"`
-	Email       string `json:"email"`
+	User        User   `json:"user"`
 }
 
 func (s *apiServer) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
@@ -53,14 +61,25 @@ func (s *apiServer) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := s.auth.createCustomToken(r.Context(), session.LocalID)
+	user, err := s.store.getUserByFirebaseUID(r.Context(), session.LocalID)
+	if err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusNotFound, "account not found")
+			return
+		}
+		log.Error("auth login load user", "error", err, "email", email)
+		writeError(w, http.StatusInternalServerError, "failed to load user")
+		return
+	}
+
+	response, err := s.buildAuthSession(r.Context(), session.LocalID, user)
 	if err != nil {
 		log.Error("auth login token", "error", err, "email", email)
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}
 
-	writeJSON(w, authTokenResponse{CustomToken: token, Email: session.Email})
+	writeJSON(w, response)
 }
 
 func (s *apiServer) handleAuthSignup(w http.ResponseWriter, r *http.Request) {
@@ -69,9 +88,22 @@ func (s *apiServer) handleAuthSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email, password, err := readAuthCredentials(r)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+	var payload authSignupRequest
+	if err := readJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, errInvalidBody.Error())
+		return
+	}
+
+	email := strings.TrimSpace(payload.Email)
+	password := payload.Password
+	firstName := strings.TrimSpace(payload.FirstName)
+	lastName := strings.TrimSpace(payload.LastName)
+	if email == "" || password == "" {
+		writeError(w, http.StatusBadRequest, errMissingCredentials.Error())
+		return
+	}
+	if firstName == "" || lastName == "" {
+		writeError(w, http.StatusBadRequest, "first name and last name are required")
 		return
 	}
 
@@ -82,14 +114,75 @@ func (s *apiServer) handleAuthSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := s.auth.createCustomToken(r.Context(), session.LocalID)
+	user, err := s.store.createUser(r.Context(), session.LocalID, session.Email, firstName, lastName, RoleGuest)
+	if err != nil {
+		if isUniqueViolation(err) {
+			writeError(w, http.StatusConflict, "user already exists")
+			return
+		}
+		log.Error("auth signup create user", "error", err, "email", email)
+		writeError(w, http.StatusInternalServerError, "failed to create user")
+		return
+	}
+
+	response, err := s.buildAuthSession(r.Context(), session.LocalID, user)
 	if err != nil {
 		log.Error("auth signup token", "error", err, "email", email)
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}
 
-	writeJSONStatus(w, http.StatusCreated, authTokenResponse{CustomToken: token, Email: session.Email})
+	log.Info("user registered", "user_id", user.ID, "email", user.Email)
+	writeJSONStatus(w, http.StatusCreated, response)
+}
+
+func (s *apiServer) handleAuthSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+
+	user, err := s.loadUserFromRequest(r)
+	if err != nil {
+		if authErr, ok := err.(*authRequestError); ok {
+			writeError(w, authErr.status, authErr.message)
+			return
+		}
+		log.Error("auth session", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to load session")
+		return
+	}
+
+	writeJSON(w, user)
+}
+
+func (s *apiServer) buildAuthSession(ctx context.Context, firebaseUID string, user *User) (authSessionResponse, error) {
+	token, err := s.auth.createCustomToken(ctx, firebaseUID)
+	if err != nil {
+		return authSessionResponse{}, err
+	}
+
+	return authSessionResponse{
+		CustomToken: token,
+		User:        *user,
+	}, nil
+}
+
+func (s *apiServer) loadUserFromRequest(r *http.Request) (*User, error) {
+	token, err := s.auth.verifyRequestToken(r)
+	if err != nil {
+		return nil, &authRequestError{status: http.StatusUnauthorized, message: err.Error()}
+	}
+
+	user, err := s.store.getUserByFirebaseUID(r.Context(), token.UID)
+	if err != nil {
+		if isNotFound(err) {
+			return nil, &authRequestError{status: http.StatusNotFound, message: "user not found"}
+		}
+		return nil, err
+	}
+
+	return user, nil
 }
 
 func readAuthCredentials(r *http.Request) (string, string, error) {
@@ -105,4 +198,13 @@ func readAuthCredentials(r *http.Request) (string, string, error) {
 	}
 
 	return email, password, nil
+}
+
+type authRequestError struct {
+	status  int
+	message string
+}
+
+func (e *authRequestError) Error() string {
+	return e.message
 }
