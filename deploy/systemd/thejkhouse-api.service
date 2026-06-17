@@ -11,6 +11,8 @@ ExecStart=/opt/thejkhouse/thejkhouse-api
 Restart=always
 RestartSec=5
 Environment=PORT=8080
+Environment=DATABASE_PATH=/opt/thejkhouse/data/thejkhouse.db
+Environment=FIREBASE_PROJECT_ID=the-jk-house
 
 [Install]
 WantedBy=multi-user.target

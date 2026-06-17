@@ -60,8 +60,9 @@ jobs:
 
           ssh -i ~/.ssh/deploy_key "${VM_USER}@${VM_HOST}" << 'EOF'
           set -euo pipefail
-          mkdir -p /opt/thejkhouse /var/www/thejkhouse
+          mkdir -p /opt/thejkhouse/data /var/www/thejkhouse
           install -m 755 /tmp/thejkhouse-api /opt/thejkhouse/thejkhouse-api
+          sudo chown -R deploy:deploy /opt/thejkhouse/data
           sudo rsync -a --delete --chown=www-data:deploy /tmp/thejkhouse-frontend/ /var/www/thejkhouse/
           sudo install -m 644 /tmp/thejkhouse.conf /etc/nginx/sites-available/thejkhouse
           sudo install -m 644 /tmp/thejkhouse-api.service /etc/systemd/system/thejkhouse-api.service

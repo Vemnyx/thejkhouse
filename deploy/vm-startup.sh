@@ -8,7 +8,7 @@ apt-get install -y nginx certbot python3-certbot-nginx curl
 
 id deploy &>/dev/null || useradd -m -s /bin/bash deploy
 
-mkdir -p /opt/thejkhouse /var/www/thejkhouse /home/deploy/.ssh
+mkdir -p /opt/thejkhouse /opt/thejkhouse/data /var/www/thejkhouse /home/deploy/.ssh
 chmod 700 /home/deploy/.ssh
 chown -R deploy:deploy /opt/thejkhouse /home/deploy
 
@@ -62,6 +62,8 @@ ExecStart=/opt/thejkhouse/thejkhouse-api
 Restart=always
 RestartSec=5
 Environment=PORT=8080
+Environment=DATABASE_PATH=/opt/thejkhouse/data/thejkhouse.db
+Environment=FIREBASE_PROJECT_ID=the-jk-house
 
 [Install]
 WantedBy=multi-user.target
