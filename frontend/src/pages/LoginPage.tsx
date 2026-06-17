@@ -10,18 +10,33 @@ export default function LoginPage() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   if (!loading && appUser) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
+
+  const switchMode = (nextMode: AuthMode) => {
+    setMode(nextMode);
+    setError("");
+    setConfirmPassword("");
+    setShowPassword(false);
+  };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
+
+    if (mode === "signup" && password !== confirmPassword) {
+      setError("passwords do not match");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -34,7 +49,7 @@ export default function LoginPage() {
         });
       }
 
-      navigate("/dashboard");
+      navigate("/");
     } catch (err) {
       const message = err instanceof Error ? err.message : "something went wrong";
       setError(message);
@@ -42,6 +57,8 @@ export default function LoginPage() {
       setSubmitting(false);
     }
   };
+
+  const passwordInputType = showPassword ? "text" : "password";
 
   return (
     <main className="page">
@@ -54,24 +71,9 @@ export default function LoginPage() {
           <span className="corner corner-br" />
         </div>
 
-        <h1 className="title title-small">Enter the House</h1>
-
-        <div className="auth-toggle" role="tablist" aria-label="Authentication mode">
-          <button
-            type="button"
-            className={mode === "login" ? "auth-toggle-btn active" : "auth-toggle-btn"}
-            onClick={() => setMode("login")}
-          >
-            Log In
-          </button>
-          <button
-            type="button"
-            className={mode === "signup" ? "auth-toggle-btn active" : "auth-toggle-btn"}
-            onClick={() => setMode("signup")}
-          >
-            Create Account
-          </button>
-        </div>
+        <h1 className="title title-small">
+          {mode === "login" ? "Enter the House" : "Create Account"}
+        </h1>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           {mode === "signup" ? (
@@ -111,7 +113,7 @@ export default function LoginPage() {
           <label className="auth-field">
             <span>Password</span>
             <input
-              type="password"
+              type={mode === "signup" ? passwordInputType : "password"}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete={mode === "login" ? "current-password" : "new-password"}
@@ -120,11 +122,56 @@ export default function LoginPage() {
             />
           </label>
 
+          {mode === "signup" ? (
+            <>
+              <label className="auth-field">
+                <span>Confirm password</span>
+                <input
+                  type={passwordInputType}
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  autoComplete="new-password"
+                  minLength={6}
+                  required
+                />
+              </label>
+
+              <label className="auth-password-toggle">
+                <input
+                  type="checkbox"
+                  checked={showPassword}
+                  onChange={(event) => setShowPassword(event.target.checked)}
+                />
+                <span>Show password</span>
+              </label>
+            </>
+          ) : null}
+
           {error ? <p className="auth-error">{error}</p> : null}
 
           <button className="auth-submit" type="submit" disabled={submitting}>
             {submitting ? "Please wait..." : mode === "login" ? "Log In" : "Create Account"}
           </button>
+
+          {mode === "login" ? (
+            <button
+              className="auth-secondary"
+              type="button"
+              onClick={() => switchMode("signup")}
+              disabled={submitting}
+            >
+              Create Account
+            </button>
+          ) : (
+            <button
+              className="auth-secondary"
+              type="button"
+              onClick={() => switchMode("login")}
+              disabled={submitting}
+            >
+              Log In
+            </button>
+          )}
         </form>
 
         <p className="auth-footer">

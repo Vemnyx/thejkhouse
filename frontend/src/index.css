@@ -178,37 +178,11 @@ body {
   width: min(100%, 28rem);
 }
 
-.auth-toggle {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  margin: 1.5rem 0;
-}
-
-.auth-toggle-btn {
-  border: 1px solid rgba(232, 120, 143, 0.35);
-  background: rgba(42, 8, 16, 0.65);
-  color: var(--ink-muted);
-  padding: 0.75rem 1rem;
-  font: inherit;
-  font-size: 0.8rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
-
-.auth-toggle-btn.active {
-  color: var(--ink);
-  border-color: var(--rose-glow);
-  background: rgba(156, 45, 69, 0.45);
-  box-shadow: 0 0 20px rgba(156, 45, 69, 0.25);
-}
-
 .auth-form {
   display: grid;
   gap: 1rem;
   text-align: left;
+  margin-top: 1.5rem;
 }
 
 .auth-row {
@@ -261,6 +235,50 @@ body {
 .auth-submit:disabled {
   opacity: 0.65;
   cursor: wait;
+}
+
+.auth-secondary {
+  border: 1px solid rgba(232, 120, 143, 0.35);
+  background: rgba(42, 8, 16, 0.65);
+  color: var(--ink-muted);
+  padding: 0.9rem 1rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.auth-secondary:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--rose-glow);
+  background: rgba(156, 45, 69, 0.35);
+}
+
+.auth-secondary:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.auth-password-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: -0.25rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.auth-password-toggle input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--rose-mid);
+  cursor: pointer;
 }
 
 .auth-error {
