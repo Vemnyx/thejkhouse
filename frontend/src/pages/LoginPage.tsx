@@ -1,12 +1,13 @@
-import { FormEvent, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { FormEvent, useEffect, useState } from "react";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 type AuthMode = "login" | "signup";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, signup, appUser, loading } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { login, signup, confirmSignup, appUser, loading } = useAuth();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,7 +16,33 @@ export default function LoginPage() {
   const [lastName, setLastName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [confirmingSignup, setConfirmingSignup] = useState(false);
+  const [confirmationTokenAttempted, setConfirmationTokenAttempted] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const token = searchParams.get("confirm_signup_token");
+    if (!token || appUser || confirmingSignup || confirmationTokenAttempted === token) {
+      return;
+    }
+
+    setConfirmingSignup(true);
+    setConfirmationTokenAttempted(token);
+    setError("");
+    setSuccess("");
+    confirmSignup(token)
+      .then(() => {
+        navigate("/", { replace: true });
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : "failed to confirm account";
+        setError(message);
+      })
+      .finally(() => {
+        setConfirmingSignup(false);
+      });
+  }, [appUser, confirmSignup, confirmationTokenAttempted, confirmingSignup, navigate, searchParams]);
 
   if (!loading && appUser) {
     return <Navigate to="/" replace />;
@@ -24,6 +51,7 @@ export default function LoginPage() {
   const switchMode = (nextMode: AuthMode) => {
     setMode(nextMode);
     setError("");
+    setSuccess("");
     setConfirmPassword("");
     setShowPassword(false);
   };
@@ -31,6 +59,7 @@ export default function LoginPage() {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
+    setSuccess("");
 
     if (mode === "signup" && password !== confirmPassword) {
       setError("passwords do not match");
@@ -47,6 +76,10 @@ export default function LoginPage() {
           firstName: firstName.trim(),
           lastName: lastName.trim(),
         });
+        setSuccess("Check your email to confirm your account.");
+        setPassword("");
+        setConfirmPassword("");
+        return;
       }
 
       navigate("/");
@@ -148,9 +181,16 @@ export default function LoginPage() {
           ) : null}
 
           {error ? <p className="auth-error">{error}</p> : null}
+          {success ? <p className="host-success">{success}</p> : null}
 
-          <button className="auth-submit" type="submit" disabled={submitting}>
-            {submitting ? "Please wait..." : mode === "login" ? "Log In" : "Create Account"}
+          <button className="auth-submit" type="submit" disabled={submitting || confirmingSignup}>
+            {confirmingSignup
+              ? "Confirming..."
+              : submitting
+                ? "Please wait..."
+                : mode === "login"
+                  ? "Log In"
+                  : "Create Account"}
           </button>
 
           {mode === "login" ? (
@@ -158,7 +198,7 @@ export default function LoginPage() {
               className="auth-secondary"
               type="button"
               onClick={() => switchMode("signup")}
-              disabled={submitting}
+              disabled={submitting || confirmingSignup}
             >
               Create Account
             </button>
@@ -167,7 +207,7 @@ export default function LoginPage() {
               className="auth-secondary"
               type="button"
               onClick={() => switchMode("login")}
-              disabled={submitting}
+              disabled={submitting || confirmingSignup}
             >
               Log In
             </button>

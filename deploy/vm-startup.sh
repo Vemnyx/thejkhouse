@@ -69,6 +69,8 @@ Environment=FIREBASE_API_KEY_SECRET=projects/the-jk-house/secrets/firebase_api_k
 Environment=IMAGE_BUCKET=thejkhouse-assets
 Environment=EMAIL_FROM=host@thejkhouse.com
 Environment=RESEND_API_KEY_SECRET=projects/the-jk-house/secrets/resend_api_key/versions/latest
+Environment=APP_BASE_URL=https://thejkhouse.com
+Environment=PENDING_SIGNUP_ENCRYPTION_KEY_SECRET=projects/the-jk-house/secrets/pending_signup_encryption_key/versions/latest
 
 [Install]
 WantedBy=multi-user.target

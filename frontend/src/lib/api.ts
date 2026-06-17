@@ -19,6 +19,10 @@ export type AuthSession = {
   user: AppUser;
 };
 
+export type SignupPendingResponse = {
+  message: string;
+};
+
 export type ImageRecord = {
   id: number;
   imageUrl: string;
@@ -83,9 +87,16 @@ export function loginUser(email: string, password: string) {
 }
 
 export function signupUser(email: string, password: string, profile: SignupPayload) {
-  return publicFetch<AuthSession>("/auth/signup", {
+  return publicFetch<SignupPendingResponse>("/auth/signup", {
     method: "POST",
     body: JSON.stringify({ email, password, ...profile }),
+  });
+}
+
+export function confirmSignup(token: string) {
+  return publicFetch<AuthSession>("/auth/confirm-signup", {
+    method: "POST",
+    body: JSON.stringify({ token }),
   });
 }
 

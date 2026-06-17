@@ -9,10 +9,11 @@ import (
 )
 
 type apiServer struct {
-	store  *userStore
-	auth   *authService
-	images *imageUploader
-	email  *emailClient
+	store          *userStore
+	auth           *authService
+	images         *imageUploader
+	email          *emailClient
+	pendingSignups *pendingSignupCodec
 }
 
 func (s *apiServer) handleHealth(w http.ResponseWriter, r *http.Request) {

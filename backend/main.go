@@ -65,18 +65,25 @@ func main() {
 		log.Fatal("email client", "error", err)
 	}
 
+	pendingSignupCodec, err := newPendingSignupCodec(ctx)
+	if err != nil {
+		log.Fatal("pending signup codec", "error", err)
+	}
+
 	log.Info("database connection established")
 
 	server := &apiServer{
-		store:  store,
-		auth:   authService,
-		images: imageUploader,
-		email:  emailClient,
+		store:          store,
+		auth:           authService,
+		images:         imageUploader,
+		email:          emailClient,
+		pendingSignups: pendingSignupCodec,
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", server.handleHealth)
 	mux.HandleFunc("/auth/config", server.handleAuthConfig)
+	mux.HandleFunc("/auth/confirm-signup", server.handleAuthConfirmSignup)
 	mux.HandleFunc("/auth/login", server.handleAuthLogin)
 	mux.HandleFunc("/auth/signup", server.handleAuthSignup)
 	mux.HandleFunc("/auth/session", server.handleAuthSession)

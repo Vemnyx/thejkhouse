@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	fbidentity "github.com/Vemnyx/thejkhouse/backend/internal/firebase"
 	"github.com/Vemnyx/thejkhouse/backend/log"
@@ -24,6 +25,14 @@ type authSignupRequest struct {
 type authSessionResponse struct {
 	CustomToken string `json:"customToken"`
 	User        User   `json:"user"`
+}
+
+type authSignupPendingResponse struct {
+	Message string `json:"message"`
+}
+
+type confirmSignupRequest struct {
+	Token string `json:"token"`
 }
 
 func (s *apiServer) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
@@ -107,27 +116,111 @@ func (s *apiServer) handleAuthSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := s.auth.identity.SignUp(r.Context(), email, password)
+	token, tokenHash, err := newPendingSignupToken()
 	if err != nil {
-		log.Error("auth signup", "error", err, "email", email)
+		log.Error("auth signup token", "error", err, "email", email)
+		writeError(w, http.StatusInternalServerError, "failed to create confirmation")
+		return
+	}
+
+	encryptedPassword, err := s.pendingSignups.encrypt(password)
+	if err != nil {
+		log.Error("auth signup encrypt", "error", err, "email", email)
+		writeError(w, http.StatusInternalServerError, "failed to create confirmation")
+		return
+	}
+
+	expiresAt := time.Now().UTC().Add(24 * time.Hour)
+	_, err = s.store.upsertPendingSignup(r.Context(), email, firstName, lastName, RoleGuest, encryptedPassword, tokenHash, expiresAt)
+	if err != nil {
+		if isUniqueViolation(err) {
+			writeError(w, http.StatusConflict, "account is already pending confirmation")
+			return
+		}
+		log.Error("auth signup pending", "error", err, "email", email)
+		writeError(w, http.StatusInternalServerError, "failed to create confirmation")
+		return
+	}
+
+	confirmURL := signupConfirmationURL(token)
+	htmlBody, textBody := signupConfirmationEmail(firstName, confirmURL)
+	_, err = s.email.send(r.Context(), []string{email}, "Confirm your The JK House account", htmlBody, textBody)
+	if err != nil {
+		log.Error("auth signup email", "error", err, "email", email)
+		writeError(w, http.StatusInternalServerError, "failed to send confirmation email")
+		return
+	}
+
+	log.Info("signup confirmation sent", "email", email)
+	writeJSONStatus(w, http.StatusAccepted, authSignupPendingResponse{Message: "check your email to confirm your account"})
+}
+
+func (s *apiServer) handleAuthConfirmSignup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+
+	var payload confirmSignupRequest
+	if err := readJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, errInvalidBody.Error())
+		return
+	}
+
+	token := strings.TrimSpace(payload.Token)
+	if token == "" {
+		writeError(w, http.StatusBadRequest, "confirmation token is required")
+		return
+	}
+
+	pending, err := s.store.getPendingSignupByTokenHash(r.Context(), pendingSignupTokenHash(token))
+	if err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusBadRequest, "confirmation link is invalid")
+			return
+		}
+		log.Error("auth confirm load pending", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to confirm account")
+		return
+	}
+	if time.Now().UTC().After(pending.ExpiresAt) {
+		_ = s.store.deletePendingSignup(r.Context(), pending.ID)
+		writeError(w, http.StatusBadRequest, "confirmation link has expired")
+		return
+	}
+
+	password, err := s.pendingSignups.decrypt(pending.EncryptedPassword)
+	if err != nil {
+		log.Error("auth confirm decrypt", "error", err, "email", pending.Email)
+		writeError(w, http.StatusInternalServerError, "failed to confirm account")
+		return
+	}
+
+	session, err := s.auth.identity.SignUp(r.Context(), pending.Email, password)
+	if err != nil {
+		log.Error("auth confirm firebase signup", "error", err, "email", pending.Email)
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	user, err := s.store.createUser(r.Context(), session.LocalID, session.Email, firstName, lastName, RoleGuest)
+	user, err := s.store.createUser(r.Context(), session.LocalID, session.Email, pending.FirstName, pending.LastName, pending.Role)
 	if err != nil {
 		if isUniqueViolation(err) {
 			writeError(w, http.StatusConflict, "user already exists")
 			return
 		}
-		log.Error("auth signup create user", "error", err, "email", email)
+		log.Error("auth confirm create user", "error", err, "email", pending.Email)
 		writeError(w, http.StatusInternalServerError, "failed to create user")
 		return
 	}
 
+	if err := s.store.deletePendingSignup(r.Context(), pending.ID); err != nil {
+		log.Error("auth confirm delete pending", "error", err, "email", pending.Email)
+	}
+
 	response, err := s.buildAuthSession(r.Context(), session.LocalID, user)
 	if err != nil {
-		log.Error("auth signup token", "error", err, "email", email)
+		log.Error("auth confirm token", "error", err, "email", pending.Email)
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}

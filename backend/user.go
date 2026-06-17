@@ -23,3 +23,15 @@ type Image struct {
 	Date       time.Time `json:"date"`
 	UploadedAt time.Time `json:"uploadedAt"`
 }
+
+type PendingSignup struct {
+	ID                int64
+	Email             string
+	FirstName         string
+	LastName          string
+	Role              Role
+	EncryptedPassword []byte
+	TokenHash         []byte
+	ExpiresAt         time.Time
+	CreatedAt         time.Time
+}

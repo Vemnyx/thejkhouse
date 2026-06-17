@@ -7,7 +7,14 @@ import {
   useMemo,
   useState,
 } from "react";
-import { AppUser, SignupPayload, getSession, loginUser, signupUser } from "../lib/api";
+import {
+  AppUser,
+  SignupPayload,
+  confirmSignup as confirmSignupRequest,
+  getSession,
+  loginUser,
+  signupUser,
+} from "../lib/api";
 import { getAuthInstance, signInWithBackendToken } from "../lib/firebaseApp";
 
 type AuthContextValue = {
@@ -16,6 +23,7 @@ type AuthContextValue = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, profile: SignupPayload) => Promise<void>;
+  confirmSignup: (token: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshAppUser: () => Promise<AppUser | null>;
 };
@@ -87,7 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAppUser(session.user);
       },
       signup: async (email, password, profile) => {
-        const session = await signupUser(email, password, profile);
+        await signupUser(email, password, profile);
+      },
+      confirmSignup: async (token) => {
+        const session = await confirmSignupRequest(token);
         await signInWithBackendToken(session.customToken);
         setAppUser(session.user);
       },
