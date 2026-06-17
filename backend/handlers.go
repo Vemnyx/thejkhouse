@@ -1,9 +1,7 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 )
@@ -50,7 +48,7 @@ func (s *apiServer) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	user, err := s.store.createUser(r.Context(), token.UID, email, firstName, lastName, RoleGuest)
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		if isUniqueViolation(err) {
 			writeError(w, http.StatusConflict, "user already exists")
 			return
 		}
@@ -75,7 +73,7 @@ func (s *apiServer) handleMe(w http.ResponseWriter, r *http.Request) {
 
 	user, err := s.store.getUserByFirebaseUID(r.Context(), token.UID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if isNotFound(err) {
 			writeError(w, http.StatusNotFound, "user not found")
 			return
 		}

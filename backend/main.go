@@ -5,15 +5,29 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/Vemnyx/thejkhouse/backend/internal/db"
 )
 
 func main() {
 	ctx := context.Background()
 
-	store, err := openUserStore()
+	cfg, err := db.LoadConfig(ctx)
 	if err != nil {
-		log.Fatalf("database: %v", err)
+		log.Fatalf("database config: %v", err)
 	}
+
+	if err := db.RunMigrations(ctx, cfg.ConnString); err != nil {
+		log.Fatalf("database migrate: %v", err)
+	}
+
+	pool, err := db.NewPool(ctx, cfg)
+	if err != nil {
+		log.Fatalf("database pool: %v", err)
+	}
+	defer pool.Close()
+
+	store := openUserStore(pool)
 	defer store.close()
 
 	authService, err := newAuthService(ctx)

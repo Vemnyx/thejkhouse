@@ -11,7 +11,7 @@ ExecStart=/opt/thejkhouse/thejkhouse-api
 Restart=always
 RestartSec=5
 Environment=PORT=8080
-Environment=DATABASE_PATH=/opt/thejkhouse/data/thejkhouse.db
+Environment=DATABASE_URL_SECRET=projects/the-jk-house/secrets/database_url/versions/latest
 Environment=FIREBASE_PROJECT_ID=the-jk-house
 
 [Install]
