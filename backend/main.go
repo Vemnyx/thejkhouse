@@ -60,12 +60,18 @@ func main() {
 	}
 	defer imageUploader.close()
 
+	emailClient, err := newEmailClient(ctx)
+	if err != nil {
+		log.Fatal("email client", "error", err)
+	}
+
 	log.Info("database connection established")
 
 	server := &apiServer{
 		store:  store,
 		auth:   authService,
 		images: imageUploader,
+		email:  emailClient,
 	}
 
 	mux := http.NewServeMux()
@@ -74,6 +80,7 @@ func main() {
 	mux.HandleFunc("/auth/login", server.handleAuthLogin)
 	mux.HandleFunc("/auth/signup", server.handleAuthSignup)
 	mux.HandleFunc("/auth/session", server.handleAuthSession)
+	mux.HandleFunc("/emails", server.handleEmails)
 	mux.HandleFunc("/images", server.handleImages)
 	mux.HandleFunc("/images/", server.handleImageByID)
 	mux.HandleFunc("/users/register", server.handleRegister)

@@ -26,6 +26,16 @@ export type ImageRecord = {
   uploadedAt: string;
 };
 
+export type SendEmailPayload = {
+  to: string;
+  subject: string;
+  message: string;
+};
+
+export type SendEmailResponse = {
+  id: string;
+};
+
 async function publicFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     ...init,
@@ -84,7 +94,7 @@ export function getSession(token: string) {
 }
 
 export function listImages(token: string) {
-  return apiFetch<ImageRecord[]>("/images", token);
+  return apiFetch<ImageRecord[] | null>("/images", token).then((images) => images ?? []);
 }
 
 export function uploadImage(token: string, file: File, date: string) {
@@ -103,5 +113,12 @@ export function uploadImage(token: string, file: File, date: string) {
 export function deleteImage(token: string, id: number) {
   return apiFetch<Record<string, never>>(`/images/${id}`, token, {
     method: "DELETE",
+  });
+}
+
+export function sendHostEmail(token: string, payload: SendEmailPayload) {
+  return apiFetch<SendEmailResponse>("/emails", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }

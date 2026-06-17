@@ -107,7 +107,7 @@ func (s *userStore) listImages(ctx context.Context) ([]Image, error) {
 	}
 	defer rows.Close()
 
-	var images []Image
+	images := make([]Image, 0)
 	for rows.Next() {
 		var image Image
 		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.UploadedAt); err != nil {

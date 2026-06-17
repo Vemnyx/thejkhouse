@@ -12,6 +12,7 @@ type apiServer struct {
 	store  *userStore
 	auth   *authService
 	images *imageUploader
+	email  *emailClient
 }
 
 func (s *apiServer) handleHealth(w http.ResponseWriter, r *http.Request) {

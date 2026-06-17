@@ -1,16 +1,21 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { ImageRecord, deleteImage, listImages, uploadImage } from "../lib/api";
+import { ImageRecord, deleteImage, listImages, sendHostEmail, uploadImage } from "../lib/api";
 
 export default function HostPage() {
   const { appUser, firebaseUser } = useAuth();
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [emailTo, setEmailTo] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [emailSuccess, setEmailSuccess] = useState("");
   const [error, setError] = useState("");
   const [loadingImages, setLoadingImages] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -94,6 +99,35 @@ export default function HostPage() {
     }
   };
 
+  const handleSendEmail = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setEmailSuccess("");
+
+    if (!firebaseUser) {
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      await sendHostEmail(token, {
+        to: emailTo.trim(),
+        subject: emailSubject.trim(),
+        message: emailMessage.trim(),
+      });
+      setEmailSuccess("Email sent.");
+      setEmailTo("");
+      setEmailSubject("");
+      setEmailMessage("");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to send email";
+      setError(message);
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   return (
     <main className="page host-page">
       <div className="page-vignette" aria-hidden="true" />
@@ -108,36 +142,79 @@ export default function HostPage() {
         <p className="eyebrow">Host Dashboard</p>
         <h1 className="title title-small">Image Library</h1>
 
-        <form className="host-upload-form" onSubmit={handleUpload}>
-          <label className="auth-field">
-            <span>Image</span>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              required
-            />
-          </label>
-
-          <label className="auth-field">
-            <span>Date</span>
-            <input
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-            />
-          </label>
-
-          <button className="auth-submit" type="submit" disabled={submitting}>
-            {submitting ? "Uploading..." : "Upload Image"}
-          </button>
-        </form>
-
-        {error ? <p className="auth-error">{error}</p> : null}
-
         <div className="host-actions">
           <Link to="/">Back to dashboard</Link>
         </div>
+
+        <section className="host-section">
+          <h2 className="host-section-title">Send Email</h2>
+          <form className="host-email-form" onSubmit={handleSendEmail}>
+            <label className="auth-field">
+              <span>To</span>
+              <input
+                type="email"
+                value={emailTo}
+                onChange={(event) => setEmailTo(event.target.value)}
+                placeholder="guest@example.com"
+                required
+              />
+            </label>
+
+            <label className="auth-field">
+              <span>Subject</span>
+              <input
+                value={emailSubject}
+                onChange={(event) => setEmailSubject(event.target.value)}
+                required
+              />
+            </label>
+
+            <label className="auth-field host-message-field">
+              <span>Message</span>
+              <textarea
+                value={emailMessage}
+                onChange={(event) => setEmailMessage(event.target.value)}
+                rows={6}
+                required
+              />
+            </label>
+
+            <button className="auth-submit" type="submit" disabled={sendingEmail}>
+              {sendingEmail ? "Sending..." : "Send Email"}
+            </button>
+          </form>
+          {emailSuccess ? <p className="host-success">{emailSuccess}</p> : null}
+        </section>
+
+        <section className="host-section">
+          <h2 className="host-section-title">Upload Images</h2>
+          <form className="host-upload-form" onSubmit={handleUpload}>
+            <label className="auth-field">
+              <span>Image</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                required
+              />
+            </label>
+
+            <label className="auth-field">
+              <span>Date</span>
+              <input
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+              />
+            </label>
+
+            <button className="auth-submit" type="submit" disabled={submitting}>
+              {submitting ? "Uploading..." : "Upload Image"}
+            </button>
+          </form>
+
+          {error ? <p className="auth-error">{error}</p> : null}
+        </section>
 
         {loadingImages ? (
           <p className="loading-text">Loading images...</p>
