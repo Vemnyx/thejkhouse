@@ -32,6 +32,7 @@ jobs:
         run: |
           go mod tidy
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o thejkhouse-api .
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o thejkhouse-migrate ./cmd/migrate
 
       - name: Build frontend
         working-directory: frontend
@@ -54,14 +55,20 @@ jobs:
           VM_USER: deploy
         run: |
           scp -i ~/.ssh/deploy_key backend/thejkhouse-api "${VM_USER}@${VM_HOST}:/tmp/thejkhouse-api"
+          scp -i ~/.ssh/deploy_key backend/thejkhouse-migrate "${VM_USER}@${VM_HOST}:/tmp/thejkhouse-migrate"
           scp -i ~/.ssh/deploy_key -r frontend/dist/* "${VM_USER}@${VM_HOST}:/tmp/thejkhouse-frontend/"
           scp -i ~/.ssh/deploy_key deploy/nginx/thejkhouse.conf "${VM_USER}@${VM_HOST}:/tmp/thejkhouse.conf"
           scp -i ~/.ssh/deploy_key deploy/systemd/thejkhouse-api.service "${VM_USER}@${VM_HOST}:/tmp/thejkhouse-api.service"
 
           ssh -i ~/.ssh/deploy_key "${VM_USER}@${VM_HOST}" << 'EOF'
           set -euo pipefail
-          mkdir -p /opt/thejkhouse /var/www/thejkhouse
+          mkdir -p /opt/thejkhouse/logs /var/www/thejkhouse
           install -m 755 /tmp/thejkhouse-api /opt/thejkhouse/thejkhouse-api
+          install -m 755 /tmp/thejkhouse-migrate /opt/thejkhouse/thejkhouse-migrate
+          sudo chown -R deploy:deploy /opt/thejkhouse/logs
+          DATABASE_URL_SECRET=projects/the-jk-house/secrets/database_url/versions/latest \
+          FIREBASE_PROJECT_ID=the-jk-house \
+          /opt/thejkhouse/thejkhouse-migrate
           sudo rsync -a --delete --chown=www-data:deploy /tmp/thejkhouse-frontend/ /var/www/thejkhouse/
           sudo install -m 644 /tmp/thejkhouse.conf /etc/nginx/sites-available/thejkhouse
           sudo install -m 644 /tmp/thejkhouse-api.service /etc/systemd/system/thejkhouse-api.service
@@ -69,5 +76,5 @@ jobs:
           sudo systemctl daemon-reload
           sudo systemctl restart thejkhouse-api
           sudo systemctl reload nginx
-          rm -rf /tmp/thejkhouse-frontend /tmp/thejkhouse-api /tmp/thejkhouse.conf /tmp/thejkhouse-api.service
+          rm -rf /tmp/thejkhouse-frontend /tmp/thejkhouse-api /tmp/thejkhouse-migrate /tmp/thejkhouse.conf /tmp/thejkhouse-api.service
           EOF

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/Vemnyx/thejkhouse/backend/log"
 )
 
 type apiServer struct {
@@ -23,12 +25,14 @@ func (s *apiServer) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	token, err := s.auth.verifyRequestToken(r)
 	if err != nil {
+		log.Error("register auth", "error", err)
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
 	var payload registerRequest
 	if err := readJSON(r, &payload); err != nil {
+		log.Error("register decode", "error", err)
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
@@ -52,10 +56,12 @@ func (s *apiServer) handleRegister(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, "user already exists")
 			return
 		}
+		log.Error("register create user", "error", err, "email", email)
 		writeError(w, http.StatusInternalServerError, "failed to create user")
 		return
 	}
 
+	log.Info("user registered", "user_id", user.ID, "email", user.Email)
 	writeJSONStatus(w, http.StatusCreated, user)
 }
 
@@ -67,6 +73,7 @@ func (s *apiServer) handleMe(w http.ResponseWriter, r *http.Request) {
 
 	token, err := s.auth.verifyRequestToken(r)
 	if err != nil {
+		log.Error("me auth", "error", err)
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
@@ -77,6 +84,7 @@ func (s *apiServer) handleMe(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "user not found")
 			return
 		}
+		log.Error("me load user", "error", err, "firebase_uid", token.UID)
 		writeError(w, http.StatusInternalServerError, "failed to load user")
 		return
 	}

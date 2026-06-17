@@ -7,10 +7,12 @@ Type=simple
 User=deploy
 Group=deploy
 WorkingDirectory=/opt/thejkhouse
+ExecStartPre=/opt/thejkhouse/thejkhouse-migrate
 ExecStart=/opt/thejkhouse/thejkhouse-api
 Restart=always
 RestartSec=5
 Environment=PORT=8080
+# Logs to /opt/thejkhouse/logs/app.log by default (see BACKEND_LOG_FILE).
 Environment=DATABASE_URL_SECRET=projects/the-jk-house/secrets/database_url/versions/latest
 Environment=FIREBASE_PROJECT_ID=the-jk-house
 

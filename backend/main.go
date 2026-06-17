@@ -2,28 +2,47 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
 
+	"github.com/Vemnyx/thejkhouse/backend/internal/app"
 	"github.com/Vemnyx/thejkhouse/backend/internal/db"
+	"github.com/Vemnyx/thejkhouse/backend/log"
 )
 
+func listenAddr() string {
+	p := strings.TrimSpace(os.Getenv("PORT"))
+	if p == "" {
+		return ":8080"
+	}
+	if strings.HasPrefix(p, ":") {
+		return p
+	}
+	return ":" + p
+}
+
 func main() {
+	closeLog := app.InitLogging()
+	defer closeLog()
+
 	ctx := context.Background()
 
 	cfg, err := db.LoadConfig(ctx)
 	if err != nil {
-		log.Fatalf("database config: %v", err)
+		log.Fatal("database config", "error", err)
 	}
 
 	if err := db.RunMigrations(ctx, cfg.ConnString); err != nil {
-		log.Fatalf("database migrate: %v", err)
+		log.Fatal("database migrate", "error", err)
 	}
 
 	pool, err := db.NewPool(ctx, cfg)
 	if err != nil {
-		log.Fatalf("database pool: %v", err)
+		log.Fatal("database pool", "error", err)
 	}
 	defer pool.Close()
 
@@ -32,8 +51,10 @@ func main() {
 
 	authService, err := newAuthService(ctx)
 	if err != nil {
-		log.Fatalf("firebase auth: %v", err)
+		log.Fatal("firebase auth", "error", err)
 	}
+
+	log.Info("database connection established")
 
 	server := &apiServer{
 		store: store,
@@ -45,11 +66,31 @@ func main() {
 	mux.HandleFunc("/users/register", server.handleRegister)
 	mux.HandleFunc("/users/me", server.handleMe)
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	addr := listenAddr()
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
-	log.Printf("listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	go func() {
+		log.Info("server listening", "addr", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal("listen", "error", err)
+		}
+	}()
+
+	sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	<-sigCtx.Done()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Fatal("shutdown", "error", err)
+	}
+	log.Info("server stopped")
 }

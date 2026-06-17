@@ -8,7 +8,7 @@ apt-get install -y nginx certbot python3-certbot-nginx curl
 
 id deploy &>/dev/null || useradd -m -s /bin/bash deploy
 
-mkdir -p /opt/thejkhouse /var/www/thejkhouse /home/deploy/.ssh
+mkdir -p /opt/thejkhouse /opt/thejkhouse/logs /var/www/thejkhouse /home/deploy/.ssh
 chmod 700 /home/deploy/.ssh
 chown -R deploy:deploy /opt/thejkhouse /home/deploy
 
@@ -58,6 +58,7 @@ Type=simple
 User=deploy
 Group=deploy
 WorkingDirectory=/opt/thejkhouse
+ExecStartPre=/opt/thejkhouse/thejkhouse-migrate
 ExecStart=/opt/thejkhouse/thejkhouse-api
 Restart=always
 RestartSec=5
