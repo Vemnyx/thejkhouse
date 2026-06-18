@@ -1,5 +1,5 @@
 import { type DragEvent, type FormEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
 import { AppUser, ImageRecord, PartyRecord, deleteImage, deleteUser, getHomepage, listImages, listParties, listUsers, sendHostEmail, updateHomepage, uploadImage } from "../lib/api";
@@ -18,7 +18,8 @@ type CropBox = {
 const homepageCropSize = 1200;
 
 export default function HostPage() {
-  const { appUser, firebaseUser } = useAuth();
+  const navigate = useNavigate();
+  const { appUser, firebaseUser, logout } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const homepageFileInputRef = useRef<HTMLInputElement | null>(null);
   const cropStageRef = useRef<HTMLDivElement | null>(null);
@@ -48,6 +49,8 @@ export default function HostPage() {
   const [homepageImageModalOpen, setHomepageImageModalOpen] = useState(false);
   const [draggingImage, setDraggingImage] = useState(false);
   const [draggingHomepageImage, setDraggingHomepageImage] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -130,6 +133,15 @@ export default function HostPage() {
   if (appUser?.role !== "host") {
     return <Navigate to="/" replace />;
   }
+
+  const fullName = [appUser?.firstName, appUser?.lastName].filter(Boolean).join(" ") || appUser?.email || "Account";
+
+  const selectHostTab = (tab: HostTab) => {
+    setActiveTab(tab);
+    setMobileMenuOpen(false);
+    setProfileOpen(false);
+    setError("");
+  };
 
   const handleUpload = async (event: FormEvent) => {
     event.preventDefault();
@@ -348,7 +360,7 @@ export default function HostPage() {
       return;
     }
 
-    const size = Math.min(bounds.width, bounds.height) * 0.62;
+    const size = Math.min(bounds.width, bounds.height);
     setCropBox({
       size,
       x: (bounds.width - size) / 2,
@@ -374,10 +386,15 @@ export default function HostPage() {
       return;
     }
 
+    const bounds = cropStageRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return;
+    }
+
     event.currentTarget.setPointerCapture(event.pointerId);
     cropDragRef.current = {
-      offsetX: event.clientX - cropBox.x,
-      offsetY: event.clientY - cropBox.y,
+      offsetX: event.clientX - bounds.left - cropBox.x,
+      offsetY: event.clientY - bounds.top - cropBox.y,
     };
   };
 
@@ -472,9 +489,9 @@ export default function HostPage() {
   };
 
   return (
-    <main className="page host-page">
+    <main className="page app-shell-page">
       <div className="page-vignette" aria-hidden="true" />
-      <section className="gothic-card host-card">
+      <section className="gothic-card app-shell-card">
         <div className="card-frame" aria-hidden="true">
           <span className="corner corner-tl" />
           <span className="corner corner-tr" />
@@ -482,51 +499,84 @@ export default function HostPage() {
           <span className="corner corner-br" />
         </div>
 
-        <div className="host-return-row">
-          <Link to="/">Return to dashboard</Link>
-        </div>
+        <header className="app-topbar">
+          <button
+            className="menu-toggle"
+            type="button"
+            aria-label="Open navigation"
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen((open) => !open)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
 
-        <div className="host-tabs" role="tablist" aria-label="Host dashboard sections">
-          <button
-            className={activeTab === "images" ? "host-tab active" : "host-tab"}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "images"}
-            onClick={() => setActiveTab("images")}
-          >
-            Images
-          </button>
-          <button
-            className={activeTab === "email" ? "host-tab active" : "host-tab"}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "email"}
-            onClick={() => setActiveTab("email")}
-          >
-            Email
-          </button>
-          <button
-            className={activeTab === "homepage" ? "host-tab active" : "host-tab"}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "homepage"}
-            onClick={() => setActiveTab("homepage")}
-          >
-            Homepage
-          </button>
-          <button
-            className={activeTab === "users" ? "host-tab active" : "host-tab"}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "users"}
-            onClick={() => setActiveTab("users")}
-          >
-            Users
-          </button>
-        </div>
+          <nav className={mobileMenuOpen ? "main-tabs open" : "main-tabs"} aria-label="Host sections">
+            <button
+              className={activeTab === "images" ? "main-tab active" : "main-tab"}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "images"}
+              onClick={() => selectHostTab("images")}
+            >
+              Images
+            </button>
+            <button
+              className={activeTab === "email" ? "main-tab active" : "main-tab"}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "email"}
+              onClick={() => selectHostTab("email")}
+            >
+              Email
+            </button>
+            <button
+              className={activeTab === "homepage" ? "main-tab active" : "main-tab"}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "homepage"}
+              onClick={() => selectHostTab("homepage")}
+            >
+              Homepage
+            </button>
+            <button
+              className={activeTab === "users" ? "main-tab active" : "main-tab"}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "users"}
+              onClick={() => selectHostTab("users")}
+            >
+              Users
+            </button>
+          </nav>
 
-        {activeTab === "images" ? (
-          <section className="host-panel" role="tabpanel">
+          <div className="profile-menu">
+            <button
+              className="profile-trigger"
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={profileOpen}
+              onClick={() => setProfileOpen((open) => !open)}
+            >
+              {fullName}
+            </button>
+            {profileOpen ? (
+              <div className="profile-dropdown" role="menu">
+                <button type="button" role="menuitem" onClick={() => navigate("/")}>
+                  Return to dashboard
+                </button>
+                <button type="button" role="menuitem" onClick={() => logout()}>
+                  Log Out
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </header>
+
+        <section className="main-content">
+          {activeTab === "images" ? (
+            <section className="host-panel" role="tabpanel">
             <div className="host-panel-header">
               <button className="auth-submit" type="button" onClick={openUploadModal}>
                 Add New Image
@@ -567,9 +617,9 @@ export default function HostPage() {
                 ))}
               </div>
             )}
-          </section>
-        ) : activeTab === "homepage" ? (
-          <section className="host-panel" role="tabpanel">
+            </section>
+          ) : activeTab === "homepage" ? (
+            <section className="host-panel" role="tabpanel">
             <form className="homepage-editor" onSubmit={handleSaveHomepage}>
               <label className="auth-field host-message-field">
                 <span>Homepage HTML</span>
@@ -600,9 +650,9 @@ export default function HostPage() {
                 />
               </div>
             </form>
-          </section>
-        ) : activeTab === "users" ? (
-          <section className="host-panel" role="tabpanel">
+            </section>
+          ) : activeTab === "users" ? (
+            <section className="host-panel" role="tabpanel">
             {error ? <p className="auth-error">{error}</p> : null}
             <div className="host-table-wrap">
               <table className="host-table">
@@ -644,9 +694,9 @@ export default function HostPage() {
                 </tbody>
               </table>
             </div>
-          </section>
-        ) : (
-          <section className="host-panel" role="tabpanel">
+            </section>
+          ) : (
+            <section className="host-panel" role="tabpanel">
             <div className="host-panel-header">
               <div>
                 <h2 className="host-section-title">Send Email</h2>
@@ -691,8 +741,9 @@ export default function HostPage() {
             </form>
             {emailSuccess ? <p className="host-success">{emailSuccess}</p> : null}
             {error ? <p className="auth-error">{error}</p> : null}
-          </section>
-        )}
+            </section>
+          )}
+        </section>
 
         {uploadModalOpen ? (
           <div className="modal-backdrop" role="presentation" onMouseDown={closeUploadModal}>
@@ -862,6 +913,7 @@ export default function HostPage() {
                           onPointerDown={handleCropPointerDown}
                           onPointerMove={handleCropPointerMove}
                           onPointerUp={handleCropPointerUp}
+                          onPointerCancel={handleCropPointerUp}
                         />
                       ) : null}
                       {submittingHomepageImage ? (

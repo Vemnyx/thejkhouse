@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import BirthdaySelect from "../components/BirthdaySelect";
+import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
 import { HomepageContent, getHomepage } from "../lib/api";
 
@@ -27,7 +28,6 @@ export default function HomePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [homepage, setHomepage] = useState<HomepageContent>({ html: "", images: [] });
-  const [homepageImageIndex, setHomepageImageIndex] = useState(0);
   const [homepageLoading, setHomepageLoading] = useState(true);
 
   const fullName = [appUser?.firstName, appUser?.lastName].filter(Boolean).join(" ") || appUser?.email || "Account";
@@ -49,7 +49,6 @@ export default function HomePage() {
             html: content.html,
             images: content.images ?? [],
           });
-          setHomepageImageIndex(0);
         }
       } catch {
         if (!cancelled) {
@@ -68,18 +67,6 @@ export default function HomePage() {
       cancelled = true;
     };
   }, [firebaseUser]);
-
-  useEffect(() => {
-    if (homepage.images.length < 2) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setHomepageImageIndex((current) => (current + 1) % homepage.images.length);
-    }, 5000);
-
-    return () => window.clearInterval(interval);
-  }, [homepage.images.length]);
 
   const selectView = (view: MainView) => {
     setActiveView(view);
@@ -221,10 +208,7 @@ export default function HomePage() {
               />
               {homepage.images.length > 0 ? (
                 <aside className="homepage-rotator" aria-label="Homepage images">
-                  <img
-                    src={homepage.images[homepageImageIndex]?.imageUrl}
-                    alt="The JK House"
-                  />
+                  <BouncingImages images={homepage.images} alt="The JK House" className="homepage-bouncer" />
                 </aside>
               ) : (
                 <aside className="homepage-empty">

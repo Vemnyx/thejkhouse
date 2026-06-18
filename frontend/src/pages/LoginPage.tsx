@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import BirthdaySelect from "../components/BirthdaySelect";
+import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
 import { ApiError, ImageRecord, getHomepageImages } from "../lib/api";
 
@@ -26,7 +27,6 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [resendingConfirmation, setResendingConfirmation] = useState(false);
   const [introImages, setIntroImages] = useState<ImageRecord[]>([]);
-  const [introImageIndex, setIntroImageIndex] = useState(0);
   const [introDismissed, setIntroDismissed] = useState(() => Boolean(searchParams.get("confirm_signup_token")));
   const confirmationToken = searchParams.get("confirm_signup_token");
 
@@ -49,18 +49,6 @@ export default function LoginPage() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (introImages.length < 2 || introDismissed) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setIntroImageIndex((current) => (current + 1) % introImages.length);
-    }, 5000);
-
-    return () => window.clearInterval(interval);
-  }, [introDismissed, introImages.length]);
 
   useEffect(() => {
     if (!confirmationToken || appUser || confirmingSignup || confirmationTokenAttempted === confirmationToken) {
@@ -180,7 +168,7 @@ export default function LoginPage() {
     <>
     {showIntroOverlay ? (
       <section className="login-image-overlay" aria-label="The JK House photos">
-        <img src={introImages[introImageIndex]?.imageUrl} alt="The JK House" />
+        <BouncingImages images={introImages} alt="The JK House" className="login-bouncer" speed={128} />
         <button type="button" onClick={() => setIntroDismissed(true)}>
           Continue to login
         </button>
