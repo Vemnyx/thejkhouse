@@ -9,16 +9,31 @@ type BouncingImagesProps = {
   alt: string;
   className?: string;
   speed?: number;
+  mobileSpeed?: number;
 };
 
-export default function BouncingImages({ images, alt, className = "", speed = 68 }: BouncingImagesProps) {
+export default function BouncingImages({ images, alt, className = "", speed = 78, mobileSpeed = 56 }: BouncingImagesProps) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const frameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
   const positionRef = useRef({ x: 0, y: 0 });
   const velocityRef = useRef({ x: speed * 0.78, y: speed * 0.62 });
+  const [isMobile, setIsMobile] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
+  const effectiveSpeed = isMobile ? mobileSpeed : speed;
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 480px)");
+    const syncMobileState = () => setIsMobile(media.matches);
+
+    syncMobileState();
+    media.addEventListener("change", syncMobileState);
+
+    return () => {
+      media.removeEventListener("change", syncMobileState);
+    };
+  }, []);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -28,6 +43,12 @@ export default function BouncingImages({ images, alt, className = "", speed = 68
     }
 
     let mounted = true;
+    const directionX = Math.sign(velocityRef.current.x) || 1;
+    const directionY = Math.sign(velocityRef.current.y) || 1;
+    velocityRef.current = {
+      x: directionX * effectiveSpeed * 0.78,
+      y: directionY * effectiveSpeed * 0.62,
+    };
 
     const imageSize = () => ({
       width: image.offsetWidth,
@@ -105,7 +126,7 @@ export default function BouncingImages({ images, alt, className = "", speed = 68
       }
       lastTimeRef.current = null;
     };
-  }, [images.length, speed]);
+  }, [effectiveSpeed, images.length]);
 
   if (images.length === 0) {
     return null;

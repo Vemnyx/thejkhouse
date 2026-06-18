@@ -932,13 +932,17 @@ body {
   inset: 0;
   z-index: 20;
   display: grid;
-  place-items: center;
+  align-items: start;
+  justify-items: center;
+  overflow-y: auto;
   padding: 1.5rem;
   background: rgba(0, 0, 0, 0.72);
 }
 
 .upload-modal {
   width: min(100%, 34rem);
+  max-height: calc(100dvh - 3rem);
+  overflow-y: auto;
 }
 
 .confirmation-modal {
@@ -1029,7 +1033,7 @@ body {
   justify-self: center;
   border: 1px solid rgba(232, 120, 143, 0.24);
   background: rgba(0, 0, 0, 0.35);
-  touch-action: none;
+  touch-action: pan-y;
 }
 
 .crop-stage img {
