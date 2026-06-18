@@ -712,9 +712,9 @@ body {
 
 .homepage-bouncer .bouncing-image {
   width: auto;
-  max-width: min(72%, 26rem);
+  max-width: min(92%, 36rem);
   height: auto;
-  max-height: 82%;
+  max-height: 96%;
   object-fit: contain;
   filter: drop-shadow(0 0 34px rgba(232, 120, 143, 0.1));
   mask-image: radial-gradient(ellipse at center, #000 34%, rgba(0, 0, 0, 0.76) 54%, rgba(0, 0, 0, 0.28) 74%, transparent 100%);
