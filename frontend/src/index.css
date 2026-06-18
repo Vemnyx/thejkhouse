@@ -474,7 +474,7 @@ body {
 .profile-dropdown button,
 .menu-toggle {
   border: 0;
-  border-radius: 999px;
+  border-radius: 0.7rem;
   background:
     radial-gradient(circle at 50% 0%, rgba(232, 120, 143, 0.1), transparent 68%),
     rgba(3, 3, 3, 0.28);
@@ -626,7 +626,24 @@ body {
   color: var(--rose-pale);
 }
 
-.homepage-rotator,
+.homepage-rotator {
+  display: grid;
+  place-items: center;
+  height: clamp(22rem, 48vw, 34rem);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.homepage-rotator img {
+  width: auto;
+  max-width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 34px rgba(232, 120, 143, 0.1));
+  mask-image: radial-gradient(ellipse at center, #000 34%, rgba(0, 0, 0, 0.76) 54%, rgba(0, 0, 0, 0.28) 74%, transparent 100%);
+}
+
 .homepage-empty {
   display: grid;
   place-items: center;
@@ -640,17 +657,6 @@ body {
     inset 0 0 0 1px rgba(232, 120, 143, 0.08),
     0 0 38px rgba(232, 120, 143, 0.07),
     0 0 70px rgba(0, 0, 0, 0.42);
-}
-
-.homepage-rotator img {
-  width: auto;
-  max-width: 100%;
-  height: 100%;
-  object-fit: contain;
-  mask-image: radial-gradient(ellipse at center, #000 42%, rgba(0, 0, 0, 0.72) 64%, transparent 100%);
-}
-
-.homepage-empty {
   color: var(--ink-muted);
   text-align: center;
 }
@@ -690,7 +696,7 @@ body {
 
 .host-tab {
   border: 0;
-  border-radius: 999px;
+  border-radius: 0.7rem;
   background:
     radial-gradient(circle at 50% 0%, rgba(232, 120, 143, 0.1), transparent 68%),
     rgba(3, 3, 3, 0.28);
