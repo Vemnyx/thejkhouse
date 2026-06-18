@@ -181,6 +181,16 @@ export function updateHomepage(token: string, html: string) {
   });
 }
 
+export function listUsers(token: string) {
+  return apiFetch<AppUser[] | null>("/users", token).then((users) => users ?? []);
+}
+
+export function deleteUser(token: string, id: number) {
+  return apiFetch<Record<string, never>>(`/users/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
 export function uploadImage(token: string, file: File, date: string, options: UploadImageOptions = {}) {
   const formData = new FormData();
   formData.append("image", file);

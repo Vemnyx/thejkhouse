@@ -228,6 +228,30 @@ body {
   text-shadow: 0 2px 16px rgba(0, 0, 0, 0.9);
 }
 
+.confirmation-loading-page {
+  overflow: hidden;
+}
+
+.confirmation-spinner {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 4rem;
+  height: 4rem;
+  border: 2px solid rgba(232, 120, 143, 0.18);
+  border-top-color: var(--rose-pale);
+  border-right-color: var(--gold);
+  border-radius: 999px;
+  animation: spin 0.9s linear infinite;
+  box-shadow: 0 0 32px rgba(232, 120, 143, 0.18);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .auth-form {
   display: grid;
   gap: 1rem;
@@ -701,6 +725,42 @@ body {
   min-height: 12rem;
 }
 
+.host-table-wrap {
+  overflow-x: auto;
+}
+
+.host-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 46rem;
+  color: var(--ink);
+}
+
+.host-table th,
+.host-table td {
+  border-bottom: 1px solid rgba(232, 120, 143, 0.16);
+  padding: 0.85rem 0.75rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.host-table th {
+  color: var(--gold);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.host-table td {
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+.host-table td:first-child {
+  color: var(--ink);
+}
+
 .host-upload-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem) auto;
@@ -803,6 +863,26 @@ body {
   width: min(100%, 34rem);
 }
 
+.confirmation-modal {
+  width: min(100%, 30rem);
+  display: grid;
+  gap: 1rem;
+  text-align: center;
+}
+
+.confirmation-modal p {
+  margin: 0;
+  color: var(--ink-muted);
+  line-height: 1.7;
+}
+
+.confirmation-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -838,6 +918,30 @@ body {
 .drop-zone.dragging {
   border-color: var(--rose-glow);
   background: rgba(156, 45, 69, 0.25);
+}
+
+.upload-preview {
+  position: relative;
+  width: min(100%, 20rem);
+  overflow: hidden;
+  border: 1px solid rgba(232, 120, 143, 0.24);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.upload-preview img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.upload-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
 }
 
 .drop-zone p,

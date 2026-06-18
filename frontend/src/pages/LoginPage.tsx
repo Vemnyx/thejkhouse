@@ -28,6 +28,7 @@ export default function LoginPage() {
   const [introImages, setIntroImages] = useState<ImageRecord[]>([]);
   const [introImageIndex, setIntroImageIndex] = useState(0);
   const [introDismissed, setIntroDismissed] = useState(() => Boolean(searchParams.get("confirm_signup_token")));
+  const confirmationToken = searchParams.get("confirm_signup_token");
 
   useEffect(() => {
     let cancelled = false;
@@ -62,16 +63,15 @@ export default function LoginPage() {
   }, [introDismissed, introImages.length]);
 
   useEffect(() => {
-    const token = searchParams.get("confirm_signup_token");
-    if (!token || appUser || confirmingSignup || confirmationTokenAttempted === token) {
+    if (!confirmationToken || appUser || confirmingSignup || confirmationTokenAttempted === confirmationToken) {
       return;
     }
 
     setConfirmingSignup(true);
-    setConfirmationTokenAttempted(token);
+    setConfirmationTokenAttempted(confirmationToken);
     setError("");
     setSuccess("");
-    confirmSignup(token)
+    confirmSignup(confirmationToken)
       .then(() => {
         navigate("/", { replace: true });
       })
@@ -82,7 +82,7 @@ export default function LoginPage() {
       .finally(() => {
         setConfirmingSignup(false);
       });
-  }, [appUser, confirmSignup, confirmationTokenAttempted, confirmingSignup, navigate, searchParams]);
+  }, [appUser, confirmSignup, confirmationToken, confirmationTokenAttempted, confirmingSignup, navigate]);
 
   if (!loading && appUser) {
     return <Navigate to="/" replace />;
@@ -164,7 +164,17 @@ export default function LoginPage() {
 
   const passwordInputType = showPassword ? "text" : "password";
 
+  const showingConfirmationLoading = Boolean(confirmationToken && confirmingSignup);
   const showIntroOverlay = !introDismissed && introImages.length > 0;
+
+  if (showingConfirmationLoading) {
+    return (
+      <main className="page confirmation-loading-page">
+        <div className="page-vignette" aria-hidden="true" />
+        <div className="confirmation-spinner" aria-label="Confirming account" />
+      </main>
+    );
+  }
 
   return (
     <>

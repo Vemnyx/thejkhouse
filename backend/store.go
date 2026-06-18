@@ -76,6 +76,66 @@ func (s *userStore) getUserByFirebaseUID(ctx context.Context, firebaseUID string
 	return &user, nil
 }
 
+func (s *userStore) getUserByID(ctx context.Context, id int64) (*User, error) {
+	var user User
+	err := s.pool.QueryRow(
+		ctx,
+		`SELECT id, firebase_uid, email, first_name, last_name, birthday, role, created_at
+		 FROM users WHERE id = $1`,
+		id,
+	).Scan(
+		&user.ID,
+		&user.FirebaseUID,
+		&user.Email,
+		&user.FirstName,
+		&user.LastName,
+		&user.Birthday,
+		&user.Role,
+		&user.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (s *userStore) listUsers(ctx context.Context) ([]User, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT id, firebase_uid, email, first_name, last_name, birthday, role, created_at
+		 FROM users
+		 ORDER BY created_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := make([]User, 0)
+	for rows.Next() {
+		var user User
+		if err := rows.Scan(
+			&user.ID,
+			&user.FirebaseUID,
+			&user.Email,
+			&user.FirstName,
+			&user.LastName,
+			&user.Birthday,
+			&user.Role,
+			&user.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func (s *userStore) updateUserProfile(ctx context.Context, firebaseUID, firstName, lastName string, birthday *time.Time) (*User, error) {
 	var user User
 	err := s.pool.QueryRow(
@@ -103,6 +163,18 @@ func (s *userStore) updateUserProfile(ctx context.Context, firebaseUID, firstNam
 	}
 
 	return &user, nil
+}
+
+func (s *userStore) deleteUser(ctx context.Context, id int64) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return nil
 }
 
 func (s *userStore) upsertPendingSignup(ctx context.Context, firebaseUID, email, firstName, lastName string, birthday *time.Time, role Role, tokenHash []byte, expiresAt time.Time) (*PendingSignup, error) {

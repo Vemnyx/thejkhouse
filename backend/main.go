@@ -88,6 +88,8 @@ func main() {
 	mux.HandleFunc("/images", server.handleImages)
 	mux.HandleFunc("/images/", server.handleImageByID)
 	mux.HandleFunc("/parties", server.handleParties)
+	mux.HandleFunc("/users", server.handleUsers)
+	mux.HandleFunc("/users/", server.handleUserByID)
 	mux.HandleFunc("/users/register", server.handleRegister)
 	mux.HandleFunc("/users/me", server.handleMe)
 

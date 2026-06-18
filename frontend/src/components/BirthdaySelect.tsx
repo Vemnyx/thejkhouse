@@ -24,6 +24,15 @@ const currentYear = new Date().getFullYear();
 const years = Array.from({ length: currentYear - 1899 }, (_, index) => String(currentYear - index));
 
 export default function BirthdaySelect({ value, onChange }: BirthdaySelectProps) {
+  return <DateSelect label="Birthday" value={value} onChange={onChange} years={years} />;
+}
+
+export function ImageDateSelect({ value, onChange }: BirthdaySelectProps) {
+  const imageYears = Array.from({ length: 16 }, (_, index) => String(currentYear + 1 - index));
+  return <DateSelect label="Date" value={value} onChange={onChange} years={imageYears} />;
+}
+
+function DateSelect({ label, value, onChange, years }: BirthdaySelectProps & { label: string; years: string[] }) {
   const [initialYear = "", initialMonth = "", initialDay = ""] = value.split("-");
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
@@ -56,7 +65,7 @@ export default function BirthdaySelect({ value, onChange }: BirthdaySelectProps)
 
   return (
     <fieldset className="birthday-picker">
-      <legend>Birthday</legend>
+      <legend>{label}</legend>
       <label>
         <span>Month</span>
         <select value={month} onChange={(event) => updateBirthday(year, event.target.value, day || "01")} required>

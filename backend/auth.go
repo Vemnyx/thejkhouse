@@ -52,6 +52,14 @@ func (a *authService) createCustomToken(ctx context.Context, uid string) (string
 	return token, nil
 }
 
+func (a *authService) deleteUser(ctx context.Context, uid string) error {
+	err := a.client.DeleteUser(ctx, uid)
+	if err != nil && !auth.IsUserNotFound(err) {
+		return fmt.Errorf("delete firebase user: %w", err)
+	}
+	return nil
+}
+
 func (a *authService) verifyRequestToken(r *http.Request) (*auth.Token, error) {
 	header := r.Header.Get("Authorization")
 	if header == "" {
