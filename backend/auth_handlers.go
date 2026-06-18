@@ -20,6 +20,7 @@ type authSignupRequest struct {
 	Password  string `json:"password"`
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
+	Birthday  string `json:"birthday"`
 }
 
 type authSessionResponse struct {
@@ -130,6 +131,11 @@ func (s *apiServer) handleAuthSignup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "first name and last name are required")
 		return
 	}
+	birthday, err := parseBirthday(payload.Birthday)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	session, err := s.auth.identity.SignUp(r.Context(), email, password)
 	if err != nil {
@@ -146,7 +152,7 @@ func (s *apiServer) handleAuthSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	expiresAt := time.Now().UTC().Add(24 * time.Hour)
-	pending, err := s.store.upsertPendingSignup(r.Context(), session.LocalID, session.Email, firstName, lastName, RoleGuest, tokenHash, expiresAt)
+	pending, err := s.store.upsertPendingSignup(r.Context(), session.LocalID, session.Email, firstName, lastName, birthday, RoleGuest, tokenHash, expiresAt)
 	if err != nil {
 		if isUniqueViolation(err) {
 			writeError(w, http.StatusConflict, "account is already pending confirmation")
@@ -203,7 +209,7 @@ func (s *apiServer) handleAuthConfirmSignup(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	user, err := s.store.createUser(r.Context(), pending.FirebaseUID, pending.Email, pending.FirstName, pending.LastName, pending.Role)
+	user, err := s.store.createUser(r.Context(), pending.FirebaseUID, pending.Email, pending.FirstName, pending.LastName, pending.Birthday, pending.Role)
 	if err != nil {
 		if isUniqueViolation(err) {
 			writeError(w, http.StatusConflict, "user already exists")
@@ -266,7 +272,7 @@ func (s *apiServer) handleAuthResendConfirmation(w http.ResponseWriter, r *http.
 	}
 
 	expiresAt := time.Now().UTC().Add(24 * time.Hour)
-	pending, err = s.store.upsertPendingSignup(r.Context(), pending.FirebaseUID, pending.Email, pending.FirstName, pending.LastName, pending.Role, tokenHash, expiresAt)
+	pending, err = s.store.upsertPendingSignup(r.Context(), pending.FirebaseUID, pending.Email, pending.FirstName, pending.LastName, pending.Birthday, pending.Role, tokenHash, expiresAt)
 	if err != nil {
 		log.Error("auth resend update pending", "error", err, "email", email)
 		writeError(w, http.StatusInternalServerError, "failed to resend confirmation")

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import BirthdaySelect from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../lib/api";
 
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [birthday, setBirthday] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -57,6 +59,7 @@ export default function LoginPage() {
     setSuccess("");
     setAwaitingConfirmation(false);
     setConfirmPassword("");
+    setBirthday("");
     setShowPassword(false);
   };
 
@@ -69,6 +72,10 @@ export default function LoginPage() {
       setError("passwords do not match");
       return;
     }
+    if (mode === "signup" && !birthday) {
+      setError("birthday is required");
+      return;
+    }
 
     setSubmitting(true);
 
@@ -79,6 +86,7 @@ export default function LoginPage() {
         await signup(email, password, {
           firstName: firstName.trim(),
           lastName: lastName.trim(),
+          birthday,
         });
         setSuccess("Check your email to confirm your account.");
         setAwaitingConfirmation(true);
@@ -161,26 +169,30 @@ export default function LoginPage() {
         ) : (
         <form className="auth-form" onSubmit={handleSubmit}>
           {mode === "signup" ? (
-            <div className="auth-row">
-              <label className="auth-field">
-                <span>First name</span>
-                <input
-                  value={firstName}
-                  onChange={(event) => setFirstName(event.target.value)}
-                  autoComplete="given-name"
-                  required
-                />
-              </label>
-              <label className="auth-field">
-                <span>Last name</span>
-                <input
-                  value={lastName}
-                  onChange={(event) => setLastName(event.target.value)}
-                  autoComplete="family-name"
-                  required
-                />
-              </label>
-            </div>
+            <>
+              <div className="auth-row">
+                <label className="auth-field">
+                  <span>First name</span>
+                  <input
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                    autoComplete="given-name"
+                    required
+                  />
+                </label>
+                <label className="auth-field">
+                  <span>Last name</span>
+                  <input
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                    autoComplete="family-name"
+                    required
+                  />
+                </label>
+              </div>
+
+              <BirthdaySelect value={birthday} onChange={setBirthday} />
+            </>
           ) : null}
 
           <label className="auth-field">

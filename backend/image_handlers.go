@@ -143,6 +143,12 @@ func (s *apiServer) handleCreateImage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	partyID, err := parseOptionalID(r.FormValue("partyId"), "party id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	homepage := parseFormBool(r.FormValue("homepage"))
 
 	sample := make([]byte, 512)
 	n, readErr := file.Read(sample)
@@ -165,7 +171,7 @@ func (s *apiServer) handleCreateImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	image, err := s.store.createImage(r.Context(), imageURL, imageDate)
+	image, err := s.store.createImage(r.Context(), imageURL, imageDate, partyID, homepage)
 	if err != nil {
 		log.Error("image create row", "error", err, "image_url", imageURL)
 		writeError(w, http.StatusInternalServerError, "failed to save image")
@@ -188,4 +194,27 @@ func parseImageDate(value string) (time.Time, error) {
 	}
 
 	return parsed, nil
+}
+
+func parseOptionalID(value string, label string) (*int64, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+
+	id, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || id < 1 {
+		return nil, errors.New(label + " must be a valid id")
+	}
+
+	return &id, nil
+}
+
+func parseFormBool(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "on", "yes":
+		return true
+	default:
+		return false
+	}
 }

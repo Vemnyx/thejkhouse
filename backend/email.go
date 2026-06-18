@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultEmailFrom  = "host@thejkhouse.com"
+	defaultEmailFrom  = "The JK House <host@thejkhouse.com>"
 	resendAPIEndpoint = "https://api.resend.com/emails"
 )
 

@@ -1,25 +1,31 @@
 import { DragEvent, FormEvent, useEffect, useRef, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { ImageRecord, deleteImage, listImages, sendHostEmail, uploadImage } from "../lib/api";
+import { ImageRecord, PartyRecord, deleteImage, getHomepage, listImages, listParties, sendHostEmail, updateHomepage, uploadImage } from "../lib/api";
 
-type HostTab = "images" | "email";
+type HostTab = "images" | "homepage" | "email";
 
 export default function HostPage() {
   const { appUser, firebaseUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = useState<HostTab>("images");
   const [images, setImages] = useState<ImageRecord[]>([]);
+  const [parties, setParties] = useState<PartyRecord[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [partyId, setPartyId] = useState("");
+  const [homepage, setHomepage] = useState(false);
   const [emailTo, setEmailTo] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
   const [emailSuccess, setEmailSuccess] = useState("");
+  const [homepageHtml, setHomepageHtml] = useState("");
+  const [homepageSuccess, setHomepageSuccess] = useState("");
   const [error, setError] = useState("");
   const [loadingImages, setLoadingImages] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [savingHomepage, setSavingHomepage] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [draggingImage, setDraggingImage] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -35,9 +41,15 @@ export default function HostPage() {
 
       try {
         const token = await firebaseUser.getIdToken();
-        const nextImages = await listImages(token);
+        const [nextImages, nextParties, nextHomepage] = await Promise.all([
+          listImages(token),
+          listParties(token),
+          getHomepage(token),
+        ]);
         if (!cancelled) {
           setImages(nextImages);
+          setParties(nextParties);
+          setHomepageHtml(nextHomepage.html);
           setError("");
         }
       } catch (err) {
@@ -75,9 +87,14 @@ export default function HostPage() {
     setSubmitting(true);
     try {
       const token = await firebaseUser.getIdToken();
-      const uploaded = await uploadImage(token, file, date);
+      const uploaded = await uploadImage(token, file, date, {
+        partyId: partyId ? Number(partyId) : null,
+        homepage,
+      });
       setImages((current) => [uploaded, ...current]);
       setFile(null);
+      setPartyId("");
+      setHomepage(false);
       setUploadModalOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to upload image";
@@ -135,9 +152,34 @@ export default function HostPage() {
     }
   };
 
+  const handleSaveHomepage = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setHomepageSuccess("");
+
+    if (!firebaseUser) {
+      return;
+    }
+
+    setSavingHomepage(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const updated = await updateHomepage(token, homepageHtml);
+      setHomepageHtml(updated.html);
+      setHomepageSuccess("Homepage saved.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to save homepage";
+      setError(message);
+    } finally {
+      setSavingHomepage(false);
+    }
+  };
+
   const openUploadModal = () => {
     setError("");
     setFile(null);
+    setPartyId("");
+    setHomepage(false);
     setDraggingImage(false);
     setUploadModalOpen(true);
   };
@@ -148,6 +190,8 @@ export default function HostPage() {
     }
     setUploadModalOpen(false);
     setFile(null);
+    setPartyId("");
+    setHomepage(false);
     setDraggingImage(false);
   };
 
@@ -179,13 +223,6 @@ export default function HostPage() {
           <span className="corner corner-br" />
         </div>
 
-        <p className="eyebrow">Host Dashboard</p>
-        <h1 className="title title-small">Image Library</h1>
-
-        <div className="host-actions">
-          <Link to="/">Back to dashboard</Link>
-        </div>
-
         <div className="host-tabs" role="tablist" aria-label="Host dashboard sections">
           <button
             className={activeTab === "images" ? "host-tab active" : "host-tab"}
@@ -205,17 +242,22 @@ export default function HostPage() {
           >
             Email
           </button>
+          <button
+            className={activeTab === "homepage" ? "host-tab active" : "host-tab"}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "homepage"}
+            onClick={() => setActiveTab("homepage")}
+          >
+            Homepage
+          </button>
         </div>
 
         {activeTab === "images" ? (
           <section className="host-panel" role="tabpanel">
             <div className="host-panel-header">
-              <div>
-                <h2 className="host-section-title">Images</h2>
-                <p className="host-section-copy">Upload and manage images served from the site CDN.</p>
-              </div>
               <button className="auth-submit" type="button" onClick={openUploadModal}>
-                Upload New Image
+                Add New Image
               </button>
             </div>
 
@@ -234,6 +276,8 @@ export default function HostPage() {
                     </a>
                     <div className="image-grid-meta">
                       <span>{formatDate(image.date)}</span>
+                      {image.partyId ? <span>{partyLabel(parties, image.partyId)}</span> : null}
+                      {image.homepage ? <span>Homepage</span> : null}
                       <span>{formatDateTime(image.uploadedAt)}</span>
                     </div>
                     <button
@@ -248,6 +292,39 @@ export default function HostPage() {
                 ))}
               </div>
             )}
+          </section>
+        ) : activeTab === "homepage" ? (
+          <section className="host-panel" role="tabpanel">
+            <form className="homepage-editor" onSubmit={handleSaveHomepage}>
+              <label className="auth-field host-message-field">
+                <span>Homepage HTML</span>
+                <textarea
+                  value={homepageHtml}
+                  onChange={(event) => setHomepageHtml(event.target.value)}
+                  rows={14}
+                  placeholder="<h1>Welcome to The JK House</h1><p>...</p>"
+                />
+              </label>
+
+              <div className="homepage-editor-actions">
+                <button className="auth-submit" type="submit" disabled={savingHomepage}>
+                  {savingHomepage ? "Saving..." : "Save Homepage"}
+                </button>
+                {homepageSuccess ? <p className="host-success">{homepageSuccess}</p> : null}
+              </div>
+
+              {error ? <p className="auth-error">{error}</p> : null}
+
+              <div className="homepage-preview-shell">
+                <p className="host-section-title">Preview</p>
+                <article
+                  className="homepage-html homepage-preview"
+                  dangerouslySetInnerHTML={{
+                    __html: homepageHtml || "<p>Under Construction</p>",
+                  }}
+                />
+              </div>
+            </form>
           </section>
         ) : (
           <section className="host-panel" role="tabpanel">
@@ -365,6 +442,29 @@ export default function HostPage() {
                   />
                 </label>
 
+                {parties.length > 0 ? (
+                  <label className="auth-field">
+                    <span>Party</span>
+                    <select value={partyId} onChange={(event) => setPartyId(event.target.value)}>
+                      <option value="">No party</option>
+                      {parties.map((party) => (
+                        <option key={party.id} value={party.id}>
+                          {party.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+
+                <label className="auth-password-toggle">
+                  <input
+                    type="checkbox"
+                    checked={homepage}
+                    onChange={(event) => setHomepage(event.target.checked)}
+                  />
+                  <span>Use on homepage</span>
+                </label>
+
                 {error ? <p className="auth-error">{error}</p> : null}
 
                 <button className="auth-submit" type="submit" disabled={submitting || !file}>
@@ -388,4 +488,8 @@ function formatDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function partyLabel(parties: PartyRecord[], partyId: number) {
+  return parties.find((party) => party.id === partyId)?.label ?? `Party #${partyId}`;
 }

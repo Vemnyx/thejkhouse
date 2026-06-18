@@ -83,8 +83,10 @@ func main() {
 	mux.HandleFunc("/auth/signup", server.handleAuthSignup)
 	mux.HandleFunc("/auth/session", server.handleAuthSession)
 	mux.HandleFunc("/emails", server.handleEmails)
+	mux.HandleFunc("/homepage", server.handleHomepage)
 	mux.HandleFunc("/images", server.handleImages)
 	mux.HandleFunc("/images/", server.handleImageByID)
+	mux.HandleFunc("/parties", server.handleParties)
 	mux.HandleFunc("/users/register", server.handleRegister)
 	mux.HandleFunc("/users/me", server.handleMe)
 

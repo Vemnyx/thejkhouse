@@ -209,7 +209,9 @@ body {
   text-transform: none;
 }
 
-.auth-field input {
+.auth-field input,
+.auth-field select,
+.birthday-picker select {
   width: 100%;
   border: 1px solid rgba(232, 120, 143, 0.28);
   background: rgba(3, 3, 3, 0.55);
@@ -222,10 +224,36 @@ body {
   text-transform: none;
 }
 
-.auth-field input:focus {
+.auth-field input:focus,
+.auth-field select:focus,
+.birthday-picker select:focus {
   outline: none;
   border-color: var(--rose-glow);
   box-shadow: 0 0 0 2px rgba(232, 120, 143, 0.15);
+}
+
+.birthday-picker {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr 1fr;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.birthday-picker legend {
+  grid-column: 1 / -1;
+  margin-bottom: 0.45rem;
+  color: var(--gold);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+}
+
+.birthday-picker label {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--ink-muted);
+  font-size: 0.72rem;
 }
 
 .auth-submit {
@@ -474,6 +502,63 @@ body {
   text-align: center;
 }
 
+.homepage-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.9fr);
+  gap: 1.5rem;
+  align-items: stretch;
+  min-height: 100%;
+}
+
+.homepage-html {
+  border: 1px solid rgba(232, 120, 143, 0.18);
+  background: rgba(3, 3, 3, 0.24);
+  color: var(--ink);
+  padding: 1.25rem;
+  line-height: 1.8;
+}
+
+.homepage-html > :first-child {
+  margin-top: 0;
+}
+
+.homepage-html > :last-child {
+  margin-bottom: 0;
+}
+
+.homepage-html h1,
+.homepage-html h2,
+.homepage-html h3 {
+  color: var(--rose-pale);
+  font-family: var(--decorative-font);
+  line-height: 1.15;
+}
+
+.homepage-html a {
+  color: var(--rose-pale);
+}
+
+.homepage-rotator,
+.homepage-empty {
+  display: grid;
+  place-items: center;
+  min-height: 24rem;
+  border: 1px solid rgba(232, 120, 143, 0.18);
+  background: rgba(3, 3, 3, 0.24);
+}
+
+.homepage-rotator img {
+  width: 100%;
+  height: 100%;
+  min-height: 24rem;
+  object-fit: cover;
+}
+
+.homepage-empty {
+  color: var(--ink-muted);
+  text-align: center;
+}
+
 .host-page {
   align-items: flex-start;
   padding-top: 3rem;
@@ -543,6 +628,32 @@ body {
   display: grid;
   gap: 1rem;
   text-align: left;
+}
+
+.homepage-editor {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.homepage-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.homepage-preview-shell {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.homepage-preview-shell .host-section-title {
+  margin: 0;
+}
+
+.homepage-preview {
+  min-height: 12rem;
 }
 
 .host-upload-form {
@@ -737,6 +848,10 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .birthday-picker {
+    grid-template-columns: 1fr;
+  }
+
   .app-shell-page {
     padding: 1rem;
   }
@@ -787,6 +902,16 @@ body {
 
   .main-content {
     min-height: 22rem;
+  }
+
+  .homepage-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .homepage-rotator,
+  .homepage-empty,
+  .homepage-rotator img {
+    min-height: 18rem;
   }
 
   .host-upload-form {

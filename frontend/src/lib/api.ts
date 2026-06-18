@@ -5,6 +5,7 @@ export type AppUser = {
   email: string;
   firstName: string;
   lastName: string;
+  birthday: string | null;
   role: UserRole;
   createdAt: string;
 };
@@ -12,11 +13,13 @@ export type AppUser = {
 export type SignupPayload = {
   firstName: string;
   lastName: string;
+  birthday: string;
 };
 
 export type UpdateProfilePayload = {
   firstName: string;
   lastName: string;
+  birthday: string;
 };
 
 export type AuthSession = {
@@ -42,7 +45,22 @@ export type ImageRecord = {
   id: number;
   imageUrl: string;
   date: string;
+  partyId: number | null;
+  homepage: boolean;
   uploadedAt: string;
+};
+
+export type PartyRecord = {
+  id: number;
+  label: string;
+  date: string;
+  imageUrl: string;
+  partifulUrl: string;
+};
+
+export type UploadImageOptions = {
+  partyId?: number | null;
+  homepage?: boolean;
 };
 
 export type SendEmailPayload = {
@@ -53,6 +71,11 @@ export type SendEmailPayload = {
 
 export type SendEmailResponse = {
   id: string;
+};
+
+export type HomepageContent = {
+  html: string;
+  images: ImageRecord[];
 };
 
 async function publicFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -139,11 +162,32 @@ export function listImages(token: string) {
   return apiFetch<ImageRecord[] | null>("/images", token).then((images) => images ?? []);
 }
 
-export function uploadImage(token: string, file: File, date: string) {
+export function listParties(token: string) {
+  return apiFetch<PartyRecord[] | null>("/parties", token).then((parties) => parties ?? []);
+}
+
+export function getHomepage(token: string) {
+  return apiFetch<HomepageContent>("/homepage", token);
+}
+
+export function updateHomepage(token: string, html: string) {
+  return apiFetch<HomepageContent>("/homepage", token, {
+    method: "PATCH",
+    body: JSON.stringify({ html }),
+  });
+}
+
+export function uploadImage(token: string, file: File, date: string, options: UploadImageOptions = {}) {
   const formData = new FormData();
   formData.append("image", file);
   if (date) {
     formData.append("date", date);
+  }
+  if (options.partyId) {
+    formData.append("partyId", String(options.partyId));
+  }
+  if (options.homepage) {
+    formData.append("homepage", "true");
   }
 
   return apiFetch<ImageRecord>("/images", token, {

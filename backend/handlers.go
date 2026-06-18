@@ -45,6 +45,11 @@ func (s *apiServer) handleRegister(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "first name and last name are required")
 		return
 	}
+	birthday, err := parseBirthday(payload.Birthday)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	email, _ := token.Claims["email"].(string)
 	if email == "" {
@@ -52,7 +57,7 @@ func (s *apiServer) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := s.store.createUser(r.Context(), token.UID, email, firstName, lastName, RoleGuest)
+	user, err := s.store.createUser(r.Context(), token.UID, email, firstName, lastName, birthday, RoleGuest)
 	if err != nil {
 		if isUniqueViolation(err) {
 			writeError(w, http.StatusConflict, "user already exists")
@@ -113,8 +118,13 @@ func (s *apiServer) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "first name and last name are required")
 		return
 	}
+	birthday, err := parseBirthday(payload.Birthday)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
-	user, err := s.store.updateUserProfile(r.Context(), token.UID, firstName, lastName)
+	user, err := s.store.updateUserProfile(r.Context(), token.UID, firstName, lastName, birthday)
 	if err != nil {
 		if isNotFound(err) {
 			writeError(w, http.StatusNotFound, "user not found")

@@ -70,7 +70,7 @@ jobs:
           FIREBASE_PROJECT_ID=the-jk-house \
           FIREBASE_API_KEY_SECRET=projects/the-jk-house/secrets/firebase_api_key/versions/latest \
           IMAGE_BUCKET=thejkhouse-assets \
-          EMAIL_FROM=host@thejkhouse.com \
+          EMAIL_FROM='The JK House <host@thejkhouse.com>' \
           RESEND_API_KEY_SECRET=projects/the-jk-house/secrets/resend_api_key/versions/latest \
           APP_BASE_URL=https://thejkhouse.com \
           /opt/thejkhouse/thejkhouse-migrate
