@@ -208,7 +208,7 @@ export default function HomePage() {
               />
               {homepage.images.length > 0 ? (
                 <aside className="homepage-rotator" aria-label="Homepage images">
-                  <BouncingImages images={homepage.images} alt="The JK House" className="homepage-bouncer" speed={24} mobileSpeed={18} />
+                  <BouncingImages images={homepage.images} alt="The JK House" className="homepage-bouncer" speed={12} mobileSpeed={9} />
                 </aside>
               ) : (
                 <aside className="homepage-empty">

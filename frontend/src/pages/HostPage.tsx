@@ -843,7 +843,7 @@ export default function HostPage() {
         {homepageImageModalOpen ? (
           <div className="modal-backdrop" role="presentation" onMouseDown={closeHomepageImageModal}>
             <section
-              className="upload-modal gothic-card"
+              className="upload-modal homepage-upload-modal gothic-card"
               role="dialog"
               aria-modal="true"
               aria-labelledby="homepage-upload-modal-title"
@@ -938,7 +938,7 @@ export default function HostPage() {
 
                 {error ? <p className="auth-error">{error}</p> : null}
 
-                <button className="auth-submit" type="submit" disabled={submittingHomepageImage || !homepageFile || !cropBox}>
+                <button className="auth-submit homepage-upload-submit" type="submit" disabled={submittingHomepageImage || !homepageFile || !cropBox}>
                   {submittingHomepageImage ? "Uploading..." : "Upload Homepage Image"}
                 </button>
               </form>
