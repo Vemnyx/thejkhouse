@@ -183,6 +183,51 @@ body {
   width: min(100%, 28rem);
 }
 
+.login-image-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: end center;
+  overflow: hidden;
+  background: var(--black);
+}
+
+.login-image-overlay img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.login-image-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 42%, rgba(0, 0, 0, 0.72) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 28%, transparent 62%, rgba(0, 0, 0, 0.78));
+}
+
+.login-image-overlay button {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 clamp(2rem, 8vh, 4.5rem);
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.9);
+  background: transparent;
+  color: #fff;
+  padding: 0.25rem 0;
+  font: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.9);
+}
+
 .auth-form {
   display: grid;
   gap: 1rem;
@@ -542,7 +587,8 @@ body {
 .homepage-empty {
   display: grid;
   place-items: center;
-  min-height: 24rem;
+  height: clamp(22rem, 48vw, 34rem);
+  overflow: hidden;
   border: 1px solid rgba(232, 120, 143, 0.18);
   background: rgba(3, 3, 3, 0.24);
 }
@@ -550,7 +596,6 @@ body {
 .homepage-rotator img {
   width: 100%;
   height: 100%;
-  min-height: 24rem;
   object-fit: cover;
 }
 
@@ -909,9 +954,8 @@ body {
   }
 
   .homepage-rotator,
-  .homepage-empty,
-  .homepage-rotator img {
-    min-height: 18rem;
+  .homepage-empty {
+    height: clamp(16rem, 72vw, 22rem);
   }
 
   .host-upload-form {

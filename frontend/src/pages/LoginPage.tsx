@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import BirthdaySelect from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { ApiError } from "../lib/api";
+import { ApiError, ImageRecord, getHomepageImages } from "../lib/api";
 
 type AuthMode = "login" | "signup";
 
@@ -25,6 +25,41 @@ export default function LoginPage() {
   const [confirmationTokenAttempted, setConfirmationTokenAttempted] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resendingConfirmation, setResendingConfirmation] = useState(false);
+  const [introImages, setIntroImages] = useState<ImageRecord[]>([]);
+  const [introImageIndex, setIntroImageIndex] = useState(0);
+  const [introDismissed, setIntroDismissed] = useState(() => Boolean(searchParams.get("confirm_signup_token")));
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getHomepageImages()
+      .then((images) => {
+        if (!cancelled) {
+          setIntroImages(images);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIntroImages([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (introImages.length < 2 || introDismissed) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setIntroImageIndex((current) => (current + 1) % introImages.length);
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [introDismissed, introImages.length]);
 
   useEffect(() => {
     const token = searchParams.get("confirm_signup_token");
@@ -129,7 +164,18 @@ export default function LoginPage() {
 
   const passwordInputType = showPassword ? "text" : "password";
 
+  const showIntroOverlay = !introDismissed && introImages.length > 0;
+
   return (
+    <>
+    {showIntroOverlay ? (
+      <section className="login-image-overlay" aria-label="The JK House photos">
+        <img src={introImages[introImageIndex]?.imageUrl} alt="The JK House" />
+        <button type="button" onClick={() => setIntroDismissed(true)}>
+          Continue to login
+        </button>
+      </section>
+    ) : null}
     <main className="page">
       <div className="page-vignette" aria-hidden="true" />
       <section className="gothic-card auth-card">
@@ -280,5 +326,6 @@ export default function LoginPage() {
 
       </section>
     </main>
+    </>
   );
 }

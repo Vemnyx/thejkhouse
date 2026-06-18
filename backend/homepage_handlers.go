@@ -21,6 +21,22 @@ func (s *apiServer) handleHomepage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *apiServer) handleHomepageImages(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+
+	images, err := s.store.listHomepageImages(r.Context())
+	if err != nil {
+		log.Error("homepage public images", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to load homepage images")
+		return
+	}
+
+	writeJSON(w, images)
+}
+
 func (s *apiServer) handleGetHomepage(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.loadUserFromRequest(r); err != nil {
 		if authErr, ok := err.(*authRequestError); ok {

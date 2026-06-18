@@ -170,6 +170,10 @@ export function getHomepage(token: string) {
   return apiFetch<HomepageContent>("/homepage", token);
 }
 
+export function getHomepageImages() {
+  return publicFetch<ImageRecord[] | null>("/homepage/images").then((images) => images ?? []);
+}
+
 export function updateHomepage(token: string, html: string) {
   return apiFetch<HomepageContent>("/homepage", token, {
     method: "PATCH",
