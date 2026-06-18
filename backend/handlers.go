@@ -9,11 +9,10 @@ import (
 )
 
 type apiServer struct {
-	store          *userStore
-	auth           *authService
-	images         *imageUploader
-	email          *emailClient
-	pendingSignups *pendingSignupCodec
+	store  *userStore
+	auth   *authService
+	images *imageUploader
+	email  *emailClient
 }
 
 func (s *apiServer) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -141,6 +140,10 @@ func writeJSONStatus(w http.ResponseWriter, status int, payload any) {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSONStatus(w, status, map[string]string{"error": message})
+}
+
+func writeErrorCode(w http.ResponseWriter, status int, code string, message string) {
+	writeJSONStatus(w, status, map[string]string{"error": message, "code": code})
 }
 
 func methodNotAllowed(w http.ResponseWriter) {

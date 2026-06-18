@@ -1,13 +1,14 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { ApiError } from "../lib/api";
 
 type AuthMode = "login" | "signup";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { login, signup, confirmSignup, appUser, loading } = useAuth();
+  const { login, signup, confirmSignup, resendConfirmation, appUser, loading } = useAuth();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,6 +22,7 @@ export default function LoginPage() {
   const [confirmingSignup, setConfirmingSignup] = useState(false);
   const [confirmationTokenAttempted, setConfirmationTokenAttempted] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resendingConfirmation, setResendingConfirmation] = useState(false);
 
   useEffect(() => {
     const token = searchParams.get("confirm_signup_token");
@@ -87,10 +89,33 @@ export default function LoginPage() {
 
       navigate("/");
     } catch (err) {
+      if (err instanceof ApiError && err.code === "pending_confirmation") {
+        setAwaitingConfirmation(true);
+        setPassword("");
+        setConfirmPassword("");
+        return;
+      }
+
       const message = err instanceof Error ? err.message : "something went wrong";
       setError(message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    setError("");
+    setSuccess("");
+    setResendingConfirmation(true);
+
+    try {
+      await resendConfirmation(email);
+      setSuccess("A new confirmation email has been sent.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to resend confirmation email";
+      setError(message);
+    } finally {
+      setResendingConfirmation(false);
     }
   };
 
@@ -114,11 +139,21 @@ export default function LoginPage() {
         {awaitingConfirmation ? (
           <div className="auth-confirmation-message">
             <p>
-              We sent a confirmation link to <strong>{email}</strong>.
+              Check your email for the confirmation link sent to <strong>{email}</strong>.
             </p>
             <p>
               Open that email and tap the confirmation button to finish creating your account.
             </p>
+            {error ? <p className="auth-error">{error}</p> : null}
+            {success ? <p className="host-success">{success}</p> : null}
+            <button
+              className="auth-submit"
+              type="button"
+              onClick={handleResendConfirmation}
+              disabled={resendingConfirmation}
+            >
+              {resendingConfirmation ? "Sending..." : "Send New Confirmation Email"}
+            </button>
             <button className="auth-secondary" type="button" onClick={() => switchMode("login")}>
               Back to Log In
             </button>

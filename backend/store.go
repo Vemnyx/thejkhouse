@@ -100,7 +100,7 @@ func (s *userStore) updateUserProfile(ctx context.Context, firebaseUID, firstNam
 	return &user, nil
 }
 
-func (s *userStore) upsertPendingSignup(ctx context.Context, email, firstName, lastName string, role Role, encryptedPassword []byte, tokenHash []byte, expiresAt time.Time) (*PendingSignup, error) {
+func (s *userStore) upsertPendingSignup(ctx context.Context, firebaseUID, email, firstName, lastName string, role Role, tokenHash []byte, expiresAt time.Time) (*PendingSignup, error) {
 	if !role.Valid() {
 		role = RoleGuest
 	}
@@ -108,31 +108,31 @@ func (s *userStore) upsertPendingSignup(ctx context.Context, email, firstName, l
 	var pending PendingSignup
 	err := s.pool.QueryRow(
 		ctx,
-		`INSERT INTO pending_signups (email, first_name, last_name, role, encrypted_password, token_hash, expires_at)
+		`INSERT INTO pending_signups (firebase_uid, email, first_name, last_name, role, token_hash, expires_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 ON CONFLICT (email) DO UPDATE SET
+		   firebase_uid = EXCLUDED.firebase_uid,
 		   first_name = EXCLUDED.first_name,
 		   last_name = EXCLUDED.last_name,
 		   role = EXCLUDED.role,
-		   encrypted_password = EXCLUDED.encrypted_password,
 		   token_hash = EXCLUDED.token_hash,
 		   expires_at = EXCLUDED.expires_at,
 		   created_at = now()
-		 RETURNING id, email, first_name, last_name, role, encrypted_password, token_hash, expires_at, created_at`,
+		 RETURNING id, firebase_uid, email, first_name, last_name, role, token_hash, expires_at, created_at`,
+		firebaseUID,
 		email,
 		firstName,
 		lastName,
 		int(role),
-		encryptedPassword,
 		tokenHash,
 		expiresAt,
 	).Scan(
 		&pending.ID,
+		&pending.FirebaseUID,
 		&pending.Email,
 		&pending.FirstName,
 		&pending.LastName,
 		&pending.Role,
-		&pending.EncryptedPassword,
 		&pending.TokenHash,
 		&pending.ExpiresAt,
 		&pending.CreatedAt,
@@ -148,16 +148,66 @@ func (s *userStore) getPendingSignupByTokenHash(ctx context.Context, tokenHash [
 	var pending PendingSignup
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, email, first_name, last_name, role, encrypted_password, token_hash, expires_at, created_at
+		`SELECT id, firebase_uid, email, first_name, last_name, role, token_hash, expires_at, created_at
 		 FROM pending_signups WHERE token_hash = $1`,
 		tokenHash,
 	).Scan(
 		&pending.ID,
+		&pending.FirebaseUID,
 		&pending.Email,
 		&pending.FirstName,
 		&pending.LastName,
 		&pending.Role,
-		&pending.EncryptedPassword,
+		&pending.TokenHash,
+		&pending.ExpiresAt,
+		&pending.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pending, nil
+}
+
+func (s *userStore) getPendingSignupByFirebaseUID(ctx context.Context, firebaseUID string) (*PendingSignup, error) {
+	var pending PendingSignup
+	err := s.pool.QueryRow(
+		ctx,
+		`SELECT id, firebase_uid, email, first_name, last_name, role, token_hash, expires_at, created_at
+		 FROM pending_signups WHERE firebase_uid = $1`,
+		firebaseUID,
+	).Scan(
+		&pending.ID,
+		&pending.FirebaseUID,
+		&pending.Email,
+		&pending.FirstName,
+		&pending.LastName,
+		&pending.Role,
+		&pending.TokenHash,
+		&pending.ExpiresAt,
+		&pending.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pending, nil
+}
+
+func (s *userStore) getPendingSignupByEmail(ctx context.Context, email string) (*PendingSignup, error) {
+	var pending PendingSignup
+	err := s.pool.QueryRow(
+		ctx,
+		`SELECT id, firebase_uid, email, first_name, last_name, role, token_hash, expires_at, created_at
+		 FROM pending_signups WHERE email = $1`,
+		email,
+	).Scan(
+		&pending.ID,
+		&pending.FirebaseUID,
+		&pending.Email,
+		&pending.FirstName,
+		&pending.LastName,
+		&pending.Role,
 		&pending.TokenHash,
 		&pending.ExpiresAt,
 		&pending.CreatedAt,

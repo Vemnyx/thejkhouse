@@ -73,7 +73,6 @@ jobs:
           EMAIL_FROM=host@thejkhouse.com \
           RESEND_API_KEY_SECRET=projects/the-jk-house/secrets/resend_api_key/versions/latest \
           APP_BASE_URL=https://thejkhouse.com \
-          PENDING_SIGNUP_ENCRYPTION_KEY_SECRET=projects/the-jk-house/secrets/pending_signup_encryption_key/versions/latest \
           /opt/thejkhouse/thejkhouse-migrate
           sudo rsync -a --delete --chown=www-data:deploy /tmp/thejkhouse-frontend/ /var/www/thejkhouse/
           sudo install -m 644 /tmp/thejkhouse.conf /etc/nginx/sites-available/thejkhouse

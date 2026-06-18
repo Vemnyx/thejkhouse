@@ -25,13 +25,13 @@ type Image struct {
 }
 
 type PendingSignup struct {
-	ID                int64
-	Email             string
-	FirstName         string
-	LastName          string
-	Role              Role
-	EncryptedPassword []byte
-	TokenHash         []byte
-	ExpiresAt         time.Time
-	CreatedAt         time.Time
+	ID          int64
+	FirebaseUID string
+	Email       string
+	FirstName   string
+	LastName    string
+	Role        Role
+	TokenHash   []byte
+	ExpiresAt   time.Time
+	CreatedAt   time.Time
 }

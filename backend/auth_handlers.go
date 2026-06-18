@@ -35,6 +35,10 @@ type confirmSignupRequest struct {
 	Token string `json:"token"`
 }
 
+type resendConfirmationRequest struct {
+	Email string `json:"email"`
+}
+
 func (s *apiServer) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w)
@@ -73,6 +77,17 @@ func (s *apiServer) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	user, err := s.store.getUserByFirebaseUID(r.Context(), session.LocalID)
 	if err != nil {
 		if isNotFound(err) {
+			_, pendingErr := s.store.getPendingSignupByFirebaseUID(r.Context(), session.LocalID)
+			if pendingErr == nil {
+				writeErrorCode(w, http.StatusForbidden, "pending_confirmation", "check your email for the confirmation link")
+				return
+			}
+			if !isNotFound(pendingErr) {
+				log.Error("auth login load pending", "error", pendingErr, "email", email)
+				writeError(w, http.StatusInternalServerError, "failed to load user")
+				return
+			}
+
 			writeError(w, http.StatusNotFound, "account not found")
 			return
 		}
@@ -116,6 +131,13 @@ func (s *apiServer) handleAuthSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	session, err := s.auth.identity.SignUp(r.Context(), email, password)
+	if err != nil {
+		log.Error("auth signup firebase", "error", err, "email", email)
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	token, tokenHash, err := newPendingSignupToken()
 	if err != nil {
 		log.Error("auth signup token", "error", err, "email", email)
@@ -123,15 +145,8 @@ func (s *apiServer) handleAuthSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	encryptedPassword, err := s.pendingSignups.encrypt(password)
-	if err != nil {
-		log.Error("auth signup encrypt", "error", err, "email", email)
-		writeError(w, http.StatusInternalServerError, "failed to create confirmation")
-		return
-	}
-
 	expiresAt := time.Now().UTC().Add(24 * time.Hour)
-	_, err = s.store.upsertPendingSignup(r.Context(), email, firstName, lastName, RoleGuest, encryptedPassword, tokenHash, expiresAt)
+	pending, err := s.store.upsertPendingSignup(r.Context(), session.LocalID, session.Email, firstName, lastName, RoleGuest, tokenHash, expiresAt)
 	if err != nil {
 		if isUniqueViolation(err) {
 			writeError(w, http.StatusConflict, "account is already pending confirmation")
@@ -142,11 +157,7 @@ func (s *apiServer) handleAuthSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	confirmURL := signupConfirmationURL(token)
-	htmlBody, textBody := signupConfirmationEmail(firstName, confirmURL)
-	_, err = s.email.send(r.Context(), []string{email}, "Confirm your The JK House account", htmlBody, textBody)
-	if err != nil {
-		log.Error("auth signup email", "error", err, "email", email)
+	if err := s.sendSignupConfirmation(r.Context(), pending, token); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to send confirmation email")
 		return
 	}
@@ -184,26 +195,15 @@ func (s *apiServer) handleAuthConfirmSignup(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if time.Now().UTC().After(pending.ExpiresAt) {
-		_ = s.store.deletePendingSignup(r.Context(), pending.ID)
 		writeError(w, http.StatusBadRequest, "confirmation link has expired")
 		return
 	}
-
-	password, err := s.pendingSignups.decrypt(pending.EncryptedPassword)
-	if err != nil {
-		log.Error("auth confirm decrypt", "error", err, "email", pending.Email)
-		writeError(w, http.StatusInternalServerError, "failed to confirm account")
+	if pending.FirebaseUID == "" {
+		writeError(w, http.StatusBadRequest, "confirmation link is no longer valid")
 		return
 	}
 
-	session, err := s.auth.identity.SignUp(r.Context(), pending.Email, password)
-	if err != nil {
-		log.Error("auth confirm firebase signup", "error", err, "email", pending.Email)
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	user, err := s.store.createUser(r.Context(), session.LocalID, session.Email, pending.FirstName, pending.LastName, pending.Role)
+	user, err := s.store.createUser(r.Context(), pending.FirebaseUID, pending.Email, pending.FirstName, pending.LastName, pending.Role)
 	if err != nil {
 		if isUniqueViolation(err) {
 			writeError(w, http.StatusConflict, "user already exists")
@@ -218,7 +218,7 @@ func (s *apiServer) handleAuthConfirmSignup(w http.ResponseWriter, r *http.Reque
 		log.Error("auth confirm delete pending", "error", err, "email", pending.Email)
 	}
 
-	response, err := s.buildAuthSession(r.Context(), session.LocalID, user)
+	response, err := s.buildAuthSession(r.Context(), pending.FirebaseUID, user)
 	if err != nil {
 		log.Error("auth confirm token", "error", err, "email", pending.Email)
 		writeError(w, http.StatusInternalServerError, "failed to create session")
@@ -227,6 +227,58 @@ func (s *apiServer) handleAuthConfirmSignup(w http.ResponseWriter, r *http.Reque
 
 	log.Info("user registered", "user_id", user.ID, "email", user.Email)
 	writeJSONStatus(w, http.StatusCreated, response)
+}
+
+func (s *apiServer) handleAuthResendConfirmation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+
+	var payload resendConfirmationRequest
+	if err := readJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, errInvalidBody.Error())
+		return
+	}
+
+	email := strings.TrimSpace(payload.Email)
+	if email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+
+	pending, err := s.store.getPendingSignupByEmail(r.Context(), email)
+	if err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusNotFound, "confirmation is not pending")
+			return
+		}
+		log.Error("auth resend load pending", "error", err, "email", email)
+		writeError(w, http.StatusInternalServerError, "failed to resend confirmation")
+		return
+	}
+
+	token, tokenHash, err := newPendingSignupToken()
+	if err != nil {
+		log.Error("auth resend token", "error", err, "email", email)
+		writeError(w, http.StatusInternalServerError, "failed to resend confirmation")
+		return
+	}
+
+	expiresAt := time.Now().UTC().Add(24 * time.Hour)
+	pending, err = s.store.upsertPendingSignup(r.Context(), pending.FirebaseUID, pending.Email, pending.FirstName, pending.LastName, pending.Role, tokenHash, expiresAt)
+	if err != nil {
+		log.Error("auth resend update pending", "error", err, "email", email)
+		writeError(w, http.StatusInternalServerError, "failed to resend confirmation")
+		return
+	}
+
+	if err := s.sendSignupConfirmation(r.Context(), pending, token); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to resend confirmation email")
+		return
+	}
+
+	writeJSON(w, authSignupPendingResponse{Message: "check your email to confirm your account"})
 }
 
 func (s *apiServer) handleAuthSession(w http.ResponseWriter, r *http.Request) {
@@ -259,6 +311,19 @@ func (s *apiServer) buildAuthSession(ctx context.Context, firebaseUID string, us
 		CustomToken: token,
 		User:        *user,
 	}, nil
+}
+
+func (s *apiServer) sendSignupConfirmation(ctx context.Context, pending *PendingSignup, token string) error {
+	confirmURL := signupConfirmationURL(token)
+	htmlBody, textBody := signupConfirmationEmail(pending.FirstName, confirmURL)
+	_, err := s.email.send(ctx, []string{pending.Email}, "Confirm your The JK House account", htmlBody, textBody)
+	if err != nil {
+		log.Error("auth confirmation email", "error", err, "email", pending.Email)
+		return err
+	}
+
+	log.Info("signup confirmation sent", "email", pending.Email)
+	return nil
 }
 
 func (s *apiServer) loadUserFromRequest(r *http.Request) (*User, error) {

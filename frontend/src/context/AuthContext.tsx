@@ -14,6 +14,7 @@ import {
   confirmSignup as confirmSignupRequest,
   getSession,
   loginUser,
+  resendSignupConfirmation,
   signupUser,
   updateProfile,
 } from "../lib/api";
@@ -26,6 +27,7 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, profile: SignupPayload) => Promise<void>;
   confirmSignup: (token: string) => Promise<void>;
+  resendConfirmation: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (profile: UpdateProfilePayload) => Promise<void>;
   refreshAppUser: () => Promise<AppUser | null>;
@@ -104,6 +106,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const session = await confirmSignupRequest(token);
         await signInWithBackendToken(session.customToken);
         setAppUser(session.user);
+      },
+      resendConfirmation: async (email) => {
+        await resendSignupConfirmation(email);
       },
       logout: async () => {
         const auth = await getAuthInstance();

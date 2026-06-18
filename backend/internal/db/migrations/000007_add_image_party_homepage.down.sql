@@ -1,0 +1,3 @@
+ALTER TABLE images
+    DROP COLUMN IF EXISTS homepage,
+    DROP COLUMN IF EXISTS party_id;

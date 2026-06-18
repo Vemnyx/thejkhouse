@@ -28,6 +28,16 @@ export type SignupPendingResponse = {
   message: string;
 };
 
+export class ApiError extends Error {
+  code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+  }
+}
+
 export type ImageRecord = {
   id: number;
   imageUrl: string;
@@ -57,7 +67,8 @@ async function publicFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = typeof body.error === "string" ? body.error : "request failed";
-    throw new Error(message);
+    const code = typeof body.code === "string" ? body.code : undefined;
+    throw new ApiError(message, code);
   }
 
   return body as T;
@@ -78,7 +89,8 @@ async function apiFetch<T>(path: string, token: string, init?: RequestInit): Pro
   const body = response.status === 204 ? {} : await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = typeof body.error === "string" ? body.error : "request failed";
-    throw new Error(message);
+    const code = typeof body.code === "string" ? body.code : undefined;
+    throw new ApiError(message, code);
   }
 
   return body as T;
@@ -102,6 +114,13 @@ export function confirmSignup(token: string) {
   return publicFetch<AuthSession>("/auth/confirm-signup", {
     method: "POST",
     body: JSON.stringify({ token }),
+  });
+}
+
+export function resendSignupConfirmation(email: string) {
+  return publicFetch<SignupPendingResponse>("/auth/resend-confirmation", {
+    method: "POST",
+    body: JSON.stringify({ email }),
   });
 }
 
