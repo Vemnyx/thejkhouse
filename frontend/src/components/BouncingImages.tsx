@@ -11,7 +11,7 @@ type BouncingImagesProps = {
   speed?: number;
 };
 
-export default function BouncingImages({ images, alt, className = "", speed = 92 }: BouncingImagesProps) {
+export default function BouncingImages({ images, alt, className = "", speed = 68 }: BouncingImagesProps) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const frameRef = useRef<number | null>(null);
@@ -29,11 +29,16 @@ export default function BouncingImages({ images, alt, className = "", speed = 92
 
     let mounted = true;
 
+    const imageSize = () => ({
+      width: image.offsetWidth,
+      height: image.offsetHeight,
+    });
+
     const placeImage = () => {
       const bounds = stage.getBoundingClientRect();
-      const imageBounds = image.getBoundingClientRect();
-      const maxX = Math.max(bounds.width - imageBounds.width, 0);
-      const maxY = Math.max(bounds.height - imageBounds.height, 0);
+      const size = imageSize();
+      const maxX = Math.max(bounds.width - size.width, 0);
+      const maxY = Math.max(bounds.height - size.height, 0);
 
       positionRef.current = {
         x: Math.min(positionRef.current.x || maxX / 2, maxX),
@@ -52,27 +57,29 @@ export default function BouncingImages({ images, alt, className = "", speed = 92
       lastTimeRef.current = time;
 
       const bounds = stage.getBoundingClientRect();
-      const imageBounds = image.getBoundingClientRect();
-      const maxX = Math.max(bounds.width - imageBounds.width, 0);
-      const maxY = Math.max(bounds.height - imageBounds.height, 0);
+      const size = imageSize();
+      const maxX = Math.max(bounds.width - size.width, 0);
+      const maxY = Math.max(bounds.height - size.height, 0);
       const next = {
         x: positionRef.current.x + velocityRef.current.x * delta,
         y: positionRef.current.y + velocityRef.current.y * delta,
       };
       let bounced = false;
 
-      if (next.x <= 0 || next.x >= maxX) {
+      if (maxX > 0 && ((next.x <= 0 && velocityRef.current.x < 0) || (next.x >= maxX && velocityRef.current.x > 0))) {
         next.x = Math.min(Math.max(next.x, 0), maxX);
         velocityRef.current.x *= -1;
         bounced = true;
       }
 
-      if (next.y <= 0 || next.y >= maxY) {
+      if (maxY > 0 && ((next.y <= 0 && velocityRef.current.y < 0) || (next.y >= maxY && velocityRef.current.y > 0))) {
         next.y = Math.min(Math.max(next.y, 0), maxY);
         velocityRef.current.y *= -1;
         bounced = true;
       }
 
+      next.x = Math.min(Math.max(next.x, 0), maxX);
+      next.y = Math.min(Math.max(next.y, 0), maxY);
       positionRef.current = next;
       image.style.transform = `translate3d(${next.x}px, ${next.y}px, 0)`;
 

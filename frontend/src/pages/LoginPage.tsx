@@ -168,7 +168,7 @@ export default function LoginPage() {
     <>
     {showIntroOverlay ? (
       <section className="login-image-overlay" aria-label="The JK House photos">
-        <BouncingImages images={introImages} alt="The JK House" className="login-bouncer" speed={128} />
+        <BouncingImages images={introImages} alt="The JK House" className="login-bouncer" speed={88} />
         <button type="button" onClick={() => setIntroDismissed(true)}>
           Continue to login
         </button>
