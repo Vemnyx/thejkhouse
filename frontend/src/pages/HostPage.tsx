@@ -1,5 +1,5 @@
 import { DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
 import { AppUser, ImageRecord, PartyRecord, deleteImage, deleteUser, getHomepage, listImages, listParties, listUsers, sendHostEmail, updateHomepage, uploadImage } from "../lib/api";
@@ -287,6 +287,10 @@ export default function HostPage() {
           <span className="corner corner-tr" />
           <span className="corner corner-bl" />
           <span className="corner corner-br" />
+        </div>
+
+        <div className="host-return-row">
+          <Link to="/">Return to dashboard</Link>
         </div>
 
         <div className="host-tabs" role="tablist" aria-label="Host dashboard sections">
