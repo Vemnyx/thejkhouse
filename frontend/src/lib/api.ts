@@ -14,6 +14,11 @@ export type SignupPayload = {
   lastName: string;
 };
 
+export type UpdateProfilePayload = {
+  firstName: string;
+  lastName: string;
+};
+
 export type AuthSession = {
   customToken: string;
   user: AppUser;
@@ -102,6 +107,13 @@ export function confirmSignup(token: string) {
 
 export function getSession(token: string) {
   return apiFetch<AppUser>("/auth/session", token);
+}
+
+export function updateProfile(token: string, payload: UpdateProfilePayload) {
+  return apiFetch<AppUser>("/users/me", token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function listImages(token: string) {

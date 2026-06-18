@@ -23,6 +23,7 @@ install -m 644 /dev/stdin /etc/nginx/sites-available/thejkhouse << 'EOF'
 server {
     listen 80;
     server_name thejkhouse.com www.thejkhouse.com;
+    client_max_body_size 10m;
 
     root /var/www/thejkhouse;
     index index.html;

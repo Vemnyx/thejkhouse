@@ -35,12 +35,11 @@ func signupConfirmationEmail(firstName string, confirmURL string) (string, strin
         <div style="height:1px;background:linear-gradient(90deg,transparent,#c94b66,transparent);margin:28px 0;"></div>
         <p style="margin:0 0 18px;color:#d4a8b2;font-size:16px;line-height:1.7;">Hi %s, confirm your email to finish creating your account.</p>
         <a href="%s" style="display:inline-block;margin-top:8px;padding:14px 22px;border:1px solid rgba(232,120,143,.45);background:linear-gradient(180deg,rgba(156,45,69,.95),rgba(92,21,40,.95));color:#f8ecee;text-decoration:none;font-size:13px;font-weight:bold;letter-spacing:.14em;text-transform:uppercase;">Enter The House</a>
-        <p style="margin:28px 0 0;color:#d4a8b2;font-size:13px;line-height:1.6;">This link expires in 24 hours. If the button does not work, paste this URL into your browser:<br><span style="color:#f2b8c4;word-break:break-all;">%s</span></p>
       </div>
     </div>
   </body>
-</html>`, name, link, link)
+</html>`, name, link)
 
-	textBody := fmt.Sprintf("Hi %s,\n\nConfirm your email to finish creating your The JK House account:\n\n%s\n\nThis link expires in 24 hours.", firstName, confirmURL)
+	textBody := fmt.Sprintf("Hi %s,\n\nConfirm your email to finish creating your The JK House account:\n\n%s", firstName, confirmURL)
 	return htmlBody, textBody
 }

@@ -73,6 +73,33 @@ func (s *userStore) getUserByFirebaseUID(ctx context.Context, firebaseUID string
 	return &user, nil
 }
 
+func (s *userStore) updateUserProfile(ctx context.Context, firebaseUID, firstName, lastName string) (*User, error) {
+	var user User
+	err := s.pool.QueryRow(
+		ctx,
+		`UPDATE users
+		 SET first_name = $2, last_name = $3
+		 WHERE firebase_uid = $1
+		 RETURNING id, firebase_uid, email, first_name, last_name, role, created_at`,
+		firebaseUID,
+		firstName,
+		lastName,
+	).Scan(
+		&user.ID,
+		&user.FirebaseUID,
+		&user.Email,
+		&user.FirstName,
+		&user.LastName,
+		&user.Role,
+		&user.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
 func (s *userStore) upsertPendingSignup(ctx context.Context, email, firstName, lastName string, role Role, encryptedPassword []byte, tokenHash []byte, expiresAt time.Time) (*PendingSignup, error) {
 	if !role.Valid() {
 		role = RoleGuest

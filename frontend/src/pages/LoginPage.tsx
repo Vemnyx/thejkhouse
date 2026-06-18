@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [confirmingSignup, setConfirmingSignup] = useState(false);
   const [confirmationTokenAttempted, setConfirmationTokenAttempted] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -52,6 +53,7 @@ export default function LoginPage() {
     setMode(nextMode);
     setError("");
     setSuccess("");
+    setAwaitingConfirmation(false);
     setConfirmPassword("");
     setShowPassword(false);
   };
@@ -77,6 +79,7 @@ export default function LoginPage() {
           lastName: lastName.trim(),
         });
         setSuccess("Check your email to confirm your account.");
+        setAwaitingConfirmation(true);
         setPassword("");
         setConfirmPassword("");
         return;
@@ -105,9 +108,22 @@ export default function LoginPage() {
         </div>
 
         <h1 className="title title-small">
-          {mode === "login" ? "Welcome To The House Of JK" : "Enter The House"}
+          {awaitingConfirmation ? "Check your email" : mode === "login" ? "Welcome To The House Of JK" : "Enter The House"}
         </h1>
 
+        {awaitingConfirmation ? (
+          <div className="auth-confirmation-message">
+            <p>
+              We sent a confirmation link to <strong>{email}</strong>.
+            </p>
+            <p>
+              Open that email and tap the confirmation button to finish creating your account.
+            </p>
+            <button className="auth-secondary" type="button" onClick={() => switchMode("login")}>
+              Back to Log In
+            </button>
+          </div>
+        ) : (
         <form className="auth-form" onSubmit={handleSubmit}>
           {mode === "signup" ? (
             <div className="auth-row">
@@ -213,6 +229,7 @@ export default function LoginPage() {
             </button>
           )}
         </form>
+        )}
 
       </section>
     </main>

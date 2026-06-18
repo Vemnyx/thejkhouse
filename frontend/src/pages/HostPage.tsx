@@ -1,10 +1,14 @@
-import { FormEvent, useEffect, useState } from "react";
+import { DragEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ImageRecord, deleteImage, listImages, sendHostEmail, uploadImage } from "../lib/api";
 
+type HostTab = "images" | "email";
+
 export default function HostPage() {
   const { appUser, firebaseUser } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [activeTab, setActiveTab] = useState<HostTab>("images");
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -16,6 +20,8 @@ export default function HostPage() {
   const [loadingImages, setLoadingImages] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [draggingImage, setDraggingImage] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -72,6 +78,7 @@ export default function HostPage() {
       const uploaded = await uploadImage(token, file, date);
       setImages((current) => [uploaded, ...current]);
       setFile(null);
+      setUploadModalOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to upload image";
       setError(message);
@@ -128,6 +135,39 @@ export default function HostPage() {
     }
   };
 
+  const openUploadModal = () => {
+    setError("");
+    setFile(null);
+    setDraggingImage(false);
+    setUploadModalOpen(true);
+  };
+
+  const closeUploadModal = () => {
+    if (submitting) {
+      return;
+    }
+    setUploadModalOpen(false);
+    setFile(null);
+    setDraggingImage(false);
+  };
+
+  const handleImageDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDraggingImage(false);
+
+    const droppedFile = event.dataTransfer.files[0];
+    if (!droppedFile) {
+      return;
+    }
+    if (!droppedFile.type.startsWith("image/")) {
+      setError("choose an image file");
+      return;
+    }
+
+    setFile(droppedFile);
+    setError("");
+  };
+
   return (
     <main className="page host-page">
       <div className="page-vignette" aria-hidden="true" />
@@ -146,103 +186,194 @@ export default function HostPage() {
           <Link to="/">Back to dashboard</Link>
         </div>
 
-        <section className="host-section">
-          <h2 className="host-section-title">Send Email</h2>
-          <form className="host-email-form" onSubmit={handleSendEmail}>
-            <label className="auth-field">
-              <span>To</span>
-              <input
-                type="email"
-                value={emailTo}
-                onChange={(event) => setEmailTo(event.target.value)}
-                placeholder="guest@example.com"
-                required
-              />
-            </label>
+        <div className="host-tabs" role="tablist" aria-label="Host dashboard sections">
+          <button
+            className={activeTab === "images" ? "host-tab active" : "host-tab"}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "images"}
+            onClick={() => setActiveTab("images")}
+          >
+            Images
+          </button>
+          <button
+            className={activeTab === "email" ? "host-tab active" : "host-tab"}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "email"}
+            onClick={() => setActiveTab("email")}
+          >
+            Email
+          </button>
+        </div>
 
-            <label className="auth-field">
-              <span>Subject</span>
-              <input
-                value={emailSubject}
-                onChange={(event) => setEmailSubject(event.target.value)}
-                required
-              />
-            </label>
+        {activeTab === "images" ? (
+          <section className="host-panel" role="tabpanel">
+            <div className="host-panel-header">
+              <div>
+                <h2 className="host-section-title">Images</h2>
+                <p className="host-section-copy">Upload and manage images served from the site CDN.</p>
+              </div>
+              <button className="auth-submit" type="button" onClick={openUploadModal}>
+                Upload New Image
+              </button>
+            </div>
 
-            <label className="auth-field host-message-field">
-              <span>Message</span>
-              <textarea
-                value={emailMessage}
-                onChange={(event) => setEmailMessage(event.target.value)}
-                rows={6}
-                required
-              />
-            </label>
+            {error ? <p className="auth-error">{error}</p> : null}
 
-            <button className="auth-submit" type="submit" disabled={sendingEmail}>
-              {sendingEmail ? "Sending..." : "Send Email"}
-            </button>
-          </form>
-          {emailSuccess ? <p className="host-success">{emailSuccess}</p> : null}
-        </section>
-
-        <section className="host-section">
-          <h2 className="host-section-title">Upload Images</h2>
-          <form className="host-upload-form" onSubmit={handleUpload}>
-            <label className="auth-field">
-              <span>Image</span>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                required
-              />
-            </label>
-
-            <label className="auth-field">
-              <span>Date</span>
-              <input
-                type="date"
-                value={date}
-                onChange={(event) => setDate(event.target.value)}
-              />
-            </label>
-
-            <button className="auth-submit" type="submit" disabled={submitting}>
-              {submitting ? "Uploading..." : "Upload Image"}
-            </button>
-          </form>
-
-          {error ? <p className="auth-error">{error}</p> : null}
-        </section>
-
-        {loadingImages ? (
-          <p className="loading-text">Loading images...</p>
-        ) : images.length === 0 ? (
-          <p className="dashboard-copy">No images uploaded yet.</p>
+            {loadingImages ? (
+              <p className="loading-text">Loading images...</p>
+            ) : images.length === 0 ? (
+              <p className="dashboard-copy">No images uploaded yet.</p>
+            ) : (
+              <div className="image-grid" role="table" aria-label="Uploaded images">
+                {images.map((image) => (
+                  <article className="image-grid-card" key={image.id}>
+                    <a href={image.imageUrl} target="_blank" rel="noreferrer">
+                      <img src={image.imageUrl} alt={`Uploaded on ${formatDate(image.date)}`} />
+                    </a>
+                    <div className="image-grid-meta">
+                      <span>{formatDate(image.date)}</span>
+                      <span>{formatDateTime(image.uploadedAt)}</span>
+                    </div>
+                    <button
+                      className="auth-secondary"
+                      type="button"
+                      onClick={() => handleDelete(image)}
+                      disabled={deletingId === image.id}
+                    >
+                      {deletingId === image.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
         ) : (
-          <div className="image-grid" role="table" aria-label="Uploaded images">
-            {images.map((image) => (
-              <article className="image-grid-card" key={image.id}>
-                <a href={image.imageUrl} target="_blank" rel="noreferrer">
-                  <img src={image.imageUrl} alt={`Uploaded on ${formatDate(image.date)}`} />
-                </a>
-                <div className="image-grid-meta">
-                  <span>{formatDate(image.date)}</span>
-                  <span>{formatDateTime(image.uploadedAt)}</span>
-                </div>
-                <button
-                  className="auth-secondary"
-                  type="button"
-                  onClick={() => handleDelete(image)}
-                  disabled={deletingId === image.id}
-                >
-                  {deletingId === image.id ? "Deleting..." : "Delete"}
-                </button>
-              </article>
-            ))}
-          </div>
+          <section className="host-panel" role="tabpanel">
+            <div className="host-panel-header">
+              <div>
+                <h2 className="host-section-title">Send Email</h2>
+                <p className="host-section-copy">Send a one-way message from host@thejkhouse.com.</p>
+              </div>
+            </div>
+
+            <form className="host-email-form" onSubmit={handleSendEmail}>
+              <label className="auth-field">
+                <span>To</span>
+                <input
+                  type="email"
+                  value={emailTo}
+                  onChange={(event) => setEmailTo(event.target.value)}
+                  placeholder="guest@example.com"
+                  required
+                />
+              </label>
+
+              <label className="auth-field">
+                <span>Subject</span>
+                <input
+                  value={emailSubject}
+                  onChange={(event) => setEmailSubject(event.target.value)}
+                  required
+                />
+              </label>
+
+              <label className="auth-field host-message-field">
+                <span>Message</span>
+                <textarea
+                  value={emailMessage}
+                  onChange={(event) => setEmailMessage(event.target.value)}
+                  rows={6}
+                  required
+                />
+              </label>
+
+              <button className="auth-submit" type="submit" disabled={sendingEmail}>
+                {sendingEmail ? "Sending..." : "Send Email"}
+              </button>
+            </form>
+            {emailSuccess ? <p className="host-success">{emailSuccess}</p> : null}
+            {error ? <p className="auth-error">{error}</p> : null}
+          </section>
         )}
+
+        {uploadModalOpen ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={closeUploadModal}>
+            <section
+              className="upload-modal gothic-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="upload-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="card-frame" aria-hidden="true">
+                <span className="corner corner-tl" />
+                <span className="corner corner-tr" />
+                <span className="corner corner-bl" />
+                <span className="corner corner-br" />
+              </div>
+
+              <div className="modal-header">
+                <h2 className="host-section-title" id="upload-modal-title">Upload image</h2>
+                <button className="modal-close" type="button" onClick={closeUploadModal} aria-label="Close upload dialog">
+                  x
+                </button>
+              </div>
+
+              <form className="host-email-form" onSubmit={handleUpload}>
+                <div
+                  className={draggingImage ? "drop-zone dragging" : "drop-zone"}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setDraggingImage(true);
+                  }}
+                  onDragLeave={() => setDraggingImage(false)}
+                  onDrop={handleImageDrop}
+                >
+                  <p>{file ? file.name : "Drag and drop an image here"}</p>
+                  <span>or</span>
+                  <button
+                    className="auth-secondary"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Choose from folder
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    className="visually-hidden"
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp"
+                    onChange={(event) => {
+                      setFile(event.target.files?.[0] ?? null);
+                      setError("");
+                    }}
+                  />
+                </div>
+
+                {file ? (
+                  <p className="selected-file">Selected: {file.name}</p>
+                ) : null}
+
+                <label className="auth-field">
+                  <span>Date</span>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(event) => setDate(event.target.value)}
+                  />
+                </label>
+
+                {error ? <p className="auth-error">{error}</p> : null}
+
+                <button className="auth-submit" type="submit" disabled={submitting || !file}>
+                  {submitting ? "Uploading..." : "Upload Image"}
+                </button>
+              </form>
+            </section>
+          </div>
+        ) : null}
       </section>
     </main>
   );

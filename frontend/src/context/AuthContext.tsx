@@ -10,10 +10,12 @@ import {
 import {
   AppUser,
   SignupPayload,
+  UpdateProfilePayload,
   confirmSignup as confirmSignupRequest,
   getSession,
   loginUser,
   signupUser,
+  updateProfile,
 } from "../lib/api";
 import { getAuthInstance, signInWithBackendToken } from "../lib/firebaseApp";
 
@@ -25,6 +27,7 @@ type AuthContextValue = {
   signup: (email: string, password: string, profile: SignupPayload) => Promise<void>;
   confirmSignup: (token: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (profile: UpdateProfilePayload) => Promise<void>;
   refreshAppUser: () => Promise<AppUser | null>;
 };
 
@@ -106,6 +109,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const auth = await getAuthInstance();
         await signOut(auth);
         setAppUser(null);
+      },
+      updateProfile: async (profile) => {
+        const user = firebaseUser;
+        if (!user) {
+          throw new Error("not signed in");
+        }
+
+        const token = await user.getIdToken();
+        const updated = await updateProfile(token, profile);
+        setAppUser(updated);
       },
       refreshAppUser: async () => refreshAppUser(),
     }),

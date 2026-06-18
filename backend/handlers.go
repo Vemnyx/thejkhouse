@@ -69,8 +69,13 @@ func (s *apiServer) handleRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *apiServer) handleMe(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	if r.Method != http.MethodGet && r.Method != http.MethodPatch {
 		methodNotAllowed(w)
+		return
+	}
+
+	if r.Method == http.MethodPatch {
+		s.handleUpdateMe(w, r)
 		return
 	}
 
@@ -82,6 +87,42 @@ func (s *apiServer) handleMe(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Error("me load user", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to load user")
+		return
+	}
+
+	writeJSON(w, user)
+}
+
+func (s *apiServer) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
+	token, err := s.auth.verifyRequestToken(r)
+	if err != nil {
+		log.Error("update me auth", "error", err)
+		writeError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	var payload registerRequest
+	if err := readJSON(r, &payload); err != nil {
+		log.Error("update me decode", "error", err)
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	firstName := strings.TrimSpace(payload.FirstName)
+	lastName := strings.TrimSpace(payload.LastName)
+	if firstName == "" || lastName == "" {
+		writeError(w, http.StatusBadRequest, "first name and last name are required")
+		return
+	}
+
+	user, err := s.store.updateUserProfile(r.Context(), token.UID, firstName, lastName)
+	if err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusNotFound, "user not found")
+			return
+		}
+		log.Error("update me", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to update user")
 		return
 	}
 
