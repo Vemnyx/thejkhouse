@@ -52,6 +52,46 @@ func (s *userStore) createUser(ctx context.Context, firebaseUID, email, firstNam
 	return &user, nil
 }
 
+func (s *userStore) confirmUserByEmail(ctx context.Context, firebaseUID, email, firstName, lastName string, birthday *time.Time, role Role) (*User, error) {
+	if !role.Valid() {
+		role = RoleGuest
+	}
+
+	var user User
+	err := s.pool.QueryRow(
+		ctx,
+		`INSERT INTO users (firebase_uid, email, first_name, last_name, birthday, role)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 ON CONFLICT (email) DO UPDATE SET
+		   firebase_uid = EXCLUDED.firebase_uid,
+		   first_name = EXCLUDED.first_name,
+		   last_name = EXCLUDED.last_name,
+		   birthday = EXCLUDED.birthday,
+		   role = EXCLUDED.role
+		 RETURNING id, firebase_uid, email, first_name, last_name, birthday, role, created_at`,
+		firebaseUID,
+		email,
+		firstName,
+		lastName,
+		birthday,
+		int(role),
+	).Scan(
+		&user.ID,
+		&user.FirebaseUID,
+		&user.Email,
+		&user.FirstName,
+		&user.LastName,
+		&user.Birthday,
+		&user.Role,
+		&user.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
 func (s *userStore) getUserByFirebaseUID(ctx context.Context, firebaseUID string) (*User, error) {
 	var user User
 	err := s.pool.QueryRow(

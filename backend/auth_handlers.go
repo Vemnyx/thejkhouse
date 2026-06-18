@@ -209,12 +209,8 @@ func (s *apiServer) handleAuthConfirmSignup(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	user, err := s.store.createUser(r.Context(), pending.FirebaseUID, pending.Email, pending.FirstName, pending.LastName, pending.Birthday, pending.Role)
+	user, err := s.store.confirmUserByEmail(r.Context(), pending.FirebaseUID, pending.Email, pending.FirstName, pending.LastName, pending.Birthday, pending.Role)
 	if err != nil {
-		if isUniqueViolation(err) {
-			writeError(w, http.StatusConflict, "user already exists")
-			return
-		}
 		log.Error("auth confirm create user", "error", err, "email", pending.Email)
 		writeError(w, http.StatusInternalServerError, "failed to create user")
 		return
