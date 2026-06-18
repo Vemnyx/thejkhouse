@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { AppUser, ImageRecord, PartyRecord, deleteImage, deleteUser, getHomepage, listImages, listParties, listUsers, sendHostEmail, updateHomepage, uploadImage } from "../lib/api";
 
 type HostTab = "images" | "homepage" | "users" | "email";
+type ImageFilter = "all" | "homepage";
 type DeleteTarget =
   | { type: "image"; image: ImageRecord }
   | { type: "user"; user: AppUser };
@@ -26,6 +27,7 @@ export default function HostPage() {
   const cropDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const [activeTab, setActiveTab] = useState<HostTab>("images");
   const [images, setImages] = useState<ImageRecord[]>([]);
+  const [imageFilter, setImageFilter] = useState<ImageFilter>("all");
   const [parties, setParties] = useState<PartyRecord[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [file, setFile] = useState<File | null>(null);
@@ -229,6 +231,10 @@ export default function HostPage() {
       : deleteTarget?.type === "user"
         ? deletingUserId === deleteTarget.user.id
         : false;
+
+  const filteredImages = imageFilter === "homepage"
+    ? images.filter((image) => image.homepage)
+    : images;
 
   const handleSendEmail = async (event: FormEvent) => {
     event.preventDefault();
@@ -578,12 +584,21 @@ export default function HostPage() {
           {activeTab === "images" ? (
             <section className="host-panel" role="tabpanel">
             <div className="host-panel-header">
-              <button className="auth-submit" type="button" onClick={openUploadModal}>
-                Add New Image
-              </button>
-              <button className="auth-secondary" type="button" onClick={openHomepageImageModal}>
-                Add Homepage Image
-              </button>
+              <label className="image-filter">
+                <span>Show</span>
+                <select value={imageFilter} onChange={(event) => setImageFilter(event.target.value as ImageFilter)}>
+                  <option value="all">All Images</option>
+                  <option value="homepage">Homepage Images</option>
+                </select>
+              </label>
+              <div className="host-panel-actions">
+                <button className="auth-submit" type="button" onClick={openUploadModal}>
+                  Add New Image
+                </button>
+                <button className="auth-secondary" type="button" onClick={openHomepageImageModal}>
+                  Add Homepage Image
+                </button>
+              </div>
             </div>
 
             {error ? <p className="auth-error">{error}</p> : null}
@@ -592,27 +607,30 @@ export default function HostPage() {
               <p className="loading-text">Loading images...</p>
             ) : images.length === 0 ? (
               <p className="dashboard-copy">No images uploaded yet.</p>
+            ) : filteredImages.length === 0 ? (
+              <p className="dashboard-copy">No homepage images yet.</p>
             ) : (
               <div className="image-grid" role="table" aria-label="Uploaded images">
-                {images.map((image) => (
+                {filteredImages.map((image) => (
                   <article className="image-grid-card" key={image.id}>
-                    <a href={image.imageUrl} target="_blank" rel="noreferrer">
+                    <div className="image-grid-image-wrap">
+                      <a href={image.imageUrl} target="_blank" rel="noreferrer">
                       <img src={image.imageUrl} alt={`Uploaded on ${formatDate(image.date)}`} />
-                    </a>
+                      </a>
+                      <button
+                        className="image-delete-button"
+                        type="button"
+                        aria-label="Delete image"
+                        onClick={() => setDeleteTarget({ type: "image", image })}
+                        disabled={deletingId === image.id}
+                      >
+                        {deletingId === image.id ? "..." : "🗑"}
+                      </button>
+                    </div>
                     <div className="image-grid-meta">
                       <span>{formatDate(image.date)}</span>
-                      {image.partyId ? <span>{partyLabel(parties, image.partyId)}</span> : null}
-                      {image.homepage ? <span>Homepage</span> : null}
-                      <span>{formatDateTime(image.uploadedAt)}</span>
+                      <span>{image.partyId ? partyLabel(parties, image.partyId) : image.homepage ? "Homepage" : "No party"}</span>
                     </div>
-                    <button
-                      className="auth-secondary"
-                      type="button"
-                      onClick={() => setDeleteTarget({ type: "image", image })}
-                      disabled={deletingId === image.id}
-                    >
-                      {deletingId === image.id ? "Deleting..." : "Delete"}
-                    </button>
                   </article>
                 ))}
               </div>
