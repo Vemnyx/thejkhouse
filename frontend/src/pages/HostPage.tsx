@@ -1,4 +1,4 @@
-import { DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type DragEvent, type FormEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
@@ -9,9 +9,20 @@ type DeleteTarget =
   | { type: "image"; image: ImageRecord }
   | { type: "user"; user: AppUser };
 
+type CropBox = {
+  x: number;
+  y: number;
+  size: number;
+};
+
+const homepageCropSize = 1200;
+
 export default function HostPage() {
   const { appUser, firebaseUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const homepageFileInputRef = useRef<HTMLInputElement | null>(null);
+  const cropStageRef = useRef<HTMLDivElement | null>(null);
+  const cropDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const [activeTab, setActiveTab] = useState<HostTab>("images");
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [parties, setParties] = useState<PartyRecord[]>([]);
@@ -19,7 +30,8 @@ export default function HostPage() {
   const [file, setFile] = useState<File | null>(null);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [partyId, setPartyId] = useState("");
-  const [homepage, setHomepage] = useState(false);
+  const [homepageFile, setHomepageFile] = useState<File | null>(null);
+  const [cropBox, setCropBox] = useState<CropBox | null>(null);
   const [emailTo, setEmailTo] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
@@ -29,10 +41,13 @@ export default function HostPage() {
   const [error, setError] = useState("");
   const [loadingImages, setLoadingImages] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [submittingHomepageImage, setSubmittingHomepageImage] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [savingHomepage, setSavingHomepage] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [homepageImageModalOpen, setHomepageImageModalOpen] = useState(false);
   const [draggingImage, setDraggingImage] = useState(false);
+  const [draggingHomepageImage, setDraggingHomepageImage] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -52,6 +67,22 @@ export default function HostPage() {
       }
     };
   }, [filePreviewUrl]);
+
+  const homepageFilePreviewUrl = useMemo(() => {
+    if (!homepageFile) {
+      return "";
+    }
+
+    return URL.createObjectURL(homepageFile);
+  }, [homepageFile]);
+
+  useEffect(() => {
+    return () => {
+      if (homepageFilePreviewUrl) {
+        URL.revokeObjectURL(homepageFilePreviewUrl);
+      }
+    };
+  }, [homepageFilePreviewUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,12 +145,10 @@ export default function HostPage() {
       const token = await firebaseUser.getIdToken();
       const uploaded = await uploadImage(token, file, date, {
         partyId: partyId ? Number(partyId) : null,
-        homepage,
       });
       setImages((current) => [uploaded, ...current]);
       setFile(null);
       setPartyId("");
-      setHomepage(false);
       setUploadModalOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to upload image";
@@ -245,9 +274,16 @@ export default function HostPage() {
     setError("");
     setFile(null);
     setPartyId("");
-    setHomepage(false);
     setDraggingImage(false);
     setUploadModalOpen(true);
+  };
+
+  const openHomepageImageModal = () => {
+    setError("");
+    setHomepageFile(null);
+    setCropBox(null);
+    setDraggingHomepageImage(false);
+    setHomepageImageModalOpen(true);
   };
 
   const closeUploadModal = () => {
@@ -257,8 +293,18 @@ export default function HostPage() {
     setUploadModalOpen(false);
     setFile(null);
     setPartyId("");
-    setHomepage(false);
     setDraggingImage(false);
+  };
+
+  const closeHomepageImageModal = () => {
+    if (submittingHomepageImage) {
+      return;
+    }
+
+    setHomepageImageModalOpen(false);
+    setHomepageFile(null);
+    setCropBox(null);
+    setDraggingHomepageImage(false);
   };
 
   const handleImageDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -276,6 +322,153 @@ export default function HostPage() {
 
     setFile(droppedFile);
     setError("");
+  };
+
+  const handleHomepageImageDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDraggingHomepageImage(false);
+
+    const droppedFile = event.dataTransfer.files[0];
+    if (!droppedFile) {
+      return;
+    }
+    if (!droppedFile.type.startsWith("image/")) {
+      setError("choose an image file");
+      return;
+    }
+
+    setHomepageFile(droppedFile);
+    setCropBox(null);
+    setError("");
+  };
+
+  const resetCropBox = () => {
+    const bounds = cropStageRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return;
+    }
+
+    const size = Math.min(bounds.width, bounds.height) * 0.62;
+    setCropBox({
+      size,
+      x: (bounds.width - size) / 2,
+      y: (bounds.height - size) / 2,
+    });
+  };
+
+  const constrainCropBox = (nextX: number, nextY: number, size: number) => {
+    const bounds = cropStageRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return { x: nextX, y: nextY, size };
+    }
+
+    return {
+      size,
+      x: Math.min(Math.max(nextX, 0), Math.max(bounds.width - size, 0)),
+      y: Math.min(Math.max(nextY, 0), Math.max(bounds.height - size, 0)),
+    };
+  };
+
+  const handleCropPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (!cropBox) {
+      return;
+    }
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    cropDragRef.current = {
+      offsetX: event.clientX - cropBox.x,
+      offsetY: event.clientY - cropBox.y,
+    };
+  };
+
+  const handleCropPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!cropBox || !cropDragRef.current) {
+      return;
+    }
+
+    const bounds = cropStageRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return;
+    }
+
+    setCropBox(constrainCropBox(
+      event.clientX - bounds.left - cropDragRef.current.offsetX,
+      event.clientY - bounds.top - cropDragRef.current.offsetY,
+      cropBox.size,
+    ));
+  };
+
+  const handleCropPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    cropDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const createCroppedHomepageFile = async () => {
+    if (!homepageFile || !homepageFilePreviewUrl || !cropBox || !cropStageRef.current) {
+      throw new Error("choose an image to crop");
+    }
+
+    const bounds = cropStageRef.current.getBoundingClientRect();
+    const image = await loadImage(homepageFilePreviewUrl);
+    const scaleX = image.naturalWidth / bounds.width;
+    const scaleY = image.naturalHeight / bounds.height;
+    const canvas = document.createElement("canvas");
+    canvas.width = homepageCropSize;
+    canvas.height = homepageCropSize;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("failed to crop image");
+    }
+
+    ctx.drawImage(
+      image,
+      cropBox.x * scaleX,
+      cropBox.y * scaleY,
+      cropBox.size * scaleX,
+      cropBox.size * scaleY,
+      0,
+      0,
+      homepageCropSize,
+      homepageCropSize,
+    );
+
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+    if (!blob) {
+      throw new Error("failed to crop image");
+    }
+
+    return new File([blob], `homepage-${Date.now()}.jpg`, { type: "image/jpeg" });
+  };
+
+  const handleHomepageImageUpload = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+
+    if (!firebaseUser || !homepageFile) {
+      setError("choose an image to upload");
+      return;
+    }
+
+    setSubmittingHomepageImage(true);
+    try {
+      const croppedFile = await createCroppedHomepageFile();
+      const token = await firebaseUser.getIdToken();
+      const uploaded = await uploadImage(token, croppedFile, new Date().toISOString().slice(0, 10), {
+        homepage: true,
+      });
+      setImages((current) => [uploaded, ...current]);
+      setHomepageFile(null);
+      setCropBox(null);
+      setHomepageImageModalOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to upload homepage image";
+      setError(message);
+    } finally {
+      setSubmittingHomepageImage(false);
+    }
   };
 
   return (
@@ -337,6 +530,9 @@ export default function HostPage() {
             <div className="host-panel-header">
               <button className="auth-submit" type="button" onClick={openUploadModal}>
                 Add New Image
+              </button>
+              <button className="auth-secondary" type="button" onClick={openHomepageImageModal}>
+                Add Homepage Image
               </button>
             </div>
 
@@ -584,19 +780,114 @@ export default function HostPage() {
                   </label>
                 ) : null}
 
-                <label className="auth-password-toggle">
-                  <input
-                    type="checkbox"
-                    checked={homepage}
-                    onChange={(event) => setHomepage(event.target.checked)}
-                  />
-                  <span>Use on homepage</span>
-                </label>
-
                 {error ? <p className="auth-error">{error}</p> : null}
 
                 <button className="auth-submit" type="submit" disabled={submitting || !file}>
                   {submitting ? "Uploading..." : "Upload Image"}
+                </button>
+              </form>
+            </section>
+          </div>
+        ) : null}
+        {homepageImageModalOpen ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={closeHomepageImageModal}>
+            <section
+              className="upload-modal gothic-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="homepage-upload-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="card-frame" aria-hidden="true">
+                <span className="corner corner-tl" />
+                <span className="corner corner-tr" />
+                <span className="corner corner-bl" />
+                <span className="corner corner-br" />
+              </div>
+
+              <div className="modal-header">
+                <h2 className="host-section-title" id="homepage-upload-modal-title">Homepage image</h2>
+                <button className="modal-close" type="button" onClick={closeHomepageImageModal} aria-label="Close homepage upload dialog">
+                  x
+                </button>
+              </div>
+
+              <form className="host-email-form" onSubmit={handleHomepageImageUpload}>
+                {!homepageFile ? (
+                  <div
+                    className={draggingHomepageImage ? "drop-zone dragging" : "drop-zone"}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setDraggingHomepageImage(true);
+                    }}
+                    onDragLeave={() => setDraggingHomepageImage(false)}
+                    onDrop={handleHomepageImageDrop}
+                  >
+                    <p>Drag and drop a homepage image here</p>
+                    <span>or</span>
+                    <button
+                      className="auth-secondary"
+                      type="button"
+                      onClick={() => homepageFileInputRef.current?.click()}
+                      disabled={submittingHomepageImage}
+                    >
+                      Choose from folder
+                    </button>
+                    <input
+                      ref={homepageFileInputRef}
+                      className="visually-hidden"
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp"
+                      disabled={submittingHomepageImage}
+                      onChange={(event) => {
+                        setHomepageFile(event.target.files?.[0] ?? null);
+                        setCropBox(null);
+                        setError("");
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <p className="selected-file">Drag the square to choose the dashboard crop.</p>
+                    <div className="crop-stage" ref={cropStageRef}>
+                      <img src={homepageFilePreviewUrl} alt="Homepage crop preview" onLoad={resetCropBox} />
+                      {cropBox ? (
+                        <div
+                          className="crop-box"
+                          style={{
+                            width: cropBox.size,
+                            height: cropBox.size,
+                            transform: `translate(${cropBox.x}px, ${cropBox.y}px)`,
+                          }}
+                          onPointerDown={handleCropPointerDown}
+                          onPointerMove={handleCropPointerMove}
+                          onPointerUp={handleCropPointerUp}
+                        />
+                      ) : null}
+                      {submittingHomepageImage ? (
+                        <div className="upload-loading" aria-label="Uploading homepage image">
+                          <span className="confirmation-spinner" />
+                        </div>
+                      ) : null}
+                    </div>
+                    <button
+                      className="auth-secondary"
+                      type="button"
+                      onClick={() => {
+                        setHomepageFile(null);
+                        setCropBox(null);
+                      }}
+                      disabled={submittingHomepageImage}
+                    >
+                      Choose Different Image
+                    </button>
+                  </>
+                )}
+
+                {error ? <p className="auth-error">{error}</p> : null}
+
+                <button className="auth-submit" type="submit" disabled={submittingHomepageImage || !homepageFile || !cropBox}>
+                  {submittingHomepageImage ? "Uploading..." : "Upload Homepage Image"}
                 </button>
               </form>
             </section>
@@ -653,4 +944,13 @@ function formatDateTime(value: string) {
 
 function partyLabel(parties: PartyRecord[], partyId: number) {
   return parties.find((party) => party.id === partyId)?.label ?? `Party #${partyId}`;
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("failed to load image"));
+    image.src = src;
+  });
 }

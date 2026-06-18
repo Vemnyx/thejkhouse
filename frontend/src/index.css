@@ -1004,6 +1004,34 @@ body {
   backdrop-filter: blur(2px);
 }
 
+.crop-stage {
+  position: relative;
+  overflow: hidden;
+  width: min(100%, 24rem);
+  justify-self: center;
+  border: 1px solid rgba(232, 120, 143, 0.24);
+  background: rgba(0, 0, 0, 0.35);
+  touch-action: none;
+}
+
+.crop-stage img {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+}
+
+.crop-box {
+  position: absolute;
+  inset: 0 auto auto 0;
+  cursor: move;
+  border: 2px solid var(--rose-pale);
+  box-shadow:
+    0 0 0 9999px rgba(0, 0, 0, 0.62),
+    0 0 24px rgba(232, 120, 143, 0.35);
+  touch-action: none;
+}
+
 .drop-zone p,
 .drop-zone span,
 .selected-file {
