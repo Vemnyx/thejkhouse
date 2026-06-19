@@ -530,18 +530,16 @@ export default function HostPage() {
         <div>
           <p>Drop images here for the AI to use.</p>
           {imageUrls.length > 0 ? (
-            <ul className="ai-image-list">
+            <div className="ai-image-preview-grid" aria-label="Uploaded AI helper images">
               {imageUrls.map((imageUrl) => (
-                <li key={imageUrl}>
-                  <a href={imageUrl} target="_blank" rel="noreferrer">
-                    {imageUrl}
-                  </a>
+                <figure className="ai-image-preview" key={imageUrl}>
+                  <img src={imageUrl} alt="Uploaded AI helper" />
                   <button type="button" onClick={() => removeAIDraftImage(type, imageUrl)} aria-label="Remove AI helper image">
                     x
                   </button>
-                </li>
+                </figure>
               ))}
-            </ul>
+            </div>
           ) : null}
         </div>
         <button
@@ -971,9 +969,8 @@ export default function HostPage() {
                   <div className="auth-field party-date-field">
                     <span>Date</span>
                     <button className="auth-secondary party-date-trigger" type="button" onClick={openPartyDateModal}>
-                      Select a date
+                      {partyDate ? formatPartyDate(partyDate) : "Select a date"}
                     </button>
-                    <p>{formatPartyDate(partyDate)}</p>
                   </div>
                   <div className="ai-draft-box">
                     <label className="auth-field host-message-field">

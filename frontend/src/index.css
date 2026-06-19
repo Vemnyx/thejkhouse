@@ -822,17 +822,16 @@ body {
   grid-column: 1 / -1;
 }
 
-.party-date-field p {
-  margin: 0;
-  color: var(--ink-muted);
-  font-size: 0.9rem;
-  letter-spacing: normal;
-  text-transform: none;
+.party-date-field {
+  grid-column: 1;
 }
 
 .party-date-trigger {
-  width: 100%;
+  width: fit-content;
   justify-content: center;
+  border-radius: 0.75rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.82rem;
 }
 
 .party-date-modal {
@@ -955,36 +954,53 @@ body {
   opacity: 0.65;
 }
 
-.ai-image-list {
-  display: grid;
-  gap: 0.35rem;
+.ai-image-preview-grid {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
   margin: 0.65rem 0 0;
-  padding: 0;
-  list-style: none;
 }
 
-.ai-image-list li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.5rem;
-  align-items: center;
-  color: var(--ink-muted);
-  font-size: 0.78rem;
-}
-
-.ai-image-list a {
+.ai-image-preview {
+  position: relative;
+  width: 5.25rem;
+  aspect-ratio: 1;
+  margin: 0;
   overflow: hidden;
-  color: inherit;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border: 1px solid rgba(232, 120, 143, 0.22);
+  border-radius: 0.8rem;
+  background: rgba(0, 0, 0, 0.32);
 }
 
-.ai-image-list button {
+.ai-image-preview img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.ai-image-preview button {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  display: grid;
+  place-items: center;
+  width: 1.45rem;
+  height: 1.45rem;
   border: 1px solid rgba(232, 120, 143, 0.22);
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.68);
   color: var(--ink);
+  font: inherit;
+  font-size: 0.76rem;
+  line-height: 1;
   cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+
+.ai-image-preview button:hover {
+  color: var(--rose-pale);
+  background: rgba(42, 8, 16, 0.78);
 }
 
 .homepage-editor-actions {
