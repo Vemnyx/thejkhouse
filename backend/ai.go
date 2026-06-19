@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,9 +23,68 @@ const (
 	partyAddress      = "1116 Rosepine Dr\nCary, NC 27519"
 )
 
+const partyHTMLTemplate = `<section class="party-template">
+  <header class="party-template-hero">
+    <p class="party-template-kicker">The JK House Presents</p>
+    <h2>Party Name</h2>
+    <p>Short intro for what guests should expect.</p>
+  </header>
+  <section class="party-template-details" aria-label="Party details">
+    <article>
+      <span>When</span>
+      <strong>Date and time</strong>
+    </article>
+    <article>
+      <span>Where</span>
+      <strong>1116 Rosepine Dr<br />Cary, NC 27519</strong>
+    </article>
+    <article>
+      <span>Theme</span>
+      <strong>What to wear or bring</strong>
+    </article>
+  </section>
+  <section class="party-template-actions" aria-label="Party actions">
+    <span>RSVP coming soon</span>
+    <span>Calendar sync coming soon</span>
+    <span>Sign-up sheets coming soon</span>
+  </section>
+  <section class="party-template-copy">
+    <h3>About the party</h3>
+    <p>Add the announcement, food notes, house rules, schedule, and anything guests should know.</p>
+  </section>
+</section>`
+
 type aiClient struct {
 	apiKey     string
 	httpClient *http.Client
+}
+
+type publicAIError struct {
+	message string
+	err     error
+}
+
+func (e publicAIError) Error() string {
+	if e.err == nil {
+		return e.message
+	}
+	return e.message + ": " + e.err.Error()
+}
+
+func (e publicAIError) Unwrap() error {
+	return e.err
+}
+
+func newPublicAIError(message string, err error) error {
+	return publicAIError{message: message, err: err}
+}
+
+func publicAIErrorMessage(err error) (string, bool) {
+	var publicErr publicAIError
+	if errors.As(err, &publicErr) {
+		return publicErr.message, true
+	}
+	return "", false
 }
 
 type cursorCreateAgentRequest struct {
@@ -111,18 +171,21 @@ func (c *aiClient) generateHTML(ctx context.Context, blockType string, instructi
 
 	run, err := c.waitForRun(ctx, created.Agent.ID, created.Run.ID)
 	if err != nil {
+		if errors.Is(err, errAIRunTimeout) {
+			return "", newPublicAIError("The AI draft took too long. Try again with shorter instructions.", err)
+		}
 		return "", err
 	}
 	if strings.ToUpper(run.Status) != "FINISHED" {
-		return "", fmt.Errorf("cursor run ended with status %s", run.Status)
+		return "", newPublicAIError("The AI draft could not be completed. Try again with a simpler prompt.", fmt.Errorf("cursor run ended with status %s", run.Status))
 	}
 
 	html := cleanGeneratedHTML(run.Result)
 	if html == "" {
-		return "", fmt.Errorf("cursor returned empty html")
+		return "", newPublicAIError("The AI returned an empty draft. Try adding more detail to the prompt.", fmt.Errorf("cursor returned empty html"))
 	}
 	if err := validateGeneratedHTML(html); err != nil {
-		return "", err
+		return "", newPublicAIError(err.Error(), err)
 	}
 
 	return html, nil
@@ -150,7 +213,7 @@ func (c *aiClient) waitForRun(ctx context.Context, agentID string, runID string)
 		case <-ctx.Done():
 			return cursorRun{}, ctx.Err()
 		case <-deadline.C:
-			return cursorRun{}, fmt.Errorf("cursor run timed out")
+			return cursorRun{}, errAIRunTimeout
 		case <-ticker.C:
 		}
 	}
@@ -198,12 +261,15 @@ func (c *aiClient) doJSON(ctx context.Context, method string, path string, paylo
 func buildHTMLPrompt(blockType string, instructions string, existingHTML string, imageURLs []string) string {
 	var target string
 	var addressInstructions string
+	var templateInstructions string
 	if blockType == "party" {
 		target = "a party announcement block"
 		addressInstructions = partyAddress
+		templateInstructions = partyHTMLTemplate
 	} else {
 		target = "a homepage announcement block"
 		addressInstructions = "No party address applies."
+		templateInstructions = "No fixed template applies."
 	}
 
 	imageInstructions := "No uploaded images were provided."
@@ -218,9 +284,10 @@ Use the repository context to match the existing frontend aesthetic and CSS conv
 Rules:
 - Do not edit files.
 - Return only a safe HTML fragment, not a full document.
-- Do not include markdown fences, explanations, scripts, inline event handlers, forms, or iframes.
+- Do not include markdown fences, explanations, scripts, inline event handlers, or iframes.
 - Do not use external assets except the uploaded CDN image URLs listed below.
 - If uploaded images are provided, include every uploaded image in the fragment.
+- For party blocks, preserve and fill the provided party template structure and class names unless the host explicitly asks for a different layout.
 - Prefer semantic HTML elements and copy that fits The JK House tone.
 - Keep the fragment concise enough to paste into the existing editor.
 
@@ -230,11 +297,14 @@ Host instructions:
 Party address:
 %s
 
+Party template:
+%s
+
 Uploaded images:
 %s
 
 Existing HTML, if any:
-%s`, target, instructions, addressInstructions, imageInstructions, existingHTML)
+%s`, target, instructions, addressInstructions, templateInstructions, imageInstructions, existingHTML)
 }
 
 func cleanGeneratedHTML(value string) string {
@@ -247,12 +317,18 @@ func cleanGeneratedHTML(value string) string {
 
 func validateGeneratedHTML(html string) error {
 	lower := strings.ToLower(html)
-	if strings.Contains(lower, "<script") || strings.Contains(lower, "javascript:") || strings.Contains(lower, "<iframe") {
-		return fmt.Errorf("generated html contained unsafe markup")
+	if strings.Contains(lower, "<script") {
+		return fmt.Errorf("The AI returned a script tag, which is not allowed. Ask it for static HTML only.")
+	}
+	if strings.Contains(lower, "javascript:") {
+		return fmt.Errorf("The AI returned a javascript link, which is not allowed. Ask it for static links or plain text.")
+	}
+	if strings.Contains(lower, "<iframe") {
+		return fmt.Errorf("The AI returned an iframe, which is not allowed. Ask it to describe embeds as plain links instead.")
 	}
 	eventHandler := regexp.MustCompile(`(?i)\son[a-z]+\s*=`)
 	if eventHandler.MatchString(html) {
-		return fmt.Errorf("generated html contained unsafe event handlers")
+		return fmt.Errorf("The AI returned inline event handlers, which are not allowed. Ask it for static HTML without click handlers.")
 	}
 	return nil
 }

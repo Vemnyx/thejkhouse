@@ -35,6 +35,10 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/home" element={<HomePage />} />
+      <Route path="/parties" element={<HomePage />} />
+      <Route path="/photos" element={<HomePage />} />
+      <Route path="/events" element={<HomePage />} />
       <Route path="/host" element={<HostPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

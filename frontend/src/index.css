@@ -700,6 +700,86 @@ body {
   color: var(--rose-pale);
 }
 
+.homepage-html .party-template {
+  display: grid;
+  gap: 1rem;
+}
+
+.homepage-html .party-template-hero {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid rgba(232, 120, 143, 0.18);
+  border-radius: 1.2rem;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(249, 214, 143, 0.12), transparent 36%),
+    linear-gradient(135deg, rgba(232, 120, 143, 0.14), rgba(3, 3, 3, 0.18));
+  padding: clamp(1rem, 3vw, 1.5rem);
+}
+
+.homepage-html .party-template-kicker {
+  margin: 0;
+  color: var(--gold);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.homepage-html .party-template-hero h2 {
+  margin: 0;
+}
+
+.homepage-html .party-template-hero p:last-child {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.homepage-html .party-template-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.homepage-html .party-template-details article,
+.homepage-html .party-template-copy {
+  border: 1px solid rgba(232, 120, 143, 0.14);
+  border-radius: 0.95rem;
+  background: rgba(3, 3, 3, 0.2);
+  padding: 0.9rem;
+}
+
+.homepage-html .party-template-details span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--gold);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.homepage-html .party-template-details strong {
+  color: var(--ink);
+}
+
+.homepage-html .party-template-actions {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.homepage-html .party-template-actions span {
+  border: 1px solid rgba(232, 120, 143, 0.22);
+  border-radius: 999px;
+  background: rgba(42, 8, 16, 0.34);
+  color: var(--rose-pale);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.homepage-html .party-template-copy h3 {
+  margin-top: 0;
+}
+
 .homepage-rotator {
   display: grid;
   place-items: center;
@@ -812,7 +892,8 @@ body {
   gap: 0.8rem;
   align-items: center;
   color: var(--gold);
-  font-size: 0.78rem;
+  font-size: 1rem;
+  font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -1189,6 +1270,23 @@ body {
   width: min(100%, 48rem);
   max-height: calc(100dvh - 3rem);
   overflow-y: auto;
+  padding: 2.5rem 1.75rem 1.75rem;
+}
+
+.party-preview-modal .party-accordion-row {
+  position: relative;
+  z-index: 1;
+}
+
+.party-preview-summary {
+  cursor: default;
+}
+
+.party-preview-close {
+  position: absolute;
+  top: 1.15rem;
+  right: 1.15rem;
+  z-index: 2;
 }
 
 .host-upload-form {
@@ -1690,6 +1788,10 @@ body {
   }
 
   .homepage-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .homepage-html .party-template-details {
     grid-template-columns: 1fr;
   }
 

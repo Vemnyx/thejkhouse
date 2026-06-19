@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import BirthdaySelect from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
@@ -15,10 +15,33 @@ const tabs: Array<{ id: MainTab; label: string }> = [
   { id: "events", label: "Events" },
 ];
 
+const tabPaths: Record<MainTab, string> = {
+  home: "/",
+  parties: "/parties",
+  photos: "/photos",
+  events: "/events",
+};
+
+function tabFromPath(pathname: string): MainTab {
+  switch (pathname) {
+    case "/parties":
+      return "parties";
+    case "/photos":
+      return "photos";
+    case "/events":
+      return "events";
+    case "/":
+    case "/home":
+    default:
+      return "home";
+  }
+}
+
 export default function HomePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { appUser, firebaseUser, logout, updateProfile } = useAuth();
-  const [activeView, setActiveView] = useState<MainView>("home");
+  const [activeView, setActiveView] = useState<MainView>(() => tabFromPath(location.pathname));
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [firstName, setFirstName] = useState(appUser?.firstName ?? "");
@@ -34,6 +57,10 @@ export default function HomePage() {
   const [expandedPartyId, setExpandedPartyId] = useState<number | null>(null);
 
   const fullName = [appUser?.firstName, appUser?.lastName].filter(Boolean).join(" ") || appUser?.email || "Account";
+
+  useEffect(() => {
+    setActiveView(tabFromPath(location.pathname));
+  }, [location.pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +112,9 @@ export default function HomePage() {
     setProfileOpen(false);
     setMessage("");
     setError("");
+    if (view !== "settings") {
+      navigate(tabPaths[view]);
+    }
   };
 
   const goToHostDashboard = () => {

@@ -40,6 +40,36 @@ const partyCalendarYears = Array.from({ length: 10 }, (_, index) => currentYear 
 const partyHours = Array.from({ length: 12 }, (_, index) => String(index + 1));
 const partyMinutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"));
 const partyPeriods = ["AM", "PM"] as const;
+const defaultPartyHTML = `<section class="party-template">
+  <header class="party-template-hero">
+    <p class="party-template-kicker">The JK House Presents</p>
+    <h2>Party Name</h2>
+    <p>Short intro for what guests should expect.</p>
+  </header>
+  <section class="party-template-details" aria-label="Party details">
+    <article>
+      <span>When</span>
+      <strong>Date and time</strong>
+    </article>
+    <article>
+      <span>Where</span>
+      <strong>1116 Rosepine Dr<br />Cary, NC 27519</strong>
+    </article>
+    <article>
+      <span>Theme</span>
+      <strong>What to wear or bring</strong>
+    </article>
+  </section>
+  <section class="party-template-actions" aria-label="Party actions">
+    <span>RSVP coming soon</span>
+    <span>Calendar sync coming soon</span>
+    <span>Sign-up sheets coming soon</span>
+  </section>
+  <section class="party-template-copy">
+    <h3>About the party</h3>
+    <p>Add the announcement, food notes, house rules, schedule, and anything guests should know.</p>
+  </section>
+</section>`;
 
 function toDateInputValue(date: Date) {
   const year = date.getFullYear();
@@ -258,7 +288,7 @@ export default function HostPage() {
     setPartyHour("7");
     setPartyMinute("00");
     setPartyPeriod("PM");
-    setPartyHtml("");
+    setPartyHtml(defaultPartyHTML);
     setPartyDraftPrompt("");
     setPartyDraftImageUrls([]);
   };
@@ -278,7 +308,7 @@ export default function HostPage() {
     setPartyHour(parts.hour);
     setPartyMinute(parts.minute);
     setPartyPeriod(parts.period);
-    setPartyHtml(party.html);
+    setPartyHtml(party.html || defaultPartyHTML);
     setPartyDraftPrompt("");
     setPartyDraftImageUrls([]);
     setPartyView("edit");
@@ -299,7 +329,8 @@ export default function HostPage() {
     try {
       const croppedFile = await createCroppedUploadFile();
       const token = await firebaseUser.getIdToken();
-      const uploaded = await uploadImage(token, croppedFile, date, {
+      const uploadDate = selectedUploadParty ? toDateInputValue(new Date(selectedUploadParty.date)) : date;
+      const uploaded = await uploadImage(token, croppedFile, uploadDate, {
         partyId: partyId ? Number(partyId) : null,
         homepage,
         notes: notes.trim(),
@@ -431,6 +462,7 @@ export default function HostPage() {
   const filteredImages = imageFilter === "homepage"
     ? images.filter((image) => image.homepage)
     : images;
+  const selectedUploadParty = partyId ? parties.find((party) => party.id === Number(partyId)) : null;
 
   const handleSendEmail = async (event: FormEvent) => {
     event.preventDefault();
@@ -1499,8 +1531,6 @@ export default function HostPage() {
                   </>
                 )}
 
-                <ImageDateSelect value={date} onChange={setDate} />
-
                 {parties.length > 0 ? (
                   <label className="auth-field">
                     <span>Party</span>
@@ -1514,6 +1544,12 @@ export default function HostPage() {
                     </select>
                   </label>
                 ) : null}
+
+                {selectedUploadParty ? (
+                  <p className="selected-file">Using party date: {formatDate(selectedUploadParty.date)}</p>
+                ) : (
+                  <ImageDateSelect value={date} onChange={setDate} />
+                )}
 
                 <label className="auth-password-toggle">
                   <input
@@ -1577,22 +1613,23 @@ export default function HostPage() {
                 <span className="corner corner-br" />
               </div>
 
-              <div className="modal-header">
-                <div>
-                  <h2 className="host-section-title" id="party-preview-title">{previewParty.label}</h2>
-                  <p className="host-section-copy">{formatDateTime(previewParty.date)}</p>
+              <button className="modal-close party-preview-close" type="button" onClick={() => setPreviewParty(null)} aria-label="Close party preview">
+                x
+              </button>
+              <article className="party-accordion-row expanded" aria-labelledby="party-preview-title">
+                <div className="party-accordion-summary party-preview-summary">
+                  <span id="party-preview-title">{previewParty.label}</span>
+                  <span>{formatDateTime(previewParty.date)}</span>
                 </div>
-                <button className="modal-close" type="button" onClick={() => setPreviewParty(null)} aria-label="Close party preview">
-                  x
-                </button>
-              </div>
-
-              <article
-                className="homepage-html homepage-preview"
-                dangerouslySetInnerHTML={{
-                  __html: previewParty.html || "<p>No announcement HTML set.</p>",
-                }}
-              />
+                <div className="party-accordion-details">
+                  <article
+                    className="homepage-html"
+                    dangerouslySetInnerHTML={{
+                      __html: previewParty.html || "<p>No announcement HTML set.</p>",
+                    }}
+                  />
+                </div>
+              </article>
             </section>
           </div>
         ) : null}

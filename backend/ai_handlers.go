@@ -72,7 +72,11 @@ func (s *apiServer) handleAIHTMLDraft(w http.ResponseWriter, r *http.Request) {
 	html, err := s.ai.generateHTML(r.Context(), blockType, instructions, payload.ExistingHTML, normalizeImageURLs(payload.ImageURLs))
 	if err != nil {
 		log.Error("ai draft generate", "error", err, "type", blockType)
-		writeError(w, http.StatusInternalServerError, "failed to generate html draft")
+		if message, ok := publicAIErrorMessage(err); ok {
+			writeError(w, http.StatusBadGateway, message)
+			return
+		}
+		writeError(w, http.StatusBadGateway, "The AI drafting service failed. Please try again.")
 		return
 	}
 
