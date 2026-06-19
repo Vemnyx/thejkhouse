@@ -1039,6 +1039,10 @@ body {
   min-height: 12rem;
 }
 
+.party-preview-shell {
+  grid-column: 1 / -1;
+}
+
 .host-table-wrap {
   overflow-x: auto;
 }

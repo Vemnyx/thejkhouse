@@ -1026,6 +1026,16 @@ export default function HostPage() {
                     />
                   </label>
 
+                  <div className="homepage-preview-shell party-preview-shell">
+                    <p className="host-section-title">Preview</p>
+                    <article
+                      className="homepage-html homepage-preview"
+                      dangerouslySetInnerHTML={{
+                        __html: partyHtml || "<p>Party preview will appear here.</p>",
+                      }}
+                    />
+                  </div>
+
                   {error ? <p className="auth-error">{error}</p> : null}
 
                   <button className="auth-submit" type="submit" disabled={savingParty}>
