@@ -810,6 +810,34 @@ body {
   gap: 1.25rem;
 }
 
+.party-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.party-form .host-panel-header,
+.party-form .auth-submit,
+.party-form .auth-error {
+  grid-column: 1 / -1;
+}
+
+.ai-draft-box {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 0.75rem;
+  border: 1px solid rgba(232, 120, 143, 0.16);
+  border-radius: 0.95rem;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(232, 120, 143, 0.08), transparent 68%),
+    rgba(3, 3, 3, 0.2);
+  padding: 1rem;
+}
+
+.ai-draft-box .auth-secondary {
+  justify-self: start;
+}
+
 .homepage-editor-actions {
   display: flex;
   align-items: center;
@@ -953,6 +981,21 @@ body {
   object-fit: cover;
 }
 
+.image-preview-trigger {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  cursor: zoom-in;
+}
+
+.image-preview-trigger:focus-visible {
+  outline: 2px solid var(--rose-pale);
+  outline-offset: -3px;
+}
+
 .image-delete-button {
   position: absolute;
   top: 0.4rem;
@@ -988,6 +1031,49 @@ body {
   font-size: 0.74rem;
   letter-spacing: normal;
   line-height: 1.35;
+}
+
+.image-lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background:
+    radial-gradient(circle at center, rgba(232, 120, 143, 0.08), transparent 58%),
+    rgba(0, 0, 0, 0.82);
+  cursor: zoom-out;
+}
+
+.image-lightbox {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+  max-width: min(92vw, 68rem);
+  max-height: min(88dvh, 50rem);
+  cursor: default;
+}
+
+.image-lightbox img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(min(88dvh, 50rem) - 3rem);
+  border-radius: 1rem;
+  object-fit: contain;
+  box-shadow:
+    0 0 0 1px rgba(232, 120, 143, 0.18),
+    0 24px 70px rgba(0, 0, 0, 0.58);
+}
+
+.image-lightbox figcaption {
+  display: flex;
+  justify-content: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  text-align: center;
 }
 
 .modal-backdrop {
@@ -1299,6 +1385,10 @@ body {
 
   .host-panel-header {
     display: grid;
+  }
+
+  .party-form {
+    grid-template-columns: 1fr;
   }
 
 }

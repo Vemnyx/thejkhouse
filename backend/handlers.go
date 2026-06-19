@@ -13,6 +13,7 @@ type apiServer struct {
 	auth   *authService
 	images *imageUploader
 	email  *emailClient
+	ai     *aiClient
 }
 
 func (s *apiServer) handleHealth(w http.ResponseWriter, r *http.Request) {

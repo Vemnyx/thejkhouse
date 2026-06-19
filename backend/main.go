@@ -65,6 +65,11 @@ func main() {
 		log.Fatal("email client", "error", err)
 	}
 
+	aiClient, err := newAIClient(ctx)
+	if err != nil {
+		log.Fatal("ai client", "error", err)
+	}
+
 	log.Info("database connection established")
 
 	server := &apiServer{
@@ -72,9 +77,11 @@ func main() {
 		auth:   authService,
 		images: imageUploader,
 		email:  emailClient,
+		ai:     aiClient,
 	}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/ai/html-draft", server.handleAIHTMLDraft)
 	mux.HandleFunc("/health", server.handleHealth)
 	mux.HandleFunc("/auth/config", server.handleAuthConfig)
 	mux.HandleFunc("/auth/confirm-signup", server.handleAuthConfirmSignup)
@@ -99,7 +106,7 @@ func main() {
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      90 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 

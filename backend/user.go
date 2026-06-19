@@ -34,6 +34,7 @@ type Party struct {
 	Date        time.Time `json:"date"`
 	ImageURL    string    `json:"imageUrl"`
 	PartifulURL string    `json:"partifulUrl"`
+	HTML        string    `json:"html"`
 }
 
 type Homepage struct {

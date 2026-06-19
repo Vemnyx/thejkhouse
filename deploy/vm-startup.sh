@@ -31,6 +31,8 @@ server {
     location /api/ {
         proxy_pass http://127.0.0.1:8080/;
         proxy_http_version 1.1;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -70,6 +72,7 @@ Environment=FIREBASE_API_KEY_SECRET=projects/the-jk-house/secrets/firebase_api_k
 Environment=IMAGE_BUCKET=thejkhouse-assets
 Environment="EMAIL_FROM=The JK House <host@thejkhouse.com>"
 Environment=RESEND_API_KEY_SECRET=projects/the-jk-house/secrets/resend_api_key/versions/latest
+Environment=CURSOR_API_KEY_SECRET=projects/the-jk-house/secrets/cursor_api_key/versions/latest
 Environment=APP_BASE_URL=https://thejkhouse.com
 
 [Install]

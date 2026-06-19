@@ -72,6 +72,7 @@ jobs:
           IMAGE_BUCKET=thejkhouse-assets \
           EMAIL_FROM='The JK House <host@thejkhouse.com>' \
           RESEND_API_KEY_SECRET=projects/the-jk-house/secrets/resend_api_key/versions/latest \
+          CURSOR_API_KEY_SECRET=projects/the-jk-house/secrets/cursor_api_key/versions/latest \
           APP_BASE_URL=https://thejkhouse.com \
           /opt/thejkhouse/thejkhouse-migrate
           sudo rsync -a --delete --chown=www-data:deploy /tmp/thejkhouse-frontend/ /var/www/thejkhouse/

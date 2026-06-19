@@ -430,7 +430,7 @@ func (s *userStore) deleteImage(ctx context.Context, id int64) error {
 func (s *userStore) listParties(ctx context.Context) ([]Party, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, label, date, image_url, partiful_url
+		`SELECT id, label, date, image_url, partiful_url, html
 		 FROM parties
 		 ORDER BY date DESC`,
 	)
@@ -442,7 +442,7 @@ func (s *userStore) listParties(ctx context.Context) ([]Party, error) {
 	parties := make([]Party, 0)
 	for rows.Next() {
 		var party Party
-		if err := rows.Scan(&party.ID, &party.Label, &party.Date, &party.ImageURL, &party.PartifulURL); err != nil {
+		if err := rows.Scan(&party.ID, &party.Label, &party.Date, &party.ImageURL, &party.PartifulURL, &party.HTML); err != nil {
 			return nil, err
 		}
 		parties = append(parties, party)
@@ -452,6 +452,26 @@ func (s *userStore) listParties(ctx context.Context) ([]Party, error) {
 	}
 
 	return parties, nil
+}
+
+func (s *userStore) createParty(ctx context.Context, label string, date time.Time, imageURL string, partifulURL string, html string) (Party, error) {
+	var party Party
+	err := s.pool.QueryRow(
+		ctx,
+		`INSERT INTO parties (label, date, image_url, partiful_url, html)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, label, date, image_url, partiful_url, html`,
+		label,
+		date,
+		imageURL,
+		partifulURL,
+		html,
+	).Scan(&party.ID, &party.Label, &party.Date, &party.ImageURL, &party.PartifulURL, &party.HTML)
+	if err != nil {
+		return Party{}, err
+	}
+
+	return party, nil
 }
 
 func (s *userStore) getHomepageHTML(ctx context.Context) (string, error) {

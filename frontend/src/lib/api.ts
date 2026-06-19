@@ -56,6 +56,15 @@ export type PartyRecord = {
   date: string;
   imageUrl: string;
   partifulUrl: string;
+  html: string;
+};
+
+export type CreatePartyPayload = {
+  label: string;
+  date: string;
+  imageUrl: string;
+  partifulUrl: string;
+  html: string;
 };
 
 export type UploadImageOptions = {
@@ -76,6 +85,16 @@ export type SendEmailResponse = {
 export type HomepageContent = {
   html: string;
   images: ImageRecord[];
+};
+
+export type HTMLDraftPayload = {
+  type: "homepage" | "party";
+  instructions: string;
+  existingHtml: string;
+};
+
+export type HTMLDraftResponse = {
+  html: string;
 };
 
 async function publicFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -166,6 +185,13 @@ export function listParties(token: string) {
   return apiFetch<PartyRecord[] | null>("/parties", token).then((parties) => parties ?? []);
 }
 
+export function createParty(token: string, payload: CreatePartyPayload) {
+  return apiFetch<PartyRecord>("/parties", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getHomepage(token: string) {
   return apiFetch<HomepageContent>("/homepage", token);
 }
@@ -178,6 +204,13 @@ export function updateHomepage(token: string, html: string) {
   return apiFetch<HomepageContent>("/homepage", token, {
     method: "PATCH",
     body: JSON.stringify({ html }),
+  });
+}
+
+export function generateHTMLDraft(token: string, payload: HTMLDraftPayload) {
+  return apiFetch<HTMLDraftResponse>("/ai/html-draft", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

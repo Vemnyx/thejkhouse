@@ -1,0 +1,2 @@
+ALTER TABLE parties
+ADD COLUMN html text NOT NULL DEFAULT '';

@@ -1,13 +1,24 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/Vemnyx/thejkhouse/backend/log"
 )
 
+type createPartyRequest struct {
+	Label       string `json:"label"`
+	Date        string `json:"date"`
+	ImageURL    string `json:"imageUrl"`
+	PartifulURL string `json:"partifulUrl"`
+	HTML        string `json:"html"`
+}
+
 func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		methodNotAllowed(w)
 		return
 	}
@@ -27,12 +38,45 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parties, err := s.store.listParties(r.Context())
-	if err != nil {
-		log.Error("party list", "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to load parties")
+	if r.Method == http.MethodGet {
+		parties, err := s.store.listParties(r.Context())
+		if err != nil {
+			log.Error("party list", "error", err)
+			writeError(w, http.StatusInternalServerError, "failed to load parties")
+			return
+		}
+
+		writeJSON(w, parties)
 		return
 	}
 
-	writeJSON(w, parties)
+	var req createPartyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid party request")
+		return
+	}
+
+	label := strings.TrimSpace(req.Label)
+	dateValue := strings.TrimSpace(req.Date)
+	imageURL := strings.TrimSpace(req.ImageURL)
+	partifulURL := strings.TrimSpace(req.PartifulURL)
+	if label == "" || dateValue == "" || imageURL == "" || partifulURL == "" {
+		writeError(w, http.StatusBadRequest, "label, date, image URL, and Partiful URL are required")
+		return
+	}
+
+	date, err := time.Parse(time.RFC3339, dateValue)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "date must be an ISO timestamp")
+		return
+	}
+
+	party, err := s.store.createParty(r.Context(), label, date, imageURL, partifulURL, req.HTML)
+	if err != nil {
+		log.Error("party create", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to create party")
+		return
+	}
+
+	writeJSON(w, party)
 }

@@ -2,9 +2,10 @@ import { type DragEvent, type FormEvent, type PointerEvent, useEffect, useMemo, 
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, ImageRecord, PartyRecord, deleteImage, deleteUser, getHomepage, listImages, listParties, listUsers, sendHostEmail, updateHomepage, uploadImage } from "../lib/api";
+import { AppUser, ImageRecord, PartyRecord, createParty, deleteImage, deleteUser, generateHTMLDraft, getHomepage, listImages, listParties, listUsers, sendHostEmail, updateHomepage, uploadImage } from "../lib/api";
 
-type HostTab = "images" | "homepage" | "users" | "email";
+type HostTab = "images" | "parties" | "homepage" | "users" | "email";
+type PartyView = "list" | "create";
 type ImageFilter = "all" | "homepage";
 type DeleteTarget =
   | { type: "image"; image: ImageRecord }
@@ -29,6 +30,7 @@ export default function HostPage() {
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [imageFilter, setImageFilter] = useState<ImageFilter>("all");
   const [parties, setParties] = useState<PartyRecord[]>([]);
+  const [partyView, setPartyView] = useState<PartyView>("list");
   const [users, setUsers] = useState<AppUser[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -40,13 +42,24 @@ export default function HostPage() {
   const [emailMessage, setEmailMessage] = useState("");
   const [emailSuccess, setEmailSuccess] = useState("");
   const [homepageHtml, setHomepageHtml] = useState("");
+  const [homepageDraftPrompt, setHomepageDraftPrompt] = useState("");
   const [homepageSuccess, setHomepageSuccess] = useState("");
+  const [partySuccess, setPartySuccess] = useState("");
+  const [partyLabelValue, setPartyLabelValue] = useState("");
+  const [partyDate, setPartyDate] = useState("");
+  const [partyImageUrl, setPartyImageUrl] = useState("");
+  const [partyPartifulUrl, setPartyPartifulUrl] = useState("");
+  const [partyHtml, setPartyHtml] = useState("");
+  const [partyDraftPrompt, setPartyDraftPrompt] = useState("");
   const [error, setError] = useState("");
   const [loadingImages, setLoadingImages] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submittingHomepageImage, setSubmittingHomepageImage] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [savingHomepage, setSavingHomepage] = useState(false);
+  const [savingParty, setSavingParty] = useState(false);
+  const [generatingHomepageDraft, setGeneratingHomepageDraft] = useState(false);
+  const [generatingPartyDraft, setGeneratingPartyDraft] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [homepageImageModalOpen, setHomepageImageModalOpen] = useState(false);
   const [draggingImage, setDraggingImage] = useState(false);
@@ -56,6 +69,7 @@ export default function HostPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [previewImage, setPreviewImage] = useState<ImageRecord | null>(null);
 
   const filePreviewUrl = useMemo(() => {
     if (!file) {
@@ -143,6 +157,10 @@ export default function HostPage() {
     setMobileMenuOpen(false);
     setProfileOpen(false);
     setError("");
+    setPartySuccess("");
+    if (tab !== "parties") {
+      setPartyView("list");
+    }
   };
 
   const handleUpload = async (event: FormEvent) => {
@@ -285,6 +303,90 @@ export default function HostPage() {
       setError(message);
     } finally {
       setSavingHomepage(false);
+    }
+  };
+
+  const handleCreateParty = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setPartySuccess("");
+
+    if (!firebaseUser) {
+      return;
+    }
+    if (!partyDate) {
+      setError("party date is required");
+      return;
+    }
+
+    setSavingParty(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const date = new Date(`${partyDate}T00:00:00`).toISOString();
+      const party = await createParty(token, {
+        label: partyLabelValue.trim(),
+        date,
+        imageUrl: partyImageUrl.trim(),
+        partifulUrl: partyPartifulUrl.trim(),
+        html: partyHtml,
+      });
+      setParties((current) => [party, ...current]);
+      setPartyLabelValue("");
+      setPartyDate("");
+      setPartyImageUrl("");
+      setPartyPartifulUrl("");
+      setPartyHtml("");
+      setPartySuccess("Party created.");
+      setPartyView("list");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to create party";
+      setError(message);
+    } finally {
+      setSavingParty(false);
+    }
+  };
+
+  const handleGenerateHTMLDraft = async (type: "homepage" | "party") => {
+    setError("");
+    setHomepageSuccess("");
+    setPartySuccess("");
+
+    if (!firebaseUser) {
+      return;
+    }
+
+    const instructions = type === "homepage" ? homepageDraftPrompt.trim() : partyDraftPrompt.trim();
+    if (!instructions) {
+      setError("tell the AI what to write first");
+      return;
+    }
+
+    if (type === "homepage") {
+      setGeneratingHomepageDraft(true);
+    } else {
+      setGeneratingPartyDraft(true);
+    }
+
+    try {
+      const token = await firebaseUser.getIdToken();
+      const draft = await generateHTMLDraft(token, {
+        type,
+        instructions,
+        existingHtml: type === "homepage" ? homepageHtml : partyHtml,
+      });
+      if (type === "homepage") {
+        setHomepageHtml(draft.html);
+        setHomepageSuccess("AI draft added.");
+      } else {
+        setPartyHtml(draft.html);
+        setPartySuccess("AI draft added.");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to generate html draft";
+      setError(message);
+    } finally {
+      setGeneratingHomepageDraft(false);
+      setGeneratingPartyDraft(false);
     }
   };
 
@@ -529,6 +631,15 @@ export default function HostPage() {
               Images
             </button>
             <button
+              className={activeTab === "parties" ? "main-tab active" : "main-tab"}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "parties"}
+              onClick={() => selectHostTab("parties")}
+            >
+              Parties
+            </button>
+            <button
               className={activeTab === "email" ? "main-tab active" : "main-tab"}
               type="button"
               role="tab"
@@ -614,9 +725,14 @@ export default function HostPage() {
                 {filteredImages.map((image) => (
                   <article className="image-grid-card" key={image.id}>
                     <div className="image-grid-image-wrap">
-                      <a href={image.imageUrl} target="_blank" rel="noreferrer">
-                      <img src={image.imageUrl} alt={`Uploaded on ${formatDate(image.date)}`} />
-                      </a>
+                      <button
+                        className="image-preview-trigger"
+                        type="button"
+                        onClick={() => setPreviewImage(image)}
+                        aria-label={`Open image uploaded on ${formatDate(image.date)}`}
+                      >
+                        <img src={image.imageUrl} alt={`Uploaded on ${formatDate(image.date)}`} />
+                      </button>
                       <button
                         className="image-delete-button"
                         type="button"
@@ -636,9 +752,144 @@ export default function HostPage() {
               </div>
             )}
             </section>
+          ) : activeTab === "parties" ? (
+            <section className="host-panel" role="tabpanel">
+              {partyView === "list" ? (
+                <>
+                  <div className="host-panel-header">
+                    <button className="auth-submit" type="button" onClick={() => {
+                      setPartyView("create");
+                      setError("");
+                      setPartySuccess("");
+                    }}>
+                      Add New Party
+                    </button>
+                  </div>
+
+                  {partySuccess ? <p className="host-success">{partySuccess}</p> : null}
+                  {error ? <p className="auth-error">{error}</p> : null}
+
+                  <div className="host-table-wrap">
+                    <table className="host-table">
+                      <thead>
+                        <tr>
+                          <th>Party</th>
+                          <th>Date</th>
+                          <th>Image</th>
+                          <th>Partiful</th>
+                          <th>HTML</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parties.map((party) => (
+                          <tr key={party.id}>
+                            <td>{party.label}</td>
+                            <td>{formatDate(party.date)}</td>
+                            <td>
+                              <a href={party.imageUrl} target="_blank" rel="noreferrer">View</a>
+                            </td>
+                            <td>
+                              <a href={party.partifulUrl} target="_blank" rel="noreferrer">Open</a>
+                            </td>
+                            <td>{party.html.trim() ? "Added" : "Empty"}</td>
+                          </tr>
+                        ))}
+                        {parties.length === 0 ? (
+                          <tr>
+                            <td colSpan={5}>No parties yet.</td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <form className="party-form" onSubmit={handleCreateParty}>
+                  <div className="host-panel-header">
+                    <button className="auth-secondary" type="button" onClick={() => {
+                      setPartyView("list");
+                      setError("");
+                    }}>
+                      Back to Parties
+                    </button>
+                  </div>
+
+                  <label className="auth-field">
+                    <span>Party label</span>
+                    <input value={partyLabelValue} onChange={(event) => setPartyLabelValue(event.target.value)} required />
+                  </label>
+                  <label className="auth-field">
+                    <span>Date</span>
+                    <input type="date" value={partyDate} onChange={(event) => setPartyDate(event.target.value)} required />
+                  </label>
+                  <label className="auth-field">
+                    <span>Image URL</span>
+                    <input type="url" value={partyImageUrl} onChange={(event) => setPartyImageUrl(event.target.value)} required />
+                  </label>
+                  <label className="auth-field">
+                    <span>Partiful URL</span>
+                    <input type="url" value={partyPartifulUrl} onChange={(event) => setPartyPartifulUrl(event.target.value)} required />
+                  </label>
+                  <div className="ai-draft-box">
+                    <label className="auth-field host-message-field">
+                      <span>AI Help</span>
+                      <textarea
+                        value={partyDraftPrompt}
+                        onChange={(event) => setPartyDraftPrompt(event.target.value)}
+                        rows={3}
+                        placeholder="Describe the party announcement you want..."
+                      />
+                    </label>
+                    <button
+                      className="auth-secondary"
+                      type="button"
+                      onClick={() => void handleGenerateHTMLDraft("party")}
+                      disabled={generatingPartyDraft}
+                    >
+                      {generatingPartyDraft ? "Writing..." : "Draft Party HTML"}
+                    </button>
+                    {partySuccess ? <p className="host-success">{partySuccess}</p> : null}
+                  </div>
+                  <label className="auth-field host-message-field">
+                    <span>Announcement HTML</span>
+                    <textarea
+                      value={partyHtml}
+                      onChange={(event) => setPartyHtml(event.target.value)}
+                      rows={10}
+                      placeholder="<h2>Party announcement</h2><p>Details...</p>"
+                    />
+                  </label>
+
+                  {error ? <p className="auth-error">{error}</p> : null}
+
+                  <button className="auth-submit" type="submit" disabled={savingParty}>
+                    {savingParty ? "Creating..." : "Create Party"}
+                  </button>
+                </form>
+              )}
+            </section>
           ) : activeTab === "homepage" ? (
             <section className="host-panel" role="tabpanel">
             <form className="homepage-editor" onSubmit={handleSaveHomepage}>
+              <div className="ai-draft-box">
+                <label className="auth-field host-message-field">
+                  <span>AI Help</span>
+                  <textarea
+                    value={homepageDraftPrompt}
+                    onChange={(event) => setHomepageDraftPrompt(event.target.value)}
+                    rows={3}
+                    placeholder="Describe the homepage announcement you want..."
+                  />
+                </label>
+                <button
+                  className="auth-secondary"
+                  type="button"
+                  onClick={() => void handleGenerateHTMLDraft("homepage")}
+                  disabled={generatingHomepageDraft}
+                >
+                  {generatingHomepageDraft ? "Writing..." : "Draft Homepage HTML"}
+                </button>
+              </div>
               <label className="auth-field host-message-field">
                 <span>Homepage HTML</span>
                 <textarea
@@ -961,6 +1212,23 @@ export default function HostPage() {
                 </button>
               </form>
             </section>
+          </div>
+        ) : null}
+        {previewImage ? (
+          <div className="image-lightbox-backdrop" role="presentation" onMouseDown={() => setPreviewImage(null)}>
+            <figure
+              className="image-lightbox"
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Image uploaded on ${formatDate(previewImage.date)}`}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <img src={previewImage.imageUrl} alt={`Uploaded on ${formatDate(previewImage.date)}`} />
+              <figcaption>
+                <span>{formatDate(previewImage.date)}</span>
+                <span>{previewImage.partyId ? partyLabel(parties, previewImage.partyId) : previewImage.homepage ? "Homepage" : "No party"}</span>
+              </figcaption>
+            </figure>
           </div>
         ) : null}
         {deleteTarget ? (
