@@ -36,6 +36,9 @@ const calendarMonths = [
 const calendarWeekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const currentYear = new Date().getFullYear();
 const partyCalendarYears = Array.from({ length: 10 }, (_, index) => currentYear - 2 + index);
+const partyHours = Array.from({ length: 12 }, (_, index) => String(index + 1));
+const partyMinutes = ["00", "15", "30", "45"];
+const partyPeriods = ["AM", "PM"] as const;
 
 function toDateInputValue(date: Date) {
   const year = date.getFullYear();
@@ -64,6 +67,21 @@ function formatPartyDate(value: string) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatPartyDateTime(value: string, hour: string, minute: string, period: string) {
+  if (!value) {
+    return "Select a date";
+  }
+
+  return `${formatPartyDate(value)} at ${hour}:${minute} ${period}`;
+}
+
+function partyDateTimeToISO(value: string, hour: string, minute: string, period: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  const baseHour = Number(hour) % 12;
+  const hour24 = period === "PM" ? baseHour + 12 : baseHour;
+  return new Date(year, month - 1, day, hour24, Number(minute), 0, 0).toISOString();
 }
 
 export default function HostPage() {
@@ -97,6 +115,9 @@ export default function HostPage() {
   const [partySuccess, setPartySuccess] = useState("");
   const [partyLabelValue, setPartyLabelValue] = useState("");
   const [partyDate, setPartyDate] = useState("");
+  const [partyHour, setPartyHour] = useState("7");
+  const [partyMinute, setPartyMinute] = useState("00");
+  const [partyPeriod, setPartyPeriod] = useState<(typeof partyPeriods)[number]>("PM");
   const [partyDateModalOpen, setPartyDateModalOpen] = useState(false);
   const [partyCalendarDate, setPartyCalendarDate] = useState(() => dateFromInputValue(""));
   const [partyHtml, setPartyHtml] = useState("");
@@ -398,7 +419,7 @@ export default function HostPage() {
     setSavingParty(true);
     try {
       const token = await firebaseUser.getIdToken();
-      const date = new Date(`${partyDate}T00:00:00`).toISOString();
+      const date = partyDateTimeToISO(partyDate, partyHour, partyMinute, partyPeriod);
       const party = await createParty(token, {
         label: partyLabelValue.trim(),
         date,
@@ -407,6 +428,9 @@ export default function HostPage() {
       setParties((current) => [party, ...current]);
       setPartyLabelValue("");
       setPartyDate("");
+      setPartyHour("7");
+      setPartyMinute("00");
+      setPartyPeriod("PM");
       setPartyHtml("");
       setPartySuccess("Party created.");
       setPartyView("list");
@@ -595,7 +619,6 @@ export default function HostPage() {
   const selectPartyDate = (day: number) => {
     const nextDate = new Date(partyCalendarDate.getFullYear(), partyCalendarDate.getMonth(), day);
     setPartyDate(toDateInputValue(nextDate));
-    setPartyDateModalOpen(false);
   };
 
   const closeUploadModal = () => {
@@ -938,7 +961,7 @@ export default function HostPage() {
                         {parties.map((party) => (
                           <tr key={party.id}>
                             <td>{party.label}</td>
-                            <td>{formatDate(party.date)}</td>
+                            <td>{formatDateTime(party.date)}</td>
                             <td>{party.html.trim() ? "Added" : "Empty"}</td>
                           </tr>
                         ))}
@@ -969,7 +992,7 @@ export default function HostPage() {
                   <div className="auth-field party-date-field">
                     <span>Date</span>
                     <button className="auth-secondary party-date-trigger" type="button" onClick={openPartyDateModal}>
-                      {partyDate ? formatPartyDate(partyDate) : "Select a date"}
+                      {formatPartyDateTime(partyDate, partyHour, partyMinute, partyPeriod)}
                     </button>
                   </div>
                   <div className="ai-draft-box">
@@ -1175,7 +1198,7 @@ export default function HostPage() {
               </div>
 
               <div className="modal-header">
-                <h2 className="host-section-title" id="party-date-modal-title">Select a date</h2>
+                <h2 className="host-section-title" id="party-date-modal-title">Select date and time</h2>
                 <button className="modal-close" type="button" onClick={() => setPartyDateModalOpen(false)} aria-label="Close date picker">
                   x
                 </button>
@@ -1204,6 +1227,39 @@ export default function HostPage() {
                 </label>
               </div>
 
+              <div className="party-time-controls">
+                <label>
+                  <span>Hour</span>
+                  <select value={partyHour} onChange={(event) => setPartyHour(event.target.value)}>
+                    {partyHours.map((hour) => (
+                      <option key={hour} value={hour}>
+                        {hour}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Minute</span>
+                  <select value={partyMinute} onChange={(event) => setPartyMinute(event.target.value)}>
+                    {partyMinutes.map((minute) => (
+                      <option key={minute} value={minute}>
+                        {minute}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>AM/PM</span>
+                  <select value={partyPeriod} onChange={(event) => setPartyPeriod(event.target.value as (typeof partyPeriods)[number])}>
+                    {partyPeriods.map((period) => (
+                      <option key={period} value={period}>
+                        {period}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
               <div className="party-calendar-grid" role="grid" aria-label="Party date calendar">
                 {calendarWeekdays.map((weekday) => (
                   <span className="party-calendar-weekday" key={weekday}>
@@ -1225,6 +1281,9 @@ export default function HostPage() {
                   )
                 ))}
               </div>
+              <button className="auth-submit party-calendar-done" type="button" onClick={() => setPartyDateModalOpen(false)} disabled={!partyDate}>
+                Done
+              </button>
             </section>
           </div>
         ) : null}

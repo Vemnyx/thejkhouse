@@ -838,14 +838,24 @@ body {
   width: min(100%, 28rem);
 }
 
-.party-calendar-controls {
+.party-calendar-controls,
+.party-time-controls {
   display: grid;
-  grid-template-columns: 1fr 0.8fr;
   gap: 0.75rem;
+}
+
+.party-calendar-controls {
+  grid-template-columns: 1fr 0.8fr;
   margin-bottom: 1rem;
 }
 
-.party-calendar-controls label {
+.party-time-controls {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 1rem;
+}
+
+.party-calendar-controls label,
+.party-time-controls label {
   display: grid;
   gap: 0.45rem;
   color: var(--gold);
@@ -853,7 +863,8 @@ body {
   letter-spacing: 0.08em;
 }
 
-.party-calendar-controls select {
+.party-calendar-controls select,
+.party-time-controls select {
   width: 100%;
   border: 1px solid rgba(232, 120, 143, 0.28);
   background: rgba(3, 3, 3, 0.55);
@@ -895,6 +906,10 @@ body {
   border-color: rgba(232, 120, 143, 0.72);
   background: rgba(42, 8, 16, 0.78);
   color: var(--rose-pale);
+}
+
+.party-calendar-done {
+  margin-top: 1rem;
 }
 
 .ai-draft-box {
