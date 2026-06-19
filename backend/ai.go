@@ -89,8 +89,8 @@ func loadCursorAPIKey(ctx context.Context) (string, error) {
 	return strings.TrimSpace(apiKey), nil
 }
 
-func (c *aiClient) generateHTML(ctx context.Context, blockType string, instructions string, existingHTML string) (string, error) {
-	prompt := buildHTMLPrompt(blockType, instructions, existingHTML)
+func (c *aiClient) generateHTML(ctx context.Context, blockType string, instructions string, existingHTML string, imageURLs []string) (string, error) {
+	prompt := buildHTMLPrompt(blockType, instructions, existingHTML, imageURLs)
 	createPayload := cursorCreateAgentRequest{
 		Prompt: cursorPrompt{Text: prompt},
 		Name:   "Draft JK House HTML block",
@@ -194,12 +194,17 @@ func (c *aiClient) doJSON(ctx context.Context, method string, path string, paylo
 	return nil
 }
 
-func buildHTMLPrompt(blockType string, instructions string, existingHTML string) string {
+func buildHTMLPrompt(blockType string, instructions string, existingHTML string, imageURLs []string) string {
 	var target string
 	if blockType == "party" {
 		target = "a party announcement block"
 	} else {
 		target = "a homepage announcement block"
+	}
+
+	imageInstructions := "No uploaded images were provided."
+	if len(imageURLs) > 0 {
+		imageInstructions = "The host uploaded these public CDN image URLs. Work them into the HTML only where they naturally support the announcement. Use img tags with useful alt text, and do not invent or use any image URLs beyond this list:\n- " + strings.Join(imageURLs, "\n- ")
 	}
 
 	return fmt.Sprintf(`You are helping The JK House website host draft %s.
@@ -209,15 +214,19 @@ Use the repository context to match the existing frontend aesthetic and CSS conv
 Rules:
 - Do not edit files.
 - Return only a safe HTML fragment, not a full document.
-- Do not include markdown fences, explanations, scripts, inline event handlers, forms, iframes, or external assets.
+- Do not include markdown fences, explanations, scripts, inline event handlers, forms, or iframes.
+- Do not use external assets except the uploaded CDN image URLs listed below.
 - Prefer semantic HTML elements and copy that fits The JK House tone.
 - Keep the fragment concise enough to paste into the existing editor.
 
 Host instructions:
 %s
 
+Uploaded images:
+%s
+
 Existing HTML, if any:
-%s`, target, instructions, existingHTML)
+%s`, target, instructions, imageInstructions, existingHTML)
 }
 
 func cleanGeneratedHTML(value string) string {

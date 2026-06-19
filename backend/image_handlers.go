@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -26,15 +27,19 @@ func (s *apiServer) handleImages(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *apiServer) handleImageByID(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
+	switch r.Method {
+	case http.MethodDelete:
+		s.handleDeleteImage(w, r)
+	case http.MethodPatch:
+		s.handleUpdateImage(w, r)
+	default:
 		methodNotAllowed(w)
-		return
 	}
+}
 
-	idText := strings.TrimPrefix(r.URL.Path, "/images/")
-	id, err := strconv.ParseInt(idText, 10, 64)
-	if err != nil || id < 1 {
-		writeError(w, http.StatusBadRequest, "invalid image id")
+func (s *apiServer) handleDeleteImage(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseImageID(w, r)
+	if !ok {
 		return
 	}
 
@@ -81,6 +86,62 @@ func (s *apiServer) handleImageByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type updateImageRequest struct {
+	Homepage bool `json:"homepage"`
+}
+
+func (s *apiServer) handleUpdateImage(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseImageID(w, r)
+	if !ok {
+		return
+	}
+
+	user, err := s.loadUserFromRequest(r)
+	if err != nil {
+		if authErr, ok := err.(*authRequestError); ok {
+			writeError(w, authErr.status, authErr.message)
+			return
+		}
+		log.Error("image update auth", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to authorize image update")
+		return
+	}
+	if user.Role != RoleHost {
+		writeError(w, http.StatusForbidden, "host access is required")
+		return
+	}
+
+	var req updateImageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid image update")
+		return
+	}
+
+	image, err := s.store.updateImageHomepage(r.Context(), id, req.Homepage)
+	if err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusNotFound, "image not found")
+			return
+		}
+		log.Error("image homepage update", "error", err, "image_id", id)
+		writeError(w, http.StatusInternalServerError, "failed to update image")
+		return
+	}
+
+	writeJSON(w, image)
+}
+
+func parseImageID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	idText := strings.TrimPrefix(r.URL.Path, "/images/")
+	id, err := strconv.ParseInt(idText, 10, 64)
+	if err != nil || id < 1 {
+		writeError(w, http.StatusBadRequest, "invalid image id")
+		return 0, false
+	}
+
+	return id, true
 }
 
 func (s *apiServer) handleListImages(w http.ResponseWriter, r *http.Request) {
@@ -149,6 +210,7 @@ func (s *apiServer) handleCreateImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	homepage := parseFormBool(r.FormValue("homepage"))
+	notes := strings.TrimSpace(r.FormValue("notes"))
 
 	sample := make([]byte, 512)
 	n, readErr := file.Read(sample)
@@ -171,7 +233,7 @@ func (s *apiServer) handleCreateImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	image, err := s.store.createImage(r.Context(), imageURL, imageDate, partyID, homepage)
+	image, err := s.store.createImage(r.Context(), imageURL, imageDate, partyID, homepage, notes)
 	if err != nil {
 		log.Error("image create row", "error", err, "image_url", imageURL)
 		writeError(w, http.StatusInternalServerError, "failed to save image")

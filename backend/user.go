@@ -25,16 +25,15 @@ type Image struct {
 	Date       time.Time `json:"date"`
 	PartyID    *int64    `json:"partyId"`
 	Homepage   bool      `json:"homepage"`
+	Notes      string    `json:"notes"`
 	UploadedAt time.Time `json:"uploadedAt"`
 }
 
 type Party struct {
-	ID          int64     `json:"id"`
-	Label       string    `json:"label"`
-	Date        time.Time `json:"date"`
-	ImageURL    string    `json:"imageUrl"`
-	PartifulURL string    `json:"partifulUrl"`
-	HTML        string    `json:"html"`
+	ID    int64     `json:"id"`
+	Label string    `json:"label"`
+	Date  time.Time `json:"date"`
+	HTML  string    `json:"html"`
 }
 
 type Homepage struct {

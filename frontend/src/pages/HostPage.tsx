@@ -2,11 +2,12 @@ import { type DragEvent, type FormEvent, type PointerEvent, useEffect, useMemo, 
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, ImageRecord, PartyRecord, createParty, deleteImage, deleteUser, generateHTMLDraft, getHomepage, listImages, listParties, listUsers, sendHostEmail, updateHomepage, uploadImage } from "../lib/api";
+import { AppUser, ImageRecord, PartyRecord, createParty, deleteImage, deleteUser, generateHTMLDraft, getHomepage, listImages, listParties, listUsers, sendHostEmail, updateHomepage, updateImageHomepage, uploadAIImage, uploadImage } from "../lib/api";
 
 type HostTab = "images" | "parties" | "homepage" | "users" | "email";
 type PartyView = "list" | "create";
 type ImageFilter = "all" | "homepage";
+type AIDraftType = "homepage" | "party";
 type DeleteTarget =
   | { type: "image"; image: ImageRecord }
   | { type: "user"; user: AppUser };
@@ -17,13 +18,60 @@ type CropBox = {
   size: number;
 };
 
-const homepageCropSize = 1200;
+const uploadCropSize = 1200;
+const calendarMonths = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+const calendarWeekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const currentYear = new Date().getFullYear();
+const partyCalendarYears = Array.from({ length: 10 }, (_, index) => currentYear - 2 + index);
+
+function toDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateFromInputValue(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  }
+
+  return new Date(year, month - 1, day);
+}
+
+function formatPartyDate(value: string) {
+  if (!value) {
+    return "No date selected";
+  }
+
+  return dateFromInputValue(value).toLocaleDateString(undefined, {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export default function HostPage() {
   const navigate = useNavigate();
   const { appUser, firebaseUser, logout } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const homepageFileInputRef = useRef<HTMLInputElement | null>(null);
+  const homepageAIFileInputRef = useRef<HTMLInputElement | null>(null);
+  const partyAIFileInputRef = useRef<HTMLInputElement | null>(null);
   const cropStageRef = useRef<HTMLDivElement | null>(null);
   const cropDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const [activeTab, setActiveTab] = useState<HostTab>("images");
@@ -35,7 +83,8 @@ export default function HostPage() {
   const [file, setFile] = useState<File | null>(null);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [partyId, setPartyId] = useState("");
-  const [homepageFile, setHomepageFile] = useState<File | null>(null);
+  const [homepage, setHomepage] = useState(false);
+  const [notes, setNotes] = useState("");
   const [cropBox, setCropBox] = useState<CropBox | null>(null);
   const [emailTo, setEmailTo] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
@@ -43,30 +92,32 @@ export default function HostPage() {
   const [emailSuccess, setEmailSuccess] = useState("");
   const [homepageHtml, setHomepageHtml] = useState("");
   const [homepageDraftPrompt, setHomepageDraftPrompt] = useState("");
+  const [homepageDraftImageUrls, setHomepageDraftImageUrls] = useState<string[]>([]);
   const [homepageSuccess, setHomepageSuccess] = useState("");
   const [partySuccess, setPartySuccess] = useState("");
   const [partyLabelValue, setPartyLabelValue] = useState("");
   const [partyDate, setPartyDate] = useState("");
-  const [partyImageUrl, setPartyImageUrl] = useState("");
-  const [partyPartifulUrl, setPartyPartifulUrl] = useState("");
+  const [partyDateModalOpen, setPartyDateModalOpen] = useState(false);
+  const [partyCalendarDate, setPartyCalendarDate] = useState(() => dateFromInputValue(""));
   const [partyHtml, setPartyHtml] = useState("");
   const [partyDraftPrompt, setPartyDraftPrompt] = useState("");
+  const [partyDraftImageUrls, setPartyDraftImageUrls] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loadingImages, setLoadingImages] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [submittingHomepageImage, setSubmittingHomepageImage] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [savingHomepage, setSavingHomepage] = useState(false);
   const [savingParty, setSavingParty] = useState(false);
   const [generatingHomepageDraft, setGeneratingHomepageDraft] = useState(false);
   const [generatingPartyDraft, setGeneratingPartyDraft] = useState(false);
+  const [uploadingAIImages, setUploadingAIImages] = useState<AIDraftType | null>(null);
+  const [draggingAIImages, setDraggingAIImages] = useState<AIDraftType | null>(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [homepageImageModalOpen, setHomepageImageModalOpen] = useState(false);
   const [draggingImage, setDraggingImage] = useState(false);
-  const [draggingHomepageImage, setDraggingHomepageImage] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [updatingHomepageId, setUpdatingHomepageId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [previewImage, setPreviewImage] = useState<ImageRecord | null>(null);
@@ -86,22 +137,6 @@ export default function HostPage() {
       }
     };
   }, [filePreviewUrl]);
-
-  const homepageFilePreviewUrl = useMemo(() => {
-    if (!homepageFile) {
-      return "";
-    }
-
-    return URL.createObjectURL(homepageFile);
-  }, [homepageFile]);
-
-  useEffect(() => {
-    return () => {
-      if (homepageFilePreviewUrl) {
-        URL.revokeObjectURL(homepageFilePreviewUrl);
-      }
-    };
-  }, [homepageFilePreviewUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -146,6 +181,20 @@ export default function HostPage() {
     };
   }, [firebaseUser]);
 
+  const partyCalendarDays = useMemo(() => {
+    const year = partyCalendarDate.getFullYear();
+    const month = partyCalendarDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells: Array<number | null> = Array.from({ length: firstDay.getDay() }, () => null);
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      cells.push(day);
+    }
+
+    return cells;
+  }, [partyCalendarDate]);
+
   if (appUser?.role !== "host") {
     return <Navigate to="/" replace />;
   }
@@ -174,13 +223,19 @@ export default function HostPage() {
 
     setSubmitting(true);
     try {
+      const croppedFile = await createCroppedUploadFile();
       const token = await firebaseUser.getIdToken();
-      const uploaded = await uploadImage(token, file, date, {
+      const uploaded = await uploadImage(token, croppedFile, date, {
         partyId: partyId ? Number(partyId) : null,
+        homepage,
+        notes: notes.trim(),
       });
       setImages((current) => [uploaded, ...current]);
       setFile(null);
       setPartyId("");
+      setHomepage(false);
+      setNotes("");
+      setCropBox(null);
       setUploadModalOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to upload image";
@@ -207,6 +262,26 @@ export default function HostPage() {
     } finally {
       setDeletingId(null);
       setDeleteTarget(null);
+    }
+  };
+
+  const handleToggleHomepageImage = async (image: ImageRecord) => {
+    if (!firebaseUser) {
+      return;
+    }
+
+    setError("");
+    setUpdatingHomepageId(image.id);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const updated = await updateImageHomepage(token, image.id, !image.homepage);
+      setImages((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setPreviewImage((current) => (current?.id === updated.id ? updated : current));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to update homepage image";
+      setError(message);
+    } finally {
+      setUpdatingHomepageId(null);
     }
   };
 
@@ -249,6 +324,7 @@ export default function HostPage() {
       : deleteTarget?.type === "user"
         ? deletingUserId === deleteTarget.user.id
         : false;
+  const generatingHTMLDraft = generatingHomepageDraft || generatingPartyDraft;
 
   const filteredImages = imageFilter === "homepage"
     ? images.filter((image) => image.homepage)
@@ -326,15 +402,11 @@ export default function HostPage() {
       const party = await createParty(token, {
         label: partyLabelValue.trim(),
         date,
-        imageUrl: partyImageUrl.trim(),
-        partifulUrl: partyPartifulUrl.trim(),
         html: partyHtml,
       });
       setParties((current) => [party, ...current]);
       setPartyLabelValue("");
       setPartyDate("");
-      setPartyImageUrl("");
-      setPartyPartifulUrl("");
       setPartyHtml("");
       setPartySuccess("Party created.");
       setPartyView("list");
@@ -356,6 +428,7 @@ export default function HostPage() {
     }
 
     const instructions = type === "homepage" ? homepageDraftPrompt.trim() : partyDraftPrompt.trim();
+    const imageUrls = type === "homepage" ? homepageDraftImageUrls : partyDraftImageUrls;
     if (!instructions) {
       setError("tell the AI what to write first");
       return;
@@ -373,13 +446,16 @@ export default function HostPage() {
         type,
         instructions,
         existingHtml: type === "homepage" ? homepageHtml : partyHtml,
+        imageUrls,
       });
       if (type === "homepage") {
         setHomepageHtml(draft.html);
         setHomepageSuccess("AI draft added.");
+        setHomepageDraftImageUrls([]);
       } else {
         setPartyHtml(draft.html);
         setPartySuccess("AI draft added.");
+        setPartyDraftImageUrls([]);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to generate html draft";
@@ -390,20 +466,138 @@ export default function HostPage() {
     }
   };
 
+  const handleAIDraftImageFiles = async (type: AIDraftType, files: FileList | File[]) => {
+    if (!firebaseUser) {
+      return;
+    }
+
+    const imageFiles = Array.from(files).filter((item) => item.type.startsWith("image/"));
+    if (imageFiles.length === 0) {
+      setError("choose image files to upload");
+      return;
+    }
+
+    setError("");
+    setUploadingAIImages(type);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const uploaded = await Promise.all(imageFiles.map((file) => uploadAIImage(token, file)));
+      const urls = uploaded.map((item) => item.imageUrl);
+      if (type === "homepage") {
+        setHomepageDraftImageUrls((current) => [...current, ...urls]);
+      } else {
+        setPartyDraftImageUrls((current) => [...current, ...urls]);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to upload AI helper image";
+      setError(message);
+    } finally {
+      setUploadingAIImages(null);
+      setDraggingAIImages(null);
+    }
+  };
+
+  const handleAIDraftImageDrop = (type: AIDraftType, event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDraggingAIImages(null);
+    void handleAIDraftImageFiles(type, event.dataTransfer.files);
+  };
+
+  const removeAIDraftImage = (type: AIDraftType, imageUrl: string) => {
+    if (type === "homepage") {
+      setHomepageDraftImageUrls((current) => current.filter((item) => item !== imageUrl));
+    } else {
+      setPartyDraftImageUrls((current) => current.filter((item) => item !== imageUrl));
+    }
+  };
+
+  const renderAIDraftImageAssist = (type: AIDraftType) => {
+    const imageUrls = type === "homepage" ? homepageDraftImageUrls : partyDraftImageUrls;
+    const inputRef = type === "homepage" ? homepageAIFileInputRef : partyAIFileInputRef;
+    const uploading = uploadingAIImages === type;
+    const dragging = draggingAIImages === type;
+
+    return (
+      <div
+        className={dragging ? "ai-image-dropzone dragging" : "ai-image-dropzone"}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDraggingAIImages(type);
+        }}
+        onDragLeave={() => setDraggingAIImages(null)}
+        onDrop={(event) => handleAIDraftImageDrop(type, event)}
+      >
+        <div>
+          <p>Drop images here for the AI to use.</p>
+          {imageUrls.length > 0 ? (
+            <ul className="ai-image-list">
+              {imageUrls.map((imageUrl) => (
+                <li key={imageUrl}>
+                  <a href={imageUrl} target="_blank" rel="noreferrer">
+                    {imageUrl}
+                  </a>
+                  <button type="button" onClick={() => removeAIDraftImage(type, imageUrl)} aria-label="Remove AI helper image">
+                    x
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+        <button
+          className="ai-image-upload-button"
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+        >
+          {uploading ? "Uploading..." : "Add image"}
+        </button>
+        <input
+          ref={inputRef}
+          className="visually-hidden"
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          multiple
+          disabled={uploading}
+          onChange={(event) => {
+            if (event.target.files) {
+              void handleAIDraftImageFiles(type, event.target.files);
+            }
+            event.target.value = "";
+          }}
+        />
+      </div>
+    );
+  };
+
   const openUploadModal = () => {
     setError("");
     setFile(null);
     setPartyId("");
+    setHomepage(false);
+    setNotes("");
+    setCropBox(null);
     setDraggingImage(false);
     setUploadModalOpen(true);
   };
 
-  const openHomepageImageModal = () => {
-    setError("");
-    setHomepageFile(null);
-    setCropBox(null);
-    setDraggingHomepageImage(false);
-    setHomepageImageModalOpen(true);
+  const openPartyDateModal = () => {
+    setPartyCalendarDate(dateFromInputValue(partyDate));
+    setPartyDateModalOpen(true);
+  };
+
+  const updatePartyCalendarMonth = (month: number) => {
+    setPartyCalendarDate((current) => new Date(current.getFullYear(), month, 1));
+  };
+
+  const updatePartyCalendarYear = (year: number) => {
+    setPartyCalendarDate((current) => new Date(year, current.getMonth(), 1));
+  };
+
+  const selectPartyDate = (day: number) => {
+    const nextDate = new Date(partyCalendarDate.getFullYear(), partyCalendarDate.getMonth(), day);
+    setPartyDate(toDateInputValue(nextDate));
+    setPartyDateModalOpen(false);
   };
 
   const closeUploadModal = () => {
@@ -413,18 +607,10 @@ export default function HostPage() {
     setUploadModalOpen(false);
     setFile(null);
     setPartyId("");
-    setDraggingImage(false);
-  };
-
-  const closeHomepageImageModal = () => {
-    if (submittingHomepageImage) {
-      return;
-    }
-
-    setHomepageImageModalOpen(false);
-    setHomepageFile(null);
+    setHomepage(false);
+    setNotes("");
     setCropBox(null);
-    setDraggingHomepageImage(false);
+    setDraggingImage(false);
   };
 
   const handleImageDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -441,23 +627,6 @@ export default function HostPage() {
     }
 
     setFile(droppedFile);
-    setError("");
-  };
-
-  const handleHomepageImageDrop = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setDraggingHomepageImage(false);
-
-    const droppedFile = event.dataTransfer.files[0];
-    if (!droppedFile) {
-      return;
-    }
-    if (!droppedFile.type.startsWith("image/")) {
-      setError("choose an image file");
-      return;
-    }
-
-    setHomepageFile(droppedFile);
     setCropBox(null);
     setError("");
   };
@@ -530,18 +699,18 @@ export default function HostPage() {
     }
   };
 
-  const createCroppedHomepageFile = async () => {
-    if (!homepageFile || !homepageFilePreviewUrl || !cropBox || !cropStageRef.current) {
+  const createCroppedUploadFile = async () => {
+    if (!file || !filePreviewUrl || !cropBox || !cropStageRef.current) {
       throw new Error("choose an image to crop");
     }
 
     const bounds = cropStageRef.current.getBoundingClientRect();
-    const image = await loadImage(homepageFilePreviewUrl);
+    const image = await loadImage(filePreviewUrl);
     const scaleX = image.naturalWidth / bounds.width;
     const scaleY = image.naturalHeight / bounds.height;
     const canvas = document.createElement("canvas");
-    canvas.width = homepageCropSize;
-    canvas.height = homepageCropSize;
+    canvas.width = uploadCropSize;
+    canvas.height = uploadCropSize;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) {
@@ -556,8 +725,8 @@ export default function HostPage() {
       cropBox.size * scaleY,
       0,
       0,
-      homepageCropSize,
-      homepageCropSize,
+      uploadCropSize,
+      uploadCropSize,
     );
 
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
@@ -565,35 +734,7 @@ export default function HostPage() {
       throw new Error("failed to crop image");
     }
 
-    return new File([blob], `homepage-${Date.now()}.jpg`, { type: "image/jpeg" });
-  };
-
-  const handleHomepageImageUpload = async (event: FormEvent) => {
-    event.preventDefault();
-    setError("");
-
-    if (!firebaseUser || !homepageFile) {
-      setError("choose an image to upload");
-      return;
-    }
-
-    setSubmittingHomepageImage(true);
-    try {
-      const croppedFile = await createCroppedHomepageFile();
-      const token = await firebaseUser.getIdToken();
-      const uploaded = await uploadImage(token, croppedFile, new Date().toISOString().slice(0, 10), {
-        homepage: true,
-      });
-      setImages((current) => [uploaded, ...current]);
-      setHomepageFile(null);
-      setCropBox(null);
-      setHomepageImageModalOpen(false);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "failed to upload homepage image";
-      setError(message);
-    } finally {
-      setSubmittingHomepageImage(false);
-    }
+    return new File([blob], `image-${Date.now()}.jpg`, { type: "image/jpeg" });
   };
 
   return (
@@ -666,6 +807,17 @@ export default function HostPage() {
             >
               Users
             </button>
+            <button
+              className="main-tab"
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setProfileOpen(false);
+                navigate("/");
+              }}
+            >
+              Dashboard
+            </button>
           </nav>
 
           <div className="profile-menu">
@@ -680,9 +832,6 @@ export default function HostPage() {
             </button>
             {profileOpen ? (
               <div className="profile-dropdown" role="menu">
-                <button type="button" role="menuitem" onClick={() => navigate("/")}>
-                  Return to dashboard
-                </button>
                 <button type="button" role="menuitem" onClick={() => logout()}>
                   Log Out
                 </button>
@@ -705,9 +854,6 @@ export default function HostPage() {
               <div className="host-panel-actions">
                 <button className="auth-submit" type="button" onClick={openUploadModal}>
                   Add New Image
-                </button>
-                <button className="auth-secondary" type="button" onClick={openHomepageImageModal}>
-                  Add Homepage Image
                 </button>
               </div>
             </div>
@@ -742,10 +888,22 @@ export default function HostPage() {
                       >
                         {deletingId === image.id ? "..." : "🗑"}
                       </button>
+                      <button
+                        className={image.homepage ? "image-homepage-button active" : "image-homepage-button"}
+                        type="button"
+                        aria-label={image.homepage ? "Remove from homepage images" : "Use as homepage image"}
+                        aria-pressed={image.homepage}
+                        title={image.homepage ? "Homepage image" : "Not on homepage"}
+                        onClick={() => void handleToggleHomepageImage(image)}
+                        disabled={updatingHomepageId === image.id}
+                      >
+                        {updatingHomepageId === image.id ? "..." : image.homepage ? "★" : "☆"}
+                      </button>
                     </div>
                     <div className="image-grid-meta">
                       <span>{formatDate(image.date)}</span>
                       <span>{image.partyId ? partyLabel(parties, image.partyId) : image.homepage ? "Homepage" : "No party"}</span>
+                      {image.notes ? <span>{image.notes}</span> : null}
                     </div>
                   </article>
                 ))}
@@ -775,8 +933,6 @@ export default function HostPage() {
                         <tr>
                           <th>Party</th>
                           <th>Date</th>
-                          <th>Image</th>
-                          <th>Partiful</th>
                           <th>HTML</th>
                         </tr>
                       </thead>
@@ -785,18 +941,12 @@ export default function HostPage() {
                           <tr key={party.id}>
                             <td>{party.label}</td>
                             <td>{formatDate(party.date)}</td>
-                            <td>
-                              <a href={party.imageUrl} target="_blank" rel="noreferrer">View</a>
-                            </td>
-                            <td>
-                              <a href={party.partifulUrl} target="_blank" rel="noreferrer">Open</a>
-                            </td>
                             <td>{party.html.trim() ? "Added" : "Empty"}</td>
                           </tr>
                         ))}
                         {parties.length === 0 ? (
                           <tr>
-                            <td colSpan={5}>No parties yet.</td>
+                            <td colSpan={3}>No parties yet.</td>
                           </tr>
                         ) : null}
                       </tbody>
@@ -818,18 +968,13 @@ export default function HostPage() {
                     <span>Party label</span>
                     <input value={partyLabelValue} onChange={(event) => setPartyLabelValue(event.target.value)} required />
                   </label>
-                  <label className="auth-field">
+                  <div className="auth-field party-date-field">
                     <span>Date</span>
-                    <input type="date" value={partyDate} onChange={(event) => setPartyDate(event.target.value)} required />
-                  </label>
-                  <label className="auth-field">
-                    <span>Image URL</span>
-                    <input type="url" value={partyImageUrl} onChange={(event) => setPartyImageUrl(event.target.value)} required />
-                  </label>
-                  <label className="auth-field">
-                    <span>Partiful URL</span>
-                    <input type="url" value={partyPartifulUrl} onChange={(event) => setPartyPartifulUrl(event.target.value)} required />
-                  </label>
+                    <button className="auth-secondary party-date-trigger" type="button" onClick={openPartyDateModal}>
+                      Select a date
+                    </button>
+                    <p>{formatPartyDate(partyDate)}</p>
+                  </div>
                   <div className="ai-draft-box">
                     <label className="auth-field host-message-field">
                       <span>AI Help</span>
@@ -840,6 +985,7 @@ export default function HostPage() {
                         placeholder="Describe the party announcement you want..."
                       />
                     </label>
+                    {renderAIDraftImageAssist("party")}
                     <button
                       className="auth-secondary"
                       type="button"
@@ -881,6 +1027,7 @@ export default function HostPage() {
                     placeholder="Describe the homepage announcement you want..."
                   />
                 </label>
+                {renderAIDraftImageAssist("homepage")}
                 <button
                   className="auth-secondary"
                   type="button"
@@ -1014,6 +1161,77 @@ export default function HostPage() {
           )}
         </section>
 
+        {partyDateModalOpen ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={() => setPartyDateModalOpen(false)}>
+            <section
+              className="party-date-modal gothic-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="party-date-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="card-frame" aria-hidden="true">
+                <span className="corner corner-tl" />
+                <span className="corner corner-tr" />
+                <span className="corner corner-bl" />
+                <span className="corner corner-br" />
+              </div>
+
+              <div className="modal-header">
+                <h2 className="host-section-title" id="party-date-modal-title">Select a date</h2>
+                <button className="modal-close" type="button" onClick={() => setPartyDateModalOpen(false)} aria-label="Close date picker">
+                  x
+                </button>
+              </div>
+
+              <div className="party-calendar-controls">
+                <label>
+                  <span>Month</span>
+                  <select value={partyCalendarDate.getMonth()} onChange={(event) => updatePartyCalendarMonth(Number(event.target.value))}>
+                    {calendarMonths.map((month, index) => (
+                      <option key={month} value={index}>
+                        {month}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Year</span>
+                  <select value={partyCalendarDate.getFullYear()} onChange={(event) => updatePartyCalendarYear(Number(event.target.value))}>
+                    {partyCalendarYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="party-calendar-grid" role="grid" aria-label="Party date calendar">
+                {calendarWeekdays.map((weekday) => (
+                  <span className="party-calendar-weekday" key={weekday}>
+                    {weekday}
+                  </span>
+                ))}
+                {partyCalendarDays.map((day, index) => (
+                  day ? (
+                    <button
+                      className={partyDate === toDateInputValue(new Date(partyCalendarDate.getFullYear(), partyCalendarDate.getMonth(), day)) ? "party-calendar-day selected" : "party-calendar-day"}
+                      type="button"
+                      key={`${partyCalendarDate.getFullYear()}-${partyCalendarDate.getMonth()}-${day}`}
+                      onClick={() => selectPartyDate(day)}
+                    >
+                      {day}
+                    </button>
+                  ) : (
+                    <span className="party-calendar-empty" key={`empty-${index}`} />
+                  )
+                ))}
+              </div>
+            </section>
+          </div>
+        ) : null}
+
         {uploadModalOpen ? (
           <div className="modal-backdrop" role="presentation" onMouseDown={closeUploadModal}>
             <section
@@ -1038,51 +1256,77 @@ export default function HostPage() {
               </div>
 
               <form className="host-email-form" onSubmit={handleUpload}>
-                <div
-                  className={draggingImage ? "drop-zone dragging" : "drop-zone"}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDraggingImage(true);
-                  }}
-                  onDragLeave={() => setDraggingImage(false)}
-                  onDrop={handleImageDrop}
-                >
-                  {filePreviewUrl ? (
-                    <div className="upload-preview">
-                      <img src={filePreviewUrl} alt="Selected upload preview" />
+                {!file ? (
+                  <div
+                    className={draggingImage ? "drop-zone dragging" : "drop-zone"}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setDraggingImage(true);
+                    }}
+                    onDragLeave={() => setDraggingImage(false)}
+                    onDrop={handleImageDrop}
+                  >
+                    <p>Drag and drop an image here</p>
+                    <span>or</span>
+                    <button
+                      className="auth-secondary"
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={submitting}
+                    >
+                      Choose from folder
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      className="visually-hidden"
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp"
+                      disabled={submitting}
+                      onChange={(event) => {
+                        setFile(event.target.files?.[0] ?? null);
+                        setCropBox(null);
+                        setError("");
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <p className="selected-file">Drag the square to choose the saved crop.</p>
+                    <div className="crop-stage" ref={cropStageRef}>
+                      <img src={filePreviewUrl} alt="Upload crop preview" onLoad={resetCropBox} />
+                      {cropBox ? (
+                        <div
+                          className="crop-box"
+                          style={{
+                            width: cropBox.size,
+                            height: cropBox.size,
+                            transform: `translate(${cropBox.x}px, ${cropBox.y}px)`,
+                          }}
+                          onPointerDown={handleCropPointerDown}
+                          onPointerMove={handleCropPointerMove}
+                          onPointerUp={handleCropPointerUp}
+                          onPointerCancel={handleCropPointerUp}
+                        />
+                      ) : null}
                       {submitting ? (
                         <div className="upload-loading" aria-label="Uploading image">
                           <span className="confirmation-spinner" />
                         </div>
                       ) : null}
                     </div>
-                  ) : null}
-                  <p>{file ? file.name : "Drag and drop an image here"}</p>
-                  <span>or</span>
-                  <button
-                    className="auth-secondary"
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={submitting}
-                  >
-                    Choose from folder
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    className="visually-hidden"
-                    type="file"
-                    accept="image/png,image/jpeg,image/gif,image/webp"
-                    disabled={submitting}
-                    onChange={(event) => {
-                      setFile(event.target.files?.[0] ?? null);
-                      setError("");
-                    }}
-                  />
-                </div>
-
-                {file ? (
-                  <p className="selected-file">Selected: {file.name}</p>
-                ) : null}
+                    <button
+                      className="auth-secondary"
+                      type="button"
+                      onClick={() => {
+                        setFile(null);
+                        setCropBox(null);
+                      }}
+                      disabled={submitting}
+                    >
+                      Choose Different Image
+                    </button>
+                  </>
+                )}
 
                 <ImageDateSelect value={date} onChange={setDate} />
 
@@ -1100,115 +1344,29 @@ export default function HostPage() {
                   </label>
                 ) : null}
 
+                <label className="auth-password-toggle">
+                  <input
+                    type="checkbox"
+                    checked={homepage}
+                    onChange={(event) => setHomepage(event.target.checked)}
+                  />
+                  <span>Use on homepage</span>
+                </label>
+
+                <label className="auth-field host-message-field">
+                  <span>Notes</span>
+                  <textarea
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    rows={3}
+                    placeholder="Optional notes about this image"
+                  />
+                </label>
+
                 {error ? <p className="auth-error">{error}</p> : null}
 
-                <button className="auth-submit" type="submit" disabled={submitting || !file}>
+                <button className="auth-submit" type="submit" disabled={submitting || !file || !cropBox}>
                   {submitting ? "Uploading..." : "Upload Image"}
-                </button>
-              </form>
-            </section>
-          </div>
-        ) : null}
-        {homepageImageModalOpen ? (
-          <div className="modal-backdrop" role="presentation" onMouseDown={closeHomepageImageModal}>
-            <section
-              className="upload-modal homepage-upload-modal gothic-card"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="homepage-upload-modal-title"
-              onMouseDown={(event) => event.stopPropagation()}
-            >
-              <div className="card-frame" aria-hidden="true">
-                <span className="corner corner-tl" />
-                <span className="corner corner-tr" />
-                <span className="corner corner-bl" />
-                <span className="corner corner-br" />
-              </div>
-
-              <div className="modal-header">
-                <h2 className="host-section-title" id="homepage-upload-modal-title">Homepage image</h2>
-                <button className="modal-close" type="button" onClick={closeHomepageImageModal} aria-label="Close homepage upload dialog">
-                  x
-                </button>
-              </div>
-
-              <form className="host-email-form" onSubmit={handleHomepageImageUpload}>
-                {!homepageFile ? (
-                  <div
-                    className={draggingHomepageImage ? "drop-zone dragging" : "drop-zone"}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      setDraggingHomepageImage(true);
-                    }}
-                    onDragLeave={() => setDraggingHomepageImage(false)}
-                    onDrop={handleHomepageImageDrop}
-                  >
-                    <p>Drag and drop a homepage image here</p>
-                    <span>or</span>
-                    <button
-                      className="auth-secondary"
-                      type="button"
-                      onClick={() => homepageFileInputRef.current?.click()}
-                      disabled={submittingHomepageImage}
-                    >
-                      Choose from folder
-                    </button>
-                    <input
-                      ref={homepageFileInputRef}
-                      className="visually-hidden"
-                      type="file"
-                      accept="image/png,image/jpeg,image/gif,image/webp"
-                      disabled={submittingHomepageImage}
-                      onChange={(event) => {
-                        setHomepageFile(event.target.files?.[0] ?? null);
-                        setCropBox(null);
-                        setError("");
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <p className="selected-file">Drag the square to choose the dashboard crop.</p>
-                    <div className="crop-stage" ref={cropStageRef}>
-                      <img src={homepageFilePreviewUrl} alt="Homepage crop preview" onLoad={resetCropBox} />
-                      {cropBox ? (
-                        <div
-                          className="crop-box"
-                          style={{
-                            width: cropBox.size,
-                            height: cropBox.size,
-                            transform: `translate(${cropBox.x}px, ${cropBox.y}px)`,
-                          }}
-                          onPointerDown={handleCropPointerDown}
-                          onPointerMove={handleCropPointerMove}
-                          onPointerUp={handleCropPointerUp}
-                          onPointerCancel={handleCropPointerUp}
-                        />
-                      ) : null}
-                      {submittingHomepageImage ? (
-                        <div className="upload-loading" aria-label="Uploading homepage image">
-                          <span className="confirmation-spinner" />
-                        </div>
-                      ) : null}
-                    </div>
-                    <button
-                      className="auth-secondary"
-                      type="button"
-                      onClick={() => {
-                        setHomepageFile(null);
-                        setCropBox(null);
-                      }}
-                      disabled={submittingHomepageImage}
-                    >
-                      Choose Different Image
-                    </button>
-                  </>
-                )}
-
-                {error ? <p className="auth-error">{error}</p> : null}
-
-                <button className="auth-submit homepage-upload-submit" type="submit" disabled={submittingHomepageImage || !homepageFile || !cropBox}>
-                  {submittingHomepageImage ? "Uploading..." : "Upload Homepage Image"}
                 </button>
               </form>
             </section>
@@ -1227,8 +1385,33 @@ export default function HostPage() {
               <figcaption>
                 <span>{formatDate(previewImage.date)}</span>
                 <span>{previewImage.partyId ? partyLabel(parties, previewImage.partyId) : previewImage.homepage ? "Homepage" : "No party"}</span>
+                {previewImage.notes ? <span>{previewImage.notes}</span> : null}
               </figcaption>
             </figure>
+          </div>
+        ) : null}
+        {generatingHTMLDraft ? (
+          <div className="modal-backdrop ai-loading-backdrop" role="presentation">
+            <section
+              className="ai-loading-modal gothic-card"
+              role="dialog"
+              aria-modal="true"
+              aria-live="polite"
+              aria-label="Generating HTML draft"
+            >
+              <div className="card-frame" aria-hidden="true">
+                <span className="corner corner-tl" />
+                <span className="corner corner-tr" />
+                <span className="corner corner-bl" />
+                <span className="corner corner-br" />
+              </div>
+
+              <span className="confirmation-spinner" aria-hidden="true" />
+              <div>
+                <h2 className="host-section-title">Writing HTML</h2>
+                <p>The Cursor agent is reading the site style and drafting your block.</p>
+              </div>
+            </section>
           </div>
         ) : null}
         {deleteTarget ? (

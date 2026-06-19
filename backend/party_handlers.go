@@ -10,11 +10,9 @@ import (
 )
 
 type createPartyRequest struct {
-	Label       string `json:"label"`
-	Date        string `json:"date"`
-	ImageURL    string `json:"imageUrl"`
-	PartifulURL string `json:"partifulUrl"`
-	HTML        string `json:"html"`
+	Label string `json:"label"`
+	Date  string `json:"date"`
+	HTML  string `json:"html"`
 }
 
 func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
@@ -58,10 +56,8 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 
 	label := strings.TrimSpace(req.Label)
 	dateValue := strings.TrimSpace(req.Date)
-	imageURL := strings.TrimSpace(req.ImageURL)
-	partifulURL := strings.TrimSpace(req.PartifulURL)
-	if label == "" || dateValue == "" || imageURL == "" || partifulURL == "" {
-		writeError(w, http.StatusBadRequest, "label, date, image URL, and Partiful URL are required")
+	if label == "" || dateValue == "" {
+		writeError(w, http.StatusBadRequest, "label and date are required")
 		return
 	}
 
@@ -71,7 +67,7 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	party, err := s.store.createParty(r.Context(), label, date, imageURL, partifulURL, req.HTML)
+	party, err := s.store.createParty(r.Context(), label, date, req.HTML)
 	if err != nil {
 		log.Error("party create", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to create party")

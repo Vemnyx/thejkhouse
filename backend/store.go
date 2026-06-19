@@ -347,23 +347,25 @@ func (s *userStore) deletePendingSignup(ctx context.Context, id int64) error {
 	return err
 }
 
-func (s *userStore) createImage(ctx context.Context, imageURL string, date time.Time, partyID *int64, homepage bool) (*Image, error) {
+func (s *userStore) createImage(ctx context.Context, imageURL string, date time.Time, partyID *int64, homepage bool, notes string) (*Image, error) {
 	var image Image
 	err := s.pool.QueryRow(
 		ctx,
-		`INSERT INTO images (image_url, date, party_id, homepage)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, image_url, date, party_id, homepage, uploaded_at`,
+		`INSERT INTO images (image_url, date, party_id, homepage, notes)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, image_url, date, party_id, homepage, notes, uploaded_at`,
 		imageURL,
 		date,
 		partyID,
 		homepage,
+		notes,
 	).Scan(
 		&image.ID,
 		&image.ImageURL,
 		&image.Date,
 		&image.PartyID,
 		&image.Homepage,
+		&image.Notes,
 		&image.UploadedAt,
 	)
 	if err != nil {
@@ -376,7 +378,7 @@ func (s *userStore) createImage(ctx context.Context, imageURL string, date time.
 func (s *userStore) listImages(ctx context.Context) ([]Image, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, image_url, date, party_id, homepage, uploaded_at
+		`SELECT id, image_url, date, party_id, homepage, notes, uploaded_at
 		 FROM images
 		 ORDER BY uploaded_at DESC`,
 	)
@@ -388,7 +390,7 @@ func (s *userStore) listImages(ctx context.Context) ([]Image, error) {
 	images := make([]Image, 0)
 	for rows.Next() {
 		var image Image
-		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.Homepage, &image.UploadedAt); err != nil {
+		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.Homepage, &image.Notes, &image.UploadedAt); err != nil {
 			return nil, err
 		}
 		images = append(images, image)
@@ -404,10 +406,28 @@ func (s *userStore) getImage(ctx context.Context, id int64) (*Image, error) {
 	var image Image
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, image_url, date, party_id, homepage, uploaded_at
+		`SELECT id, image_url, date, party_id, homepage, notes, uploaded_at
 		 FROM images WHERE id = $1`,
 		id,
-	).Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.Homepage, &image.UploadedAt)
+	).Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.Homepage, &image.Notes, &image.UploadedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &image, nil
+}
+
+func (s *userStore) updateImageHomepage(ctx context.Context, id int64, homepage bool) (*Image, error) {
+	var image Image
+	err := s.pool.QueryRow(
+		ctx,
+		`UPDATE images
+		 SET homepage = $2
+		 WHERE id = $1
+		 RETURNING id, image_url, date, party_id, homepage, notes, uploaded_at`,
+		id,
+		homepage,
+	).Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.Homepage, &image.Notes, &image.UploadedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +450,7 @@ func (s *userStore) deleteImage(ctx context.Context, id int64) error {
 func (s *userStore) listParties(ctx context.Context) ([]Party, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, label, date, image_url, partiful_url, html
+		`SELECT id, label, date, html
 		 FROM parties
 		 ORDER BY date DESC`,
 	)
@@ -442,7 +462,7 @@ func (s *userStore) listParties(ctx context.Context) ([]Party, error) {
 	parties := make([]Party, 0)
 	for rows.Next() {
 		var party Party
-		if err := rows.Scan(&party.ID, &party.Label, &party.Date, &party.ImageURL, &party.PartifulURL, &party.HTML); err != nil {
+		if err := rows.Scan(&party.ID, &party.Label, &party.Date, &party.HTML); err != nil {
 			return nil, err
 		}
 		parties = append(parties, party)
@@ -454,19 +474,17 @@ func (s *userStore) listParties(ctx context.Context) ([]Party, error) {
 	return parties, nil
 }
 
-func (s *userStore) createParty(ctx context.Context, label string, date time.Time, imageURL string, partifulURL string, html string) (Party, error) {
+func (s *userStore) createParty(ctx context.Context, label string, date time.Time, html string) (Party, error) {
 	var party Party
 	err := s.pool.QueryRow(
 		ctx,
-		`INSERT INTO parties (label, date, image_url, partiful_url, html)
-		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, label, date, image_url, partiful_url, html`,
+		`INSERT INTO parties (label, date, html)
+		 VALUES ($1, $2, $3)
+		 RETURNING id, label, date, html`,
 		label,
 		date,
-		imageURL,
-		partifulURL,
 		html,
-	).Scan(&party.ID, &party.Label, &party.Date, &party.ImageURL, &party.PartifulURL, &party.HTML)
+	).Scan(&party.ID, &party.Label, &party.Date, &party.HTML)
 	if err != nil {
 		return Party{}, err
 	}
@@ -510,7 +528,7 @@ func (s *userStore) updateHomepageHTML(ctx context.Context, html string) (string
 func (s *userStore) listHomepageImages(ctx context.Context) ([]Image, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, image_url, date, party_id, homepage, uploaded_at
+		`SELECT id, image_url, date, party_id, homepage, notes, uploaded_at
 		 FROM images
 		 WHERE homepage = true
 		 ORDER BY uploaded_at DESC`,
@@ -523,7 +541,7 @@ func (s *userStore) listHomepageImages(ctx context.Context) ([]Image, error) {
 	images := make([]Image, 0)
 	for rows.Next() {
 		var image Image
-		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.Homepage, &image.UploadedAt); err != nil {
+		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.Homepage, &image.Notes, &image.UploadedAt); err != nil {
 			return nil, err
 		}
 		images = append(images, image)

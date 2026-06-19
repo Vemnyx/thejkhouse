@@ -82,6 +82,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ai/html-draft", server.handleAIHTMLDraft)
+	mux.HandleFunc("/ai/images", server.handleAIImageUpload)
 	mux.HandleFunc("/health", server.handleHealth)
 	mux.HandleFunc("/auth/config", server.handleAuthConfig)
 	mux.HandleFunc("/auth/confirm-signup", server.handleAuthConfirmSignup)

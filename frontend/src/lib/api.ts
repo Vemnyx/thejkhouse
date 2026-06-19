@@ -47,6 +47,7 @@ export type ImageRecord = {
   date: string;
   partyId: number | null;
   homepage: boolean;
+  notes: string;
   uploadedAt: string;
 };
 
@@ -54,22 +55,19 @@ export type PartyRecord = {
   id: number;
   label: string;
   date: string;
-  imageUrl: string;
-  partifulUrl: string;
   html: string;
 };
 
 export type CreatePartyPayload = {
   label: string;
   date: string;
-  imageUrl: string;
-  partifulUrl: string;
   html: string;
 };
 
 export type UploadImageOptions = {
   partyId?: number | null;
   homepage?: boolean;
+  notes?: string;
 };
 
 export type SendEmailPayload = {
@@ -91,10 +89,15 @@ export type HTMLDraftPayload = {
   type: "homepage" | "party";
   instructions: string;
   existingHtml: string;
+  imageUrls?: string[];
 };
 
 export type HTMLDraftResponse = {
   html: string;
+};
+
+export type AIImageUploadResponse = {
+  imageUrl: string;
 };
 
 async function publicFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -214,6 +217,16 @@ export function generateHTMLDraft(token: string, payload: HTMLDraftPayload) {
   });
 }
 
+export function uploadAIImage(token: string, file: File) {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  return apiFetch<AIImageUploadResponse>("/ai/images", token, {
+    method: "POST",
+    body: formData,
+  });
+}
+
 export function listUsers(token: string) {
   return apiFetch<AppUser[] | null>("/users", token).then((users) => users ?? []);
 }
@@ -236,6 +249,9 @@ export function uploadImage(token: string, file: File, date: string, options: Up
   if (options.homepage) {
     formData.append("homepage", "true");
   }
+  if (options.notes) {
+    formData.append("notes", options.notes);
+  }
 
   return apiFetch<ImageRecord>("/images", token, {
     method: "POST",
@@ -246,6 +262,13 @@ export function uploadImage(token: string, file: File, date: string, options: Up
 export function deleteImage(token: string, id: number) {
   return apiFetch<Record<string, never>>(`/images/${id}`, token, {
     method: "DELETE",
+  });
+}
+
+export function updateImageHomepage(token: string, id: number, homepage: boolean) {
+  return apiFetch<ImageRecord>(`/images/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ homepage }),
   });
 }
 

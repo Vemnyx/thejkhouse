@@ -1,0 +1,3 @@
+ALTER TABLE parties
+DROP COLUMN IF EXISTS partiful_url,
+DROP COLUMN IF EXISTS image_url;
