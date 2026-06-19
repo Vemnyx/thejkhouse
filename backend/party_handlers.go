@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -75,4 +76,45 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, party)
+}
+
+func (s *apiServer) handlePartyByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		methodNotAllowed(w)
+		return
+	}
+
+	idText := strings.TrimPrefix(r.URL.Path, "/parties/")
+	id, err := strconv.ParseInt(idText, 10, 64)
+	if err != nil || id < 1 {
+		writeError(w, http.StatusBadRequest, "invalid party id")
+		return
+	}
+
+	user, err := s.loadUserFromRequest(r)
+	if err != nil {
+		if authErr, ok := err.(*authRequestError); ok {
+			writeError(w, authErr.status, authErr.message)
+			return
+		}
+		log.Error("party delete auth", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to authorize party delete")
+		return
+	}
+	if user.Role != RoleHost {
+		writeError(w, http.StatusForbidden, "host access is required")
+		return
+	}
+
+	if err := s.store.deleteParty(r.Context(), id); err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusNotFound, "party not found")
+			return
+		}
+		log.Error("party delete", "error", err, "party_id", id)
+		writeError(w, http.StatusInternalServerError, "failed to delete party")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

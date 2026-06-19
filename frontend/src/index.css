@@ -1079,6 +1079,25 @@ body {
   color: var(--ink);
 }
 
+.host-table .clickable-row {
+  cursor: pointer;
+}
+
+.host-table .clickable-row:hover td {
+  background: rgba(232, 120, 143, 0.06);
+}
+
+.table-action-button {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+.party-preview-modal {
+  width: min(100%, 48rem);
+  max-height: calc(100dvh - 3rem);
+  overflow-y: auto;
+}
+
 .host-upload-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem) auto;

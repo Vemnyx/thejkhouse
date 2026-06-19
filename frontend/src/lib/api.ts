@@ -195,6 +195,12 @@ export function createParty(token: string, payload: CreatePartyPayload) {
   });
 }
 
+export function deleteParty(token: string, id: number) {
+  return apiFetch<Record<string, never>>(`/parties/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
 export function getHomepage(token: string) {
   return apiFetch<HomepageContent>("/homepage", token);
 }

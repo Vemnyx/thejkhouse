@@ -2,7 +2,7 @@ import { type DragEvent, type FormEvent, type PointerEvent, useEffect, useMemo, 
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, ImageRecord, PartyRecord, createParty, deleteImage, deleteUser, generateHTMLDraft, getHomepage, listImages, listParties, listUsers, sendHostEmail, updateHomepage, updateImageHomepage, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, ImageRecord, PartyRecord, createParty, deleteImage, deleteParty, deleteUser, generateHTMLDraft, getHomepage, listImages, listParties, listUsers, sendHostEmail, updateHomepage, updateImageHomepage, uploadAIImage, uploadImage } from "../lib/api";
 
 type HostTab = "images" | "parties" | "homepage" | "users" | "email";
 type PartyView = "list" | "create";
@@ -10,6 +10,7 @@ type ImageFilter = "all" | "homepage";
 type AIDraftType = "homepage" | "party";
 type DeleteTarget =
   | { type: "image"; image: ImageRecord }
+  | { type: "party"; party: PartyRecord }
   | { type: "user"; user: AppUser };
 
 type CropBox = {
@@ -139,9 +140,11 @@ export default function HostPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [updatingHomepageId, setUpdatingHomepageId] = useState<number | null>(null);
+  const [deletingPartyId, setDeletingPartyId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [previewImage, setPreviewImage] = useState<ImageRecord | null>(null);
+  const [previewParty, setPreviewParty] = useState<PartyRecord | null>(null);
 
   const filePreviewUrl = useMemo(() => {
     if (!file) {
@@ -326,6 +329,27 @@ export default function HostPage() {
     }
   };
 
+  const handleDeleteParty = async (party: PartyRecord) => {
+    if (!firebaseUser) {
+      return;
+    }
+
+    setError("");
+    setDeletingPartyId(party.id);
+    try {
+      const token = await firebaseUser.getIdToken();
+      await deleteParty(token, party.id);
+      setParties((current) => current.filter((item) => item.id !== party.id));
+      setPreviewParty((current) => (current?.id === party.id ? null : current));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to delete party";
+      setError(message);
+    } finally {
+      setDeletingPartyId(null);
+      setDeleteTarget(null);
+    }
+  };
+
   const handleConfirmDelete = () => {
     if (!deleteTarget) {
       return;
@@ -336,12 +360,19 @@ export default function HostPage() {
       return;
     }
 
+    if (deleteTarget.type === "party") {
+      void handleDeleteParty(deleteTarget.party);
+      return;
+    }
+
     void handleDeleteUser(deleteTarget.user);
   };
 
   const deletingTarget =
     deleteTarget?.type === "image"
       ? deletingId === deleteTarget.image.id
+      : deleteTarget?.type === "party"
+        ? deletingPartyId === deleteTarget.party.id
       : deleteTarget?.type === "user"
         ? deletingUserId === deleteTarget.user.id
         : false;
@@ -955,19 +986,33 @@ export default function HostPage() {
                           <th>Party</th>
                           <th>Date</th>
                           <th>HTML</th>
+                          <th aria-label="Actions" />
                         </tr>
                       </thead>
                       <tbody>
                         {parties.map((party) => (
-                          <tr key={party.id}>
+                          <tr className="clickable-row" key={party.id} onClick={() => setPreviewParty(party)}>
                             <td>{party.label}</td>
                             <td>{formatDateTime(party.date)}</td>
                             <td>{party.html.trim() ? "Added" : "Empty"}</td>
+                            <td>
+                              <button
+                                className="auth-secondary table-action-button"
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setDeleteTarget({ type: "party", party });
+                                }}
+                                disabled={deletingPartyId === party.id}
+                              >
+                                {deletingPartyId === party.id ? "Deleting..." : "Delete"}
+                              </button>
+                            </td>
                           </tr>
                         ))}
                         {parties.length === 0 ? (
                           <tr>
-                            <td colSpan={3}>No parties yet.</td>
+                            <td colSpan={4}>No parties yet.</td>
                           </tr>
                         ) : null}
                       </tbody>
@@ -1456,6 +1501,41 @@ export default function HostPage() {
             </figure>
           </div>
         ) : null}
+        {previewParty ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={() => setPreviewParty(null)}>
+            <section
+              className="party-preview-modal gothic-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="party-preview-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="card-frame" aria-hidden="true">
+                <span className="corner corner-tl" />
+                <span className="corner corner-tr" />
+                <span className="corner corner-bl" />
+                <span className="corner corner-br" />
+              </div>
+
+              <div className="modal-header">
+                <div>
+                  <h2 className="host-section-title" id="party-preview-title">{previewParty.label}</h2>
+                  <p className="host-section-copy">{formatDateTime(previewParty.date)}</p>
+                </div>
+                <button className="modal-close" type="button" onClick={() => setPreviewParty(null)} aria-label="Close party preview">
+                  x
+                </button>
+              </div>
+
+              <article
+                className="homepage-html homepage-preview"
+                dangerouslySetInnerHTML={{
+                  __html: previewParty.html || "<p>No announcement HTML set.</p>",
+                }}
+              />
+            </section>
+          </div>
+        ) : null}
         {generatingHTMLDraft ? (
           <div className="modal-backdrop ai-loading-backdrop" role="presentation">
             <section
@@ -1500,7 +1580,9 @@ export default function HostPage() {
               <p>
                 {deleteTarget.type === "image"
                   ? "Delete this image from the library and storage?"
-                  : `Delete ${deleteTarget.user.firstName} ${deleteTarget.user.lastName}? This will remove their account access.`}
+                  : deleteTarget.type === "party"
+                    ? `Delete ${deleteTarget.party.label}?`
+                    : `Delete ${deleteTarget.user.firstName} ${deleteTarget.user.lastName}? This will remove their account access.`}
               </p>
               <div className="confirmation-actions">
                 <button className="auth-secondary" type="button" onClick={() => setDeleteTarget(null)} disabled={deletingTarget}>

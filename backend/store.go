@@ -492,6 +492,18 @@ func (s *userStore) createParty(ctx context.Context, label string, date time.Tim
 	return party, nil
 }
 
+func (s *userStore) deleteParty(ctx context.Context, id int64) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM parties WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return nil
+}
+
 func (s *userStore) getHomepageHTML(ctx context.Context) (string, error) {
 	var html string
 	err := s.pool.QueryRow(ctx, `SELECT html FROM homepage LIMIT 1`).Scan(&html)
