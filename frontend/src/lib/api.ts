@@ -195,6 +195,13 @@ export function createParty(token: string, payload: CreatePartyPayload) {
   });
 }
 
+export function updateParty(token: string, id: number, payload: CreatePartyPayload) {
+  return apiFetch<PartyRecord>(`/parties/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function deleteParty(token: string, id: number) {
   return apiFetch<Record<string, never>>(`/parties/${id}`, token, {
     method: "DELETE",

@@ -492,6 +492,26 @@ func (s *userStore) createParty(ctx context.Context, label string, date time.Tim
 	return party, nil
 }
 
+func (s *userStore) updateParty(ctx context.Context, id int64, label string, date time.Time, html string) (Party, error) {
+	var party Party
+	err := s.pool.QueryRow(
+		ctx,
+		`UPDATE parties
+		 SET label = $2, date = $3, html = $4
+		 WHERE id = $1
+		 RETURNING id, label, date, html`,
+		id,
+		label,
+		date,
+		html,
+	).Scan(&party.ID, &party.Label, &party.Date, &party.HTML)
+	if err != nil {
+		return Party{}, err
+	}
+
+	return party, nil
+}
+
 func (s *userStore) deleteParty(ctx context.Context, id int64) error {
 	tag, err := s.pool.Exec(ctx, `DELETE FROM parties WHERE id = $1`, id)
 	if err != nil {

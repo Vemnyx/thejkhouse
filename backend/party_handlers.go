@@ -32,11 +32,6 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to authorize parties")
 		return
 	}
-	if user.Role != RoleHost {
-		writeError(w, http.StatusForbidden, "host access is required")
-		return
-	}
-
 	if r.Method == http.MethodGet {
 		parties, err := s.store.listParties(r.Context())
 		if err != nil {
@@ -46,6 +41,11 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 		}
 
 		writeJSON(w, parties)
+		return
+	}
+
+	if user.Role != RoleHost {
+		writeError(w, http.StatusForbidden, "host access is required")
 		return
 	}
 
@@ -79,7 +79,7 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *apiServer) handlePartyByID(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPatch {
 		methodNotAllowed(w)
 		return
 	}
@@ -103,6 +103,41 @@ func (s *apiServer) handlePartyByID(w http.ResponseWriter, r *http.Request) {
 	}
 	if user.Role != RoleHost {
 		writeError(w, http.StatusForbidden, "host access is required")
+		return
+	}
+
+	if r.Method == http.MethodPatch {
+		var req createPartyRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid party request")
+			return
+		}
+
+		label := strings.TrimSpace(req.Label)
+		dateValue := strings.TrimSpace(req.Date)
+		if label == "" || dateValue == "" {
+			writeError(w, http.StatusBadRequest, "label and date are required")
+			return
+		}
+
+		date, err := time.Parse(time.RFC3339, dateValue)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "date must be an ISO timestamp")
+			return
+		}
+
+		party, err := s.store.updateParty(r.Context(), id, label, date, req.HTML)
+		if err != nil {
+			if isNotFound(err) {
+				writeError(w, http.StatusNotFound, "party not found")
+				return
+			}
+			log.Error("party update", "error", err, "party_id", id)
+			writeError(w, http.StatusInternalServerError, "failed to update party")
+			return
+		}
+
+		writeJSON(w, party)
 		return
 	}
 

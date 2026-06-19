@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import BirthdaySelect from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
-import { HomepageContent, getHomepage } from "../lib/api";
+import { HomepageContent, PartyRecord, getHomepage, listParties } from "../lib/api";
 
 type MainTab = "home" | "parties" | "photos" | "events";
 type MainView = MainTab | "settings";
@@ -29,39 +29,50 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [homepage, setHomepage] = useState<HomepageContent>({ html: "", images: [] });
   const [homepageLoading, setHomepageLoading] = useState(true);
+  const [parties, setParties] = useState<PartyRecord[]>([]);
+  const [partiesLoading, setPartiesLoading] = useState(true);
+  const [expandedPartyId, setExpandedPartyId] = useState<number | null>(null);
 
   const fullName = [appUser?.firstName, appUser?.lastName].filter(Boolean).join(" ") || appUser?.email || "Account";
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadHomepage() {
+    async function loadDashboardContent() {
       if (!firebaseUser) {
         setHomepageLoading(false);
+        setPartiesLoading(false);
         return;
       }
 
       try {
         const token = await firebaseUser.getIdToken();
-        const content = await getHomepage(token);
+        const [content, nextParties] = await Promise.all([
+          getHomepage(token),
+          listParties(token),
+        ]);
         if (!cancelled) {
           setHomepage({
             html: content.html,
             images: content.images ?? [],
           });
+          setParties(nextParties);
+          setExpandedPartyId((current) => current ?? nextParties[0]?.id ?? null);
         }
       } catch {
         if (!cancelled) {
           setHomepage({ html: "", images: [] });
+          setParties([]);
         }
       } finally {
         if (!cancelled) {
           setHomepageLoading(false);
+          setPartiesLoading(false);
         }
       }
     }
 
-    loadHomepage();
+    loadDashboardContent();
 
     return () => {
       cancelled = true;
@@ -216,6 +227,54 @@ export default function HomePage() {
                 </aside>
               )}
             </div>
+          ) : activeView === "parties" ? (
+            <div className="dashboard-parties">
+              {partiesLoading ? (
+                <p className="dashboard-copy">Loading parties...</p>
+              ) : parties.length === 0 ? (
+                <p className="dashboard-copy">No parties yet.</p>
+              ) : (
+                <div className="party-accordion" aria-label="Party announcements">
+                  {parties.map((party, index) => {
+                    const partyYear = new Date(party.date).getFullYear();
+                    const nextParty = parties[index + 1];
+                    const yearChanges = !nextParty || new Date(nextParty.date).getFullYear() !== partyYear;
+                    const expanded = expandedPartyId === party.id;
+
+                    return (
+                      <div className="party-accordion-group" key={party.id}>
+                        <article className={expanded ? "party-accordion-row expanded" : "party-accordion-row"}>
+                          <button
+                            className="party-accordion-summary"
+                            type="button"
+                            aria-expanded={expanded}
+                            onClick={() => setExpandedPartyId(party.id)}
+                          >
+                            <span>{party.label}</span>
+                            <span>{formatDateTime(party.date)}</span>
+                          </button>
+                          {expanded ? (
+                            <div className="party-accordion-details">
+                              <article
+                                className="homepage-html"
+                                dangerouslySetInnerHTML={{
+                                  __html: party.html || "<p>No party details yet.</p>",
+                                }}
+                              />
+                            </div>
+                          ) : null}
+                        </article>
+                        {yearChanges ? (
+                          <div className="party-year-divider" aria-label={`${partyYear} parties`}>
+                            <span>{partyYear}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="under-construction">
               <p>Under Construction</p>
@@ -225,4 +284,11 @@ export default function HomePage() {
       </section>
     </main>
   );
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }

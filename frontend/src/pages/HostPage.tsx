@@ -2,10 +2,10 @@ import { type DragEvent, type FormEvent, type PointerEvent, useEffect, useMemo, 
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, ImageRecord, PartyRecord, createParty, deleteImage, deleteParty, deleteUser, generateHTMLDraft, getHomepage, listImages, listParties, listUsers, sendHostEmail, updateHomepage, updateImageHomepage, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, ImageRecord, PartyRecord, createParty, deleteImage, deleteParty, deleteUser, generateHTMLDraft, getHomepage, listImages, listParties, listUsers, sendHostEmail, updateHomepage, updateImageHomepage, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 
 type HostTab = "images" | "parties" | "homepage" | "users" | "email";
-type PartyView = "list" | "create";
+type PartyView = "list" | "create" | "edit";
 type ImageFilter = "all" | "homepage";
 type AIDraftType = "homepage" | "party";
 type DeleteTarget =
@@ -38,7 +38,7 @@ const calendarWeekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const currentYear = new Date().getFullYear();
 const partyCalendarYears = Array.from({ length: 10 }, (_, index) => currentYear - 2 + index);
 const partyHours = Array.from({ length: 12 }, (_, index) => String(index + 1));
-const partyMinutes = ["00", "15", "30", "45"];
+const partyMinutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"));
 const partyPeriods = ["AM", "PM"] as const;
 
 function toDateInputValue(date: Date) {
@@ -85,6 +85,20 @@ function partyDateTimeToISO(value: string, hour: string, minute: string, period:
   return new Date(year, month - 1, day, hour24, Number(minute), 0, 0).toISOString();
 }
 
+function timePartsFromISO(value: string) {
+  const date = new Date(value);
+  const hours = date.getHours();
+  const period = hours >= 12 ? "PM" : "AM";
+  const hour = String(hours % 12 || 12);
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return {
+    date: toDateInputValue(date),
+    hour,
+    minute: partyMinutes.includes(minute) ? minute : "00",
+    period: period as (typeof partyPeriods)[number],
+  };
+}
+
 export default function HostPage() {
   const navigate = useNavigate();
   const { appUser, firebaseUser, logout } = useAuth();
@@ -98,6 +112,7 @@ export default function HostPage() {
   const [imageFilter, setImageFilter] = useState<ImageFilter>("all");
   const [parties, setParties] = useState<PartyRecord[]>([]);
   const [partyView, setPartyView] = useState<PartyView>("list");
+  const [editingParty, setEditingParty] = useState<PartyRecord | null>(null);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -234,6 +249,41 @@ export default function HostPage() {
     if (tab !== "parties") {
       setPartyView("list");
     }
+  };
+
+  const resetPartyForm = () => {
+    setEditingParty(null);
+    setPartyLabelValue("");
+    setPartyDate("");
+    setPartyHour("7");
+    setPartyMinute("00");
+    setPartyPeriod("PM");
+    setPartyHtml("");
+    setPartyDraftPrompt("");
+    setPartyDraftImageUrls([]);
+  };
+
+  const openCreatePartyForm = () => {
+    resetPartyForm();
+    setPartyView("create");
+    setError("");
+    setPartySuccess("");
+  };
+
+  const openEditPartyForm = (party: PartyRecord) => {
+    const parts = timePartsFromISO(party.date);
+    setEditingParty(party);
+    setPartyLabelValue(party.label);
+    setPartyDate(parts.date);
+    setPartyHour(parts.hour);
+    setPartyMinute(parts.minute);
+    setPartyPeriod(parts.period);
+    setPartyHtml(party.html);
+    setPartyDraftPrompt("");
+    setPartyDraftImageUrls([]);
+    setPartyView("edit");
+    setError("");
+    setPartySuccess("");
   };
 
   const handleUpload = async (event: FormEvent) => {
@@ -451,22 +501,25 @@ export default function HostPage() {
     try {
       const token = await firebaseUser.getIdToken();
       const date = partyDateTimeToISO(partyDate, partyHour, partyMinute, partyPeriod);
-      const party = await createParty(token, {
+      const payload = {
         label: partyLabelValue.trim(),
         date,
         html: partyHtml,
-      });
-      setParties((current) => [party, ...current]);
-      setPartyLabelValue("");
-      setPartyDate("");
-      setPartyHour("7");
-      setPartyMinute("00");
-      setPartyPeriod("PM");
-      setPartyHtml("");
-      setPartySuccess("Party created.");
+      };
+      if (partyView === "edit" && editingParty) {
+        const party = await updateParty(token, editingParty.id, payload);
+        setParties((current) => sortPartiesByDate(current.map((item) => (item.id === party.id ? party : item))));
+        setPreviewParty((current) => (current?.id === party.id ? party : current));
+        setPartySuccess("Party updated.");
+      } else {
+        const party = await createParty(token, payload);
+        setParties((current) => sortPartiesByDate([party, ...current]));
+        setPartySuccess("Party created.");
+      }
+      resetPartyForm();
       setPartyView("list");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "failed to create party";
+      const message = err instanceof Error ? err.message : "failed to save party";
       setError(message);
     } finally {
       setSavingParty(false);
@@ -967,11 +1020,7 @@ export default function HostPage() {
               {partyView === "list" ? (
                 <>
                   <div className="host-panel-header">
-                    <button className="auth-submit" type="button" onClick={() => {
-                      setPartyView("create");
-                      setError("");
-                      setPartySuccess("");
-                    }}>
+                    <button className="auth-submit" type="button" onClick={openCreatePartyForm}>
                       Add New Party
                     </button>
                   </div>
@@ -995,7 +1044,17 @@ export default function HostPage() {
                             <td>{party.label}</td>
                             <td>{formatDateTime(party.date)}</td>
                             <td>{party.html.trim() ? "Added" : "Empty"}</td>
-                            <td>
+                            <td className="party-row-actions">
+                              <button
+                                className="auth-secondary table-action-button"
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openEditPartyForm(party);
+                                }}
+                              >
+                                Edit
+                              </button>
                               <button
                                 className="auth-secondary table-action-button"
                                 type="button"
@@ -1024,6 +1083,7 @@ export default function HostPage() {
                   <div className="host-panel-header">
                     <button className="auth-secondary" type="button" onClick={() => {
                       setPartyView("list");
+                      resetPartyForm();
                       setError("");
                     }}>
                       Back to Parties
@@ -1084,7 +1144,7 @@ export default function HostPage() {
                   {error ? <p className="auth-error">{error}</p> : null}
 
                   <button className="auth-submit" type="submit" disabled={savingParty}>
-                    {savingParty ? "Creating..." : "Create Party"}
+                    {savingParty ? "Saving..." : partyView === "edit" ? "Update Party" : "Create Party"}
                   </button>
                 </form>
               )}
@@ -1609,6 +1669,10 @@ function formatDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function sortPartiesByDate(parties: PartyRecord[]) {
+  return [...parties].sort((first, second) => new Date(second.date).getTime() - new Date(first.date).getTime());
 }
 
 function partyLabel(parties: PartyRecord[], partyId: number) {
