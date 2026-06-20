@@ -906,7 +906,7 @@ export default function HostPage() {
               aria-selected={activeTab === "images"}
               onClick={() => selectHostTab("images")}
             >
-              Images
+              Photos
             </button>
             <button
               className={activeTab === "parties" ? "main-tab active" : "main-tab"}

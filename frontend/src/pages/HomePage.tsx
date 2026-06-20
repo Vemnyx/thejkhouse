@@ -1,6 +1,6 @@
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import BirthdaySelect from "../components/BirthdaySelect";
+import BirthdaySelect, { ImageDateSelect } from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
 import { HomepageContent, ImageRecord, PartyRecord, getHomepage, listImages, listParties, uploadImage } from "../lib/api";
@@ -62,6 +62,7 @@ export default function HomePage() {
   const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(null);
   const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
   const [photoUploadPartyId, setPhotoUploadPartyId] = useState("");
+  const [photoUploadDate, setPhotoUploadDate] = useState(() => toDateInputValue(new Date()));
   const [photoUploadFile, setPhotoUploadFile] = useState<File | null>(null);
   const [photoUploadNotes, setPhotoUploadNotes] = useState("");
   const [photoUploadDragging, setPhotoUploadDragging] = useState(false);
@@ -164,6 +165,7 @@ export default function HomePage() {
     setError("");
     setMessage("");
     setPhotoUploadPartyId("");
+    setPhotoUploadDate(toDateInputValue(new Date()));
     setPhotoUploadFile(null);
     setPhotoUploadNotes("");
     setPhotoUploadDragging(false);
@@ -209,25 +211,26 @@ export default function HomePage() {
       setError("You need to be signed in to upload photos.");
       return;
     }
-    if (!selectedUploadParty) {
-      setError("Choose a party for this photo.");
-      return;
-    }
     if (!photoUploadFile) {
       setError("Choose an image to upload.");
+      return;
+    }
+    if (!selectedUploadParty && !photoUploadDate) {
+      setError("Choose a date for this photo.");
       return;
     }
 
     setPhotoUploading(true);
     try {
       const token = await firebaseUser.getIdToken();
-      const uploaded = await uploadImage(token, photoUploadFile, selectedUploadParty.date.slice(0, 10), {
-        partyId: selectedUploadParty.id,
+      const uploaded = await uploadImage(token, photoUploadFile, selectedUploadParty ? selectedUploadParty.date.slice(0, 10) : photoUploadDate, {
+        partyId: selectedUploadParty?.id ?? null,
         notes: photoUploadNotes.trim(),
       });
       setPhotos((current) => [uploaded, ...current.filter((photo) => photo.id !== uploaded.id)]);
-      setPhotoPartyFilter(String(selectedUploadParty.id));
+      setPhotoPartyFilter(selectedUploadParty ? String(selectedUploadParty.id) : "all");
       setPhotoUploadOpen(false);
+      setPhotoUploadDate(toDateInputValue(new Date()));
       setPhotoUploadFile(null);
       setPhotoUploadNotes("");
       setMessage("Photo uploaded.");
@@ -513,7 +516,7 @@ export default function HomePage() {
             <form className="host-email-form" onSubmit={handlePhotoUpload}>
               <label className="auth-field">
                 <span>Party</span>
-                <select value={photoUploadPartyId} onChange={(event) => setPhotoUploadPartyId(event.target.value)} required>
+                <select value={photoUploadPartyId} onChange={(event) => setPhotoUploadPartyId(event.target.value)}>
                   <option value="">Select a party</option>
                   {partyOptions.map((party) => (
                     <option value={party.value} key={party.id}>
@@ -524,7 +527,9 @@ export default function HomePage() {
               </label>
               {selectedUploadParty ? (
                 <p className="selected-file">Using party date: {formatDate(selectedUploadParty.date)}</p>
-              ) : null}
+              ) : (
+                <ImageDateSelect value={photoUploadDate} onChange={setPhotoUploadDate} />
+              )}
               {!photoUploadFile ? (
                 <div
                   className={photoUploadDragging ? "drop-zone dragging" : "drop-zone"}
@@ -567,7 +572,7 @@ export default function HomePage() {
                 />
               </label>
               {error ? <p className="auth-error">{error}</p> : null}
-              <button className="auth-submit" type="submit" disabled={photoUploading || !photoUploadFile || !selectedUploadParty}>
+              <button className="auth-submit" type="submit" disabled={photoUploading || !photoUploadFile || (!selectedUploadParty && !photoUploadDate)}>
                 {photoUploading ? "Uploading..." : "Upload Image"}
               </button>
             </form>
@@ -576,6 +581,13 @@ export default function HomePage() {
       ) : null}
     </main>
   );
+}
+
+function toDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatDate(value: string) {

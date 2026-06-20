@@ -199,10 +199,6 @@ func (s *apiServer) handleCreateImage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if user.Role != RoleHost && partyID == nil {
-		writeError(w, http.StatusBadRequest, "party is required")
-		return
-	}
 	homepage := user.Role == RoleHost && parseFormBool(r.FormValue("homepage"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
 
