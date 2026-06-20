@@ -14,6 +14,7 @@ import (
 )
 
 const maxImageUploadSize = 10 << 20 // 10 MiB
+const imageDateLocation = "America/New_York"
 
 func (s *apiServer) handleImages(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -306,12 +307,16 @@ func normalizeImageUserIDs(values []int32) ([]int32, error) {
 
 func parseImageDate(value string) (time.Time, error) {
 	value = strings.TrimSpace(value)
+	location, err := time.LoadLocation(imageDateLocation)
+	if err != nil {
+		location = time.FixedZone("EST", -5*60*60)
+	}
 	if value == "" {
-		now := time.Now().UTC()
-		return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC), nil
+		now := time.Now().In(location)
+		return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location), nil
 	}
 
-	parsed, err := time.Parse("2006-01-02", value)
+	parsed, err := time.ParseInLocation("2006-01-02", value, location)
 	if err != nil {
 		return time.Time{}, errors.New("date must be YYYY-MM-DD")
 	}

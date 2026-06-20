@@ -109,7 +109,9 @@ export default function HomePage() {
     .map((userId) => users.find((user) => user.id === userId))
     .filter((user): user is AppUser => Boolean(user));
   const eventGroups = useMemo(() => {
-    const now = Date.now();
+    const nowDate = new Date();
+    const now = nowDate.getTime();
+    const todayStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate()).getTime();
     const groups: Record<EventDashboardTab, EventRecord[]> = {
       active: [],
       upcoming: [],
@@ -118,7 +120,12 @@ export default function HomePage() {
 
     for (const event of events) {
       if (event.completedAt) {
-        groups.past.push(event);
+        const completedTime = new Date(event.completedAt).getTime();
+        if (completedTime >= todayStart) {
+          groups.active.push(event);
+        } else {
+          groups.past.push(event);
+        }
         continue;
       }
 
@@ -568,7 +575,7 @@ export default function HomePage() {
                         </div>
                         <div className="image-grid-meta">
                           <span>{photoParty?.label ?? "No party"}</span>
-                          <span>{formatDate(photo.date)}</span>
+                          <span>{formatImageDate(photo.date)}</span>
                           {taggedUsers.length > 0 ? <span>Tagged: {taggedUsers.join(", ")}</span> : null}
                           {photo.notes ? <span>{photo.notes}</span> : null}
                         </div>
@@ -618,7 +625,7 @@ export default function HomePage() {
           <figure className="image-lightbox" onMouseDown={(event) => event.stopPropagation()}>
             <img src={selectedPhoto.imageUrl} alt={selectedPhoto.notes || "Party photo preview"} />
             <figcaption>
-              <span>{formatDate(selectedPhoto.date)}</span>
+              <span>{formatImageDate(selectedPhoto.date)}</span>
               {taggedUserLabels(users, selectedPhoto.userIds).map((label) => (
                 <span key={label}>{label}</span>
               ))}
@@ -741,6 +748,13 @@ function toDateInputValue(date: Date) {
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
+  }).format(new Date(value));
+}
+
+function formatImageDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeZone: "UTC",
   }).format(new Date(value));
 }
 

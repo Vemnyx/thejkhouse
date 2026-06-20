@@ -1711,9 +1711,9 @@ export default function HostPage() {
                         className="image-preview-trigger"
                         type="button"
                         onClick={() => setPreviewImage(image)}
-                        aria-label={`Open image uploaded on ${formatDate(image.date)}`}
+                        aria-label={`Open image uploaded on ${formatImageDate(image.date)}`}
                       >
-                        <img src={image.imageUrl} alt={`Uploaded on ${formatDate(image.date)}`} />
+                        <img src={image.imageUrl} alt={`Uploaded on ${formatImageDate(image.date)}`} />
                       </button>
                       <button
                         className="image-delete-button"
@@ -1746,7 +1746,7 @@ export default function HostPage() {
                       </button>
                     </div>
                     <div className="image-grid-meta">
-                      <span>{formatDate(image.date)}</span>
+                      <span>{formatImageDate(image.date)}</span>
                       <span>{image.partyId ? partyLabel(parties, image.partyId) : image.homepage ? "Homepage" : "No party"}</span>
                       {taggedUserLabels(users, image.userIds).length > 0 ? <span>Tagged: {taggedUserLabels(users, image.userIds).join(", ")}</span> : null}
                       {image.notes ? <span>{image.notes}</span> : null}
@@ -2771,12 +2771,12 @@ export default function HostPage() {
               className="image-lightbox"
               role="dialog"
               aria-modal="true"
-              aria-label={`Image uploaded on ${formatDate(previewImage.date)}`}
+              aria-label={`Image uploaded on ${formatImageDate(previewImage.date)}`}
               onMouseDown={(event) => event.stopPropagation()}
             >
-              <img src={previewImage.imageUrl} alt={`Uploaded on ${formatDate(previewImage.date)}`} />
+              <img src={previewImage.imageUrl} alt={`Uploaded on ${formatImageDate(previewImage.date)}`} />
               <figcaption>
-                <span>{formatDate(previewImage.date)}</span>
+                <span>{formatImageDate(previewImage.date)}</span>
                 <span>{previewImage.partyId ? partyLabel(parties, previewImage.partyId) : previewImage.homepage ? "Homepage" : "No party"}</span>
                 {taggedUserLabels(users, previewImage.userIds).map((label) => (
                   <span key={label}>{label}</span>
@@ -2881,9 +2881,8 @@ export default function HostPage() {
         ) : null}
         {qrEvent ? (
           <div className="modal-backdrop" role="presentation" onMouseDown={() => setQrEvent(null)}>
-            <section className="upload-modal gothic-card qr-code-modal" role="dialog" aria-modal="true" aria-labelledby="qr-code-title" onMouseDown={(event) => event.stopPropagation()}>
+            <section className="upload-modal gothic-card qr-code-modal" role="dialog" aria-modal="true" aria-label={`${qrEvent.label} QR code`} onMouseDown={(event) => event.stopPropagation()}>
               <div className="modal-header">
-                <h2 className="host-section-title" id="qr-code-title">Event QR Code</h2>
                 <button className="modal-close" type="button" onClick={() => setQrEvent(null)} aria-label="Close QR code modal">
                   x
                 </button>
@@ -2971,6 +2970,13 @@ export default function HostPage() {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+}
+
+function formatImageDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(new Date(value));
 }
 
 function formatDateTime(value: string) {

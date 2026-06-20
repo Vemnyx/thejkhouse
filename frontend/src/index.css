@@ -859,6 +859,7 @@ body {
 }
 
 .contestant-detail-modal {
+  width: min(100%, 28rem);
   padding: 0 0 2rem;
   overflow: hidden auto;
 }
@@ -906,14 +907,11 @@ body {
   animation: victory-rise 420ms ease both;
 }
 
-.slideshow-image-button {
+.slideshow-image-frame {
+  position: relative;
   display: block;
   justify-self: center;
   width: min(100%, 28rem);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
 }
 
 .contestant-presentation-card img {
@@ -934,16 +932,35 @@ body {
   border-radius: 0;
 }
 
-.slideshow-image-button img {
+.slideshow-image-frame img {
+  display: block;
   width: 100%;
 }
 
-.contestant-detail-modal .slideshow-image-button {
+.contestant-detail-modal .slideshow-image-frame {
   width: 100%;
 }
 
-.slideshow-image-button:focus-visible img,
-.slideshow-image-button:hover img {
+.slideshow-tap-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.slideshow-tap-previous {
+  left: 0;
+}
+
+.slideshow-tap-next {
+  right: 0;
+}
+
+.slideshow-image-frame:has(.slideshow-tap-zone:focus-visible) img,
+.slideshow-image-frame:hover img {
   box-shadow:
     0 0 0 2px rgba(242, 184, 196, 0.28),
     0 26px 60px rgba(0, 0, 0, 0.46);
@@ -2177,7 +2194,11 @@ body {
 }
 
 .qr-code-modal {
-  width: min(100%, 30rem);
+  width: min(100%, 34rem);
+}
+
+.qr-code-modal .modal-header {
+  justify-content: flex-end;
 }
 
 .qr-code-content {
@@ -2189,7 +2210,7 @@ body {
 
 .qr-code-image {
   display: block;
-  width: min(100%, 18rem);
+  width: min(100%, 22rem);
   aspect-ratio: 1;
   border: 0.75rem solid #fff;
   border-radius: 1rem;

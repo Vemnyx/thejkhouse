@@ -120,11 +120,11 @@ export default function EventPage() {
     if (!slideshowOpen || costumeContestEntries.length === 0) {
       return undefined;
     }
-    const interval = window.setInterval(() => {
+    const interval = window.setTimeout(() => {
       setSlideshowIndex((current) => (current + 1) % costumeContestEntries.length);
     }, 5000);
-    return () => window.clearInterval(interval);
-  }, [slideshowOpen, costumeContestEntries.length]);
+    return () => window.clearTimeout(interval);
+  }, [slideshowOpen, slideshowIndex, costumeContestEntries.length]);
 
   const showCostumeContestGrid = event?.type === "0" && (isActiveEvent(event) || Boolean(event.completedAt));
   const categories = event ? eventMetadataCategories(event.metadata) : [];
@@ -168,6 +168,13 @@ export default function EventPage() {
       return;
     }
     setSlideshowIndex((current) => (current + 1) % costumeContestEntries.length);
+  };
+
+  const rewindSlideshow = () => {
+    if (costumeContestEntries.length === 0) {
+      return;
+    }
+    setSlideshowIndex((current) => (current - 1 + costumeContestEntries.length) % costumeContestEntries.length);
   };
 
   const submitVote = async (submitEvent: FormEvent) => {
@@ -348,9 +355,11 @@ export default function EventPage() {
               x
             </button>
             <article className="contestant-presentation-card slideshow-card" key={slideshowEntry.id}>
-              <button className="slideshow-image-button" type="button" onClick={advanceSlideshow} aria-label="Show next contestant">
+              <div className="slideshow-image-frame">
                 <img src={slideshowEntry.image.imageUrl} alt={slideshowEntry.costumeName} />
-              </button>
+                <button className="slideshow-tap-zone slideshow-tap-previous" type="button" onClick={rewindSlideshow} aria-label="Show previous contestant" />
+                <button className="slideshow-tap-zone slideshow-tap-next" type="button" onClick={advanceSlideshow} aria-label="Show next contestant" />
+              </div>
               <div>
                 <h3>{slideshowEntry.costumeName}</h3>
                 <p className="contestant-wearers">
