@@ -3571,11 +3571,12 @@ function bracketSidePlaceholderCount(firstRoundMatchCount: number, roundNumber: 
 }
 
 function bracketSetupPlaceholderCount(sideSlotCount: number, roundNumber: number) {
-  return Math.max(1, Math.floor(sideSlotCount / 2 ** (roundNumber - 1)));
+  return Math.max(1, Math.floor(sideSlotCount / 2 ** roundNumber));
 }
 
 function bracketSideRoundCounts(firstRoundMatchCount: number, totalRounds: number) {
-  return Array.from({ length: Math.max(totalRounds - 1, 0) }, (_, index) => bracketSidePlaceholderCount(firstRoundMatchCount, index + 1));
+  const firstSideRoundCount = Math.max(1, Math.ceil(firstRoundMatchCount / 2));
+  return Array.from({ length: Math.max(totalRounds - 1, 0) }, (_, index) => Math.max(1, Math.floor(firstSideRoundCount / 2 ** index)));
 }
 
 function BracketFinalPlaceholder() {

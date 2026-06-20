@@ -1203,7 +1203,13 @@ body {
 
 .bracket-side-left .bracket-match-card:has(.bracket-participant-node + .bracket-participant-node)::after,
 .bracket-side-left .bracket-setup-match:has(.bracket-seed-card + .bracket-seed-card)::after {
-  content: none;
+  content: "";
+  position: absolute;
+  top: 2.72rem;
+  right: -1.7rem;
+  width: 0.75rem;
+  height: 2px;
+  background: rgba(249, 214, 143, 0.76);
 }
 
 .bracket-side-right .bracket-match-card:has(.bracket-participant-node + .bracket-participant-node)::before,
@@ -1219,7 +1225,13 @@ body {
 
 .bracket-side-right .bracket-match-card:has(.bracket-participant-node + .bracket-participant-node)::after,
 .bracket-side-right .bracket-setup-match:has(.bracket-seed-card + .bracket-seed-card)::after {
-  content: none;
+  content: "";
+  position: absolute;
+  top: 2.72rem;
+  left: -1.7rem;
+  width: 0.75rem;
+  height: 2px;
+  background: rgba(249, 214, 143, 0.76);
 }
 
 .bracket-side-left .bracket-setup-match:has(.bracket-seed-card + .bracket-seed-card)::before,
