@@ -91,6 +91,8 @@ func (s *apiServer) handleDeleteImage(w http.ResponseWriter, r *http.Request) {
 type updateImageRequest struct {
 	Homepage *bool    `json:"homepage"`
 	UserIDs  *[]int32 `json:"userIds"`
+	EventID  *int64   `json:"eventId"`
+	TeamID   *int64   `json:"teamId"`
 }
 
 func (s *apiServer) handleUpdateImage(w http.ResponseWriter, r *http.Request) {
@@ -120,7 +122,7 @@ func (s *apiServer) handleUpdateImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Homepage == nil && req.UserIDs == nil {
+	if req.Homepage == nil && req.UserIDs == nil && req.EventID == nil && req.TeamID == nil {
 		writeError(w, http.StatusBadRequest, "image update is required")
 		return
 	}
@@ -133,7 +135,7 @@ func (s *apiServer) handleUpdateImage(w http.ResponseWriter, r *http.Request) {
 		req.UserIDs = &userIDs
 	}
 
-	image, err := s.store.updateImage(r.Context(), id, req.Homepage, req.UserIDs)
+	image, err := s.store.updateImage(r.Context(), id, req.Homepage, req.UserIDs, req.EventID, req.TeamID)
 	if err != nil {
 		if isNotFound(err) {
 			writeError(w, http.StatusNotFound, "image not found")

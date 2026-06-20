@@ -2,7 +2,7 @@ import { type DragEvent, type FormEvent, type PointerEvent, useEffect, useMemo, 
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, PartyRecord, createEvent, createEventContestant, createParty, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, startEvent, updateEventMetadata, updateHomepage, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, PartyRecord, createEvent, createEventContestant, createParty, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
@@ -141,6 +141,8 @@ export default function HostPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const contestantPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const contestantPhotoTargetRef = useRef<number | "couple" | null>(null);
+  const contestantCropStageRef = useRef<HTMLDivElement | null>(null);
+  const contestantCropDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const homepageAIFileInputRef = useRef<HTMLInputElement | null>(null);
   const partyAIFileInputRef = useRef<HTMLInputElement | null>(null);
   const cropStageRef = useRef<HTMLDivElement | null>(null);
@@ -198,9 +200,14 @@ export default function HostPage() {
   const [contestantUserId, setContestantUserId] = useState("");
   const [contestantUserIds, setContestantUserIds] = useState<number[]>([]);
   const [contestantName, setContestantName] = useState("");
-  const [contestantPhotos, setContestantPhotos] = useState<Record<number, File>>({});
-  const [couplePhoto, setCouplePhoto] = useState<File | null>(null);
+  const [contestantPhotos, setContestantPhotos] = useState<Record<number, ImageRecord>>({});
+  const [couplePhoto, setCouplePhoto] = useState<ImageRecord | null>(null);
   const [contestantPhotoTarget, setContestantPhotoTarget] = useState<number | "couple" | null>(null);
+  const [contestantPhotoModalOpen, setContestantPhotoModalOpen] = useState(false);
+  const [contestantPhotoFile, setContestantPhotoFile] = useState<File | null>(null);
+  const [contestantPhotoCropBox, setContestantPhotoCropBox] = useState<CropBox | null>(null);
+  const [draggingContestantPhoto, setDraggingContestantPhoto] = useState(false);
+  const [uploadingContestantPhoto, setUploadingContestantPhoto] = useState(false);
   const [savingContestant, setSavingContestant] = useState(false);
   const [startingEvent, setStartingEvent] = useState(false);
   const [error, setError] = useState("");
@@ -237,6 +244,13 @@ export default function HostPage() {
 
     return URL.createObjectURL(file);
   }, [file]);
+  const contestantPhotoPreviewUrl = useMemo(() => {
+    if (!contestantPhotoFile) {
+      return "";
+    }
+
+    return URL.createObjectURL(contestantPhotoFile);
+  }, [contestantPhotoFile]);
 
   useEffect(() => {
     return () => {
@@ -245,6 +259,14 @@ export default function HostPage() {
       }
     };
   }, [filePreviewUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (contestantPhotoPreviewUrl) {
+        URL.revokeObjectURL(contestantPhotoPreviewUrl);
+      }
+    };
+  }, [contestantPhotoPreviewUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -477,6 +499,11 @@ export default function HostPage() {
     setContestantPhotos({});
     setCouplePhoto(null);
     setContestantPhotoTarget(null);
+    contestantPhotoTargetRef.current = null;
+    setContestantPhotoFile(null);
+    setContestantPhotoCropBox(null);
+    setContestantPhotoModalOpen(false);
+    setDraggingContestantPhoto(false);
   };
 
   const openContestantModal = () => {
@@ -509,22 +536,176 @@ export default function HostPage() {
     });
   };
 
+  const openContestantPhotoModal = (target: number | "couple") => {
+    contestantPhotoTargetRef.current = target;
+    setContestantPhotoTarget(target);
+    setContestantPhotoFile(null);
+    setContestantPhotoCropBox(null);
+    setDraggingContestantPhoto(false);
+    setContestantPhotoModalOpen(true);
+    setError("");
+  };
+
+  const closeContestantPhotoModal = () => {
+    if (uploadingContestantPhoto) {
+      return;
+    }
+    contestantPhotoTargetRef.current = null;
+    setContestantPhotoTarget(null);
+    setContestantPhotoFile(null);
+    setContestantPhotoCropBox(null);
+    setDraggingContestantPhoto(false);
+    setContestantPhotoModalOpen(false);
+  };
+
   const handleContestantPhotoFile = (file: File | null) => {
-    const target = contestantPhotoTarget ?? contestantPhotoTargetRef.current;
-    if (!file || !target) {
+    if (!file) {
       return;
     }
     if (!file.type.startsWith("image/")) {
       setError("choose an image file");
       return;
     }
-    if (target === "couple") {
-      setCouplePhoto(file);
-    } else {
-      setContestantPhotos((current) => ({ ...current, [target]: file }));
+    setContestantPhotoFile(file);
+    setContestantPhotoCropBox(null);
+    setError("");
+  };
+
+  const handleContestantPhotoDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDraggingContestantPhoto(false);
+    handleContestantPhotoFile(event.dataTransfer.files[0] ?? null);
+  };
+
+  const resetContestantPhotoCropBox = () => {
+    const bounds = contestantCropStageRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return;
     }
-    contestantPhotoTargetRef.current = null;
-    setContestantPhotoTarget(null);
+    const size = Math.min(bounds.width, bounds.height);
+    setContestantPhotoCropBox({
+      x: (bounds.width - size) / 2,
+      y: (bounds.height - size) / 2,
+      size,
+    });
+  };
+
+  const constrainContestantPhotoCropBox = (nextX: number, nextY: number, size: number) => {
+    const bounds = contestantCropStageRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return { x: nextX, y: nextY, size };
+    }
+    return {
+      x: Math.min(Math.max(nextX, 0), bounds.width - size),
+      y: Math.min(Math.max(nextY, 0), bounds.height - size),
+      size,
+    };
+  };
+
+  const handleContestantPhotoCropPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (!contestantPhotoCropBox) {
+      return;
+    }
+    const bounds = contestantCropStageRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return;
+    }
+    event.currentTarget.setPointerCapture(event.pointerId);
+    contestantCropDragRef.current = {
+      offsetX: event.clientX - bounds.left - contestantPhotoCropBox.x,
+      offsetY: event.clientY - bounds.top - contestantPhotoCropBox.y,
+    };
+  };
+
+  const handleContestantPhotoCropPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!contestantPhotoCropBox || !contestantCropDragRef.current) {
+      return;
+    }
+    const bounds = contestantCropStageRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return;
+    }
+    setContestantPhotoCropBox(constrainContestantPhotoCropBox(
+      event.clientX - bounds.left - contestantCropDragRef.current.offsetX,
+      event.clientY - bounds.top - contestantCropDragRef.current.offsetY,
+      contestantPhotoCropBox.size,
+    ));
+  };
+
+  const handleContestantPhotoCropPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    contestantCropDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const createContestantCroppedPhotoFile = async () => {
+    if (!contestantPhotoFile || !contestantPhotoPreviewUrl || !contestantPhotoCropBox || !contestantCropStageRef.current) {
+      throw new Error("choose an image to crop");
+    }
+    const bounds = contestantCropStageRef.current.getBoundingClientRect();
+    const image = await loadImage(contestantPhotoPreviewUrl);
+    const scaleX = image.naturalWidth / bounds.width;
+    const scaleY = image.naturalHeight / bounds.height;
+    const canvas = document.createElement("canvas");
+    canvas.width = uploadCropSize;
+    canvas.height = uploadCropSize;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("failed to crop image");
+    }
+    ctx.drawImage(
+      image,
+      contestantPhotoCropBox.x * scaleX,
+      contestantPhotoCropBox.y * scaleY,
+      contestantPhotoCropBox.size * scaleX,
+      contestantPhotoCropBox.size * scaleY,
+      0,
+      0,
+      uploadCropSize,
+      uploadCropSize,
+    );
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+    if (!blob) {
+      throw new Error("failed to crop image");
+    }
+    return new File([blob], `contestant-image-${Date.now()}.jpg`, { type: "image/jpeg" });
+  };
+
+  const submitContestantPhoto = async (event: FormEvent) => {
+    event.preventDefault();
+    const target = contestantPhotoTarget ?? contestantPhotoTargetRef.current;
+    if (!firebaseUser || !selectedEvent || !target) {
+      return;
+    }
+    setError("");
+    setUploadingContestantPhoto(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const croppedFile = await createContestantCroppedPhotoFile();
+      const userIds = target === "couple" ? contestantUserIds : [target];
+      const uploaded = await uploadImage(token, croppedFile, toDateInputValue(new Date()), {
+        eventId: selectedEvent.id,
+        userIds,
+      });
+      setImages((current) => [uploaded, ...current.filter((image) => image.id !== uploaded.id)]);
+      if (target === "couple") {
+        setCouplePhoto(uploaded);
+      } else {
+        setContestantPhotos((current) => ({ ...current, [target]: uploaded }));
+      }
+      contestantPhotoTargetRef.current = null;
+      setContestantPhotoTarget(null);
+      setContestantPhotoFile(null);
+      setContestantPhotoCropBox(null);
+      setDraggingContestantPhoto(false);
+      setContestantPhotoModalOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to upload contestant photo";
+      setError(message);
+    } finally {
+      setUploadingContestantPhoto(false);
+    }
   };
 
   const submitContestant = async (event: FormEvent) => {
@@ -551,26 +732,23 @@ export default function HostPage() {
         costume: contestantCouple ? undefined : contestantName.trim(),
         team: contestantCouple,
       });
-      const uploadedImages: ImageRecord[] = [];
-      const uploadDate = toDateInputValue(new Date());
-      for (const [userIdText, file] of Object.entries(contestantPhotos)) {
-        const userId = Number(userIdText);
-        const uploaded = await uploadImage(token, file, uploadDate, {
-          eventId: selectedEvent.id,
-          teamId: response.team?.id ?? null,
-          userIds: [userId],
-        });
-        uploadedImages.push(uploaded);
+      const assignedImages: ImageRecord[] = [];
+      if (response.team) {
+        const imageIds = [
+          ...Object.values(contestantPhotos).map((image) => image.id),
+          ...(couplePhoto ? [couplePhoto.id] : []),
+        ];
+        for (const imageId of imageIds) {
+          const updated = await updateImageEventAssignment(token, imageId, {
+            eventId: selectedEvent.id,
+            teamId: response.team.id,
+          });
+          assignedImages.push(updated);
+        }
       }
-      if (contestantCouple && couplePhoto) {
-        const uploaded = await uploadImage(token, couplePhoto, uploadDate, {
-          eventId: selectedEvent.id,
-          teamId: response.team?.id ?? null,
-          userIds: contestantUserIds,
-        });
-        uploadedImages.push(uploaded);
+      if (assignedImages.length > 0) {
+        setImages((current) => current.map((image) => assignedImages.find((updated) => updated.id === image.id) ?? image));
       }
-      setImages((current) => [...uploadedImages, ...current]);
       setSelectedEventDetail(response.detail);
       resetContestantForm();
       setContestantModalOpen(false);
@@ -1665,21 +1843,21 @@ export default function HostPage() {
                   {selectedEventCategories.length === 0 ? (
                     <section className="event-setup-step">
                       <h3 className="host-section-title">Categories</h3>
-                      <button className="auth-submit" type="button" onClick={() => setCategoryModalOpen(true)}>
+                      <button className="auth-submit event-setup-small-button" type="button" onClick={() => setCategoryModalOpen(true)}>
                         Add Category
                       </button>
-                      <div className="event-category-list">
+                      <ul className="event-category-list event-category-bullets">
                         {eventCategories.map((category) => (
-                          <span className="tagged-user-bubble" key={category}>
-                            {category}
+                          <li key={category}>
+                            <span>{category}</span>
                             <button type="button" onClick={() => setEventCategories((current) => current.filter((item) => item !== category))} aria-label={`Remove ${category}`}>
                               x
                             </button>
-                          </span>
+                          </li>
                         ))}
                         {eventCategories.length === 0 ? <p className="selected-file">No categories added yet.</p> : null}
-                      </div>
-                      <button className="auth-submit" type="button" onClick={() => void saveEventCategories()} disabled={savingEvent || eventCategories.length === 0}>
+                      </ul>
+                      <button className="auth-submit event-setup-next-button" type="button" onClick={() => void saveEventCategories()} disabled={savingEvent || eventCategories.length === 0}>
                         {savingEvent ? "Saving..." : "Next"}
                       </button>
                     </section>
@@ -2154,6 +2332,7 @@ export default function HostPage() {
                       setCouplePhoto(null);
                     }}
                   />
+                  <span className="toggle-switch" aria-hidden="true" />
                   <span>Couple costume</span>
                 </label>
 
@@ -2193,45 +2372,117 @@ export default function HostPage() {
                   {contestantUserIds.map((userId) => (
                     <div className="contestant-photo-row" key={userId}>
                       <span>{userLabel(users, userId)}</span>
-                      <button className="auth-secondary" type="button" onClick={() => {
-                        contestantPhotoTargetRef.current = userId;
-                        setContestantPhotoTarget(userId);
-                        contestantPhotoInputRef.current?.click();
-                      }}>
+                      <button className="auth-secondary contestant-add-photo-button" type="button" onClick={() => openContestantPhotoModal(userId)}>
                         Add Photo
                       </button>
-                      {contestantPhotos[userId] ? <span className="selected-file">{contestantPhotos[userId].name}</span> : null}
+                      {contestantPhotos[userId] ? (
+                        <div className="contestant-photo-preview">
+                          <img src={contestantPhotos[userId].imageUrl} alt={`${userLabel(users, userId)} contestant preview`} />
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                   {contestantCouple ? (
                     <div className="contestant-photo-row">
                       <span>Couple</span>
-                      <button className="auth-secondary" type="button" onClick={() => {
-                        contestantPhotoTargetRef.current = "couple";
-                        setContestantPhotoTarget("couple");
-                        contestantPhotoInputRef.current?.click();
-                      }}>
+                      <button className="auth-secondary contestant-add-photo-button" type="button" onClick={() => openContestantPhotoModal("couple")}>
                         Add Couple Photo
                       </button>
-                      {couplePhoto ? <span className="selected-file">{couplePhoto.name}</span> : null}
+                      {couplePhoto ? (
+                        <div className="contestant-photo-preview">
+                          <img src={couplePhoto.imageUrl} alt="Couple contestant preview" />
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
 
-                <input
-                  ref={contestantPhotoInputRef}
-                  className="visually-hidden"
-                  type="file"
-                  accept="image/png,image/jpeg,image/gif,image/webp"
-                  onChange={(event) => {
-                    handleContestantPhotoFile(event.target.files?.[0] ?? null);
-                    event.target.value = "";
-                  }}
-                />
-
                 {error ? <p className="auth-error">{error}</p> : null}
                 <button className="auth-submit" type="submit" disabled={savingContestant}>
                   {savingContestant ? "Saving..." : "Save Contestant"}
+                </button>
+              </form>
+            </section>
+          </div>
+        ) : null}
+
+        {contestantPhotoModalOpen ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={closeContestantPhotoModal}>
+            <section className="upload-modal gothic-card" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+              <div className="modal-header">
+                <h2 className="host-section-title">Add Photo</h2>
+                <button className="modal-close" type="button" onClick={closeContestantPhotoModal} aria-label="Close contestant photo modal">
+                  x
+                </button>
+              </div>
+              <form className="host-email-form" onSubmit={submitContestantPhoto}>
+                {!contestantPhotoFile ? (
+                  <div
+                    className={draggingContestantPhoto ? "drop-zone dragging" : "drop-zone"}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setDraggingContestantPhoto(true);
+                    }}
+                    onDragLeave={() => setDraggingContestantPhoto(false)}
+                    onDrop={handleContestantPhotoDrop}
+                  >
+                    <p>Drop an image here or choose one from your device.</p>
+                    <button className="auth-submit" type="button" onClick={() => contestantPhotoInputRef.current?.click()}>
+                      Choose Image
+                    </button>
+                    <input
+                      ref={contestantPhotoInputRef}
+                      className="visually-hidden"
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp"
+                      disabled={uploadingContestantPhoto}
+                      onChange={(event) => {
+                        handleContestantPhotoFile(event.target.files?.[0] ?? null);
+                        event.target.value = "";
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <p className="selected-file">Drag the square to choose the saved crop.</p>
+                    <div className="crop-stage" ref={contestantCropStageRef}>
+                      <img src={contestantPhotoPreviewUrl} alt="Contestant upload crop preview" onLoad={resetContestantPhotoCropBox} />
+                      {contestantPhotoCropBox ? (
+                        <div
+                          className="crop-box"
+                          style={{
+                            width: contestantPhotoCropBox.size,
+                            height: contestantPhotoCropBox.size,
+                            transform: `translate(${contestantPhotoCropBox.x}px, ${contestantPhotoCropBox.y}px)`,
+                          }}
+                          onPointerDown={handleContestantPhotoCropPointerDown}
+                          onPointerMove={handleContestantPhotoCropPointerMove}
+                          onPointerUp={handleContestantPhotoCropPointerUp}
+                          onPointerCancel={handleContestantPhotoCropPointerUp}
+                        />
+                      ) : null}
+                      {uploadingContestantPhoto ? (
+                        <div className="upload-loading" aria-label="Uploading contestant photo">
+                          <span className="confirmation-spinner" />
+                        </div>
+                      ) : null}
+                    </div>
+                    <button
+                      className="auth-secondary"
+                      type="button"
+                      onClick={() => {
+                        setContestantPhotoFile(null);
+                        setContestantPhotoCropBox(null);
+                      }}
+                      disabled={uploadingContestantPhoto}
+                    >
+                      Choose Different Image
+                    </button>
+                  </>
+                )}
+                {error ? <p className="auth-error">{error}</p> : null}
+                <button className="auth-submit" type="submit" disabled={uploadingContestantPhoto || !contestantPhotoFile || !contestantPhotoCropBox}>
+                  {uploadingContestantPhoto ? "Uploading..." : "Upload Photo"}
                 </button>
               </form>
             </section>
@@ -2315,6 +2566,7 @@ export default function HostPage() {
                     checked={homepage}
                     onChange={(event) => setHomepage(event.target.checked)}
                   />
+                  <span className="toggle-switch" aria-hidden="true" />
                   <span>Use on homepage</span>
                 </label>
 

@@ -411,6 +411,13 @@ export function updateImageTags(token: string, id: number, userIds: number[]) {
   });
 }
 
+export function updateImageEventAssignment(token: string, id: number, payload: { eventId?: number; teamId?: number; userIds?: number[] }) {
+  return apiFetch<ImageRecord>(`/images/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function sendHostEmail(token: string, payload: SendEmailPayload) {
   return apiFetch<SendEmailResponse>("/emails", token, {
     method: "POST",

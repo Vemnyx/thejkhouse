@@ -425,10 +425,10 @@ func (s *userStore) getImage(ctx context.Context, id int64) (*Image, error) {
 }
 
 func (s *userStore) updateImageHomepage(ctx context.Context, id int64, homepage bool) (*Image, error) {
-	return s.updateImage(ctx, id, &homepage, nil)
+	return s.updateImage(ctx, id, &homepage, nil, nil, nil)
 }
 
-func (s *userStore) updateImage(ctx context.Context, id int64, homepage *bool, userIDs *[]int32) (*Image, error) {
+func (s *userStore) updateImage(ctx context.Context, id int64, homepage *bool, userIDs *[]int32, eventID *int64, teamID *int64) (*Image, error) {
 	var image Image
 	var homepageArg any
 	if homepage != nil {
@@ -438,16 +438,28 @@ func (s *userStore) updateImage(ctx context.Context, id int64, homepage *bool, u
 	if userIDs != nil {
 		userIDsArg = *userIDs
 	}
+	var eventIDArg any
+	if eventID != nil {
+		eventIDArg = *eventID
+	}
+	var teamIDArg any
+	if teamID != nil {
+		teamIDArg = *teamID
+	}
 	err := s.pool.QueryRow(
 		ctx,
 		`UPDATE images
 		 SET homepage = COALESCE($2::boolean, homepage),
-		     user_ids = COALESCE($3::integer[], user_ids)
+		     user_ids = COALESCE($3::integer[], user_ids),
+		     event_id = COALESCE($4::integer, event_id),
+		     team_id = COALESCE($5::integer, team_id)
 		 WHERE id = $1
 		 RETURNING id, image_url, date, party_id, event_id, team_id, user_ids, homepage, notes, uploaded_at`,
 		id,
 		homepageArg,
 		userIDsArg,
+		eventIDArg,
+		teamIDArg,
 	).Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.TeamID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt)
 	if err != nil {
 		return nil, err

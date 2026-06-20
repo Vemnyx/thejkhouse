@@ -282,6 +282,7 @@ export default function LoginPage() {
                   checked={showPassword}
                   onChange={(event) => setShowPassword(event.target.checked)}
                 />
+                <span className="toggle-switch" aria-hidden="true" />
                 <span>Show password</span>
               </label>
             </>
