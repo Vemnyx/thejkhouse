@@ -1071,7 +1071,7 @@ body {
 }
 
 .bracket-seed-card,
-.bracket-match-card,
+.bracket-participant-node,
 .bracket-user-matchup {
   position: relative;
   display: grid;
@@ -1105,7 +1105,7 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: space-around;
-  gap: 1.25rem;
+  gap: 1.45rem;
   min-width: 13.5rem;
 }
 
@@ -1116,10 +1116,39 @@ body {
 }
 
 .bracket-match-card {
+  position: relative;
+  display: grid;
+  align-content: center;
+  gap: 1.1rem;
   min-height: 6.4rem;
+  padding: 0;
+  background: transparent;
+  border: 0;
 }
 
-.bracket-side-left .bracket-match-card::after,
+.bracket-match-card small,
+.bracket-match-label {
+  color: rgba(249, 214, 143, 0.72);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.bracket-participant-node {
+  min-height: 3.1rem;
+  align-items: center;
+  color: rgba(255, 248, 230, 0.92);
+  font-weight: 800;
+}
+
+.bracket-winner {
+  border-color: rgba(249, 214, 143, 0.72);
+  box-shadow: 0 0 0 1px rgba(249, 214, 143, 0.28), 0 0 24px rgba(249, 214, 143, 0.14);
+  color: var(--gold);
+}
+
+.bracket-side-left .bracket-participant-node::after,
 .bracket-side-left .bracket-seed-card::after {
   content: "";
   position: absolute;
@@ -1130,7 +1159,7 @@ body {
   background: rgba(249, 214, 143, 0.46);
 }
 
-.bracket-side-right .bracket-match-card::before,
+.bracket-side-right .bracket-participant-node::before,
 .bracket-side-right .bracket-seed-card::before {
   content: "";
   position: absolute;
@@ -1191,7 +1220,7 @@ body {
   text-transform: uppercase;
 }
 
-.bracket-match-card span {
+.bracket-match-card span:not(.bracket-participant-node) {
   color: var(--ink-muted);
 }
 
@@ -1253,6 +1282,8 @@ body {
 .results-modal {
   position: relative;
   overflow: hidden;
+  gap: 0.7rem;
+  padding-block: 1.1rem;
 }
 
 .result-category-buttons {
@@ -1263,22 +1294,30 @@ body {
 
 .results-back-button {
   justify-self: start;
+  padding: 0;
 }
 
 .victory-card {
   position: relative;
   display: grid;
   justify-items: center;
-  gap: 0.85rem;
+  gap: 0.55rem;
   text-align: center;
   animation: victory-rise 520ms ease both;
+}
+
+.victory-card .eyebrow {
+  margin: 0;
+  color: var(--gold);
+  font-size: 1rem;
+  letter-spacing: 0.16em;
 }
 
 .victory-card h3 {
   margin: 0;
   color: var(--rose-pale);
   font-family: var(--decorative-font);
-  font-size: clamp(2rem, 7vw, 4.5rem);
+  font-size: clamp(1.8rem, 5vw, 3.4rem);
   letter-spacing: 0.08em;
   text-shadow: 0 0 28px rgba(232, 120, 143, 0.34);
 }
@@ -1293,7 +1332,7 @@ body {
 }
 
 .victory-card img {
-  width: min(100%, 22rem);
+  width: min(100%, 18rem);
   aspect-ratio: 1;
   border: 1px solid rgba(232, 120, 143, 0.24);
   border-radius: 1.2rem;
