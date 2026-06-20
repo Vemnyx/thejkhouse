@@ -184,6 +184,7 @@ func (c *aiClient) generateHTML(ctx context.Context, blockType string, instructi
 	if html == "" {
 		return "", newPublicAIError("The AI returned an empty draft. Try adding more detail to the prompt.", fmt.Errorf("cursor returned empty html"))
 	}
+	html = ensureUploadedImagesIncluded(html, imageURLs)
 	if err := validateGeneratedHTML(html); err != nil {
 		return "", newPublicAIError(err.Error(), err)
 	}
@@ -287,6 +288,7 @@ Rules:
 - Do not include markdown fences, explanations, scripts, inline event handlers, or iframes.
 - Do not use external assets except the uploaded CDN image URLs listed below.
 - If uploaded images are provided, include every uploaded image in the fragment.
+- Any uploaded image URL omitted from your draft will be appended automatically at the end, so place them intentionally in the layout instead.
 - For party blocks, preserve and fill the provided party template structure and class names unless the host explicitly asks for a different layout.
 - Prefer semantic HTML elements and copy that fits The JK House tone.
 - Keep the fragment concise enough to paste into the existing editor.
@@ -313,6 +315,29 @@ func cleanGeneratedHTML(value string) string {
 	html = strings.TrimPrefix(html, "```")
 	html = strings.TrimSuffix(html, "```")
 	return strings.TrimSpace(html)
+}
+
+func ensureUploadedImagesIncluded(html string, imageURLs []string) string {
+	missing := make([]string, 0)
+	for _, imageURL := range imageURLs {
+		imageURL = strings.TrimSpace(imageURL)
+		if imageURL == "" || strings.Contains(html, imageURL) {
+			continue
+		}
+		missing = append(missing, imageURL)
+	}
+	if len(missing) == 0 {
+		return html
+	}
+
+	var builder strings.Builder
+	builder.WriteString(strings.TrimSpace(html))
+	builder.WriteString("\n\n<section class=\"party-template-images\" aria-label=\"Party images\">\n")
+	for index, imageURL := range missing {
+		builder.WriteString(fmt.Sprintf("  <figure>\n    <img src=%q alt=%q />\n  </figure>\n", imageURL, fmt.Sprintf("Party image %d", index+1)))
+	}
+	builder.WriteString("</section>")
+	return builder.String()
 }
 
 func validateGeneratedHTML(html string) error {

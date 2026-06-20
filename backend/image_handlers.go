@@ -145,7 +145,7 @@ func parseImageID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 }
 
 func (s *apiServer) handleListImages(w http.ResponseWriter, r *http.Request) {
-	user, err := s.loadUserFromRequest(r)
+	_, err := s.loadUserFromRequest(r)
 	if err != nil {
 		if authErr, ok := err.(*authRequestError); ok {
 			writeError(w, authErr.status, authErr.message)
@@ -155,11 +155,6 @@ func (s *apiServer) handleListImages(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to authorize images")
 		return
 	}
-	if user.Role != RoleHost {
-		writeError(w, http.StatusForbidden, "host access is required")
-		return
-	}
-
 	images, err := s.store.listImages(r.Context())
 	if err != nil {
 		log.Error("image list", "error", err)
@@ -181,11 +176,6 @@ func (s *apiServer) handleCreateImage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to authorize upload")
 		return
 	}
-	if user.Role != RoleHost {
-		writeError(w, http.StatusForbidden, "host access is required")
-		return
-	}
-
 	r.Body = http.MaxBytesReader(w, r.Body, maxImageUploadSize)
 	if err := r.ParseMultipartForm(maxImageUploadSize); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid multipart form")
@@ -209,7 +199,11 @@ func (s *apiServer) handleCreateImage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	homepage := parseFormBool(r.FormValue("homepage"))
+	if user.Role != RoleHost && partyID == nil {
+		writeError(w, http.StatusBadRequest, "party is required")
+		return
+	}
+	homepage := user.Role == RoleHost && parseFormBool(r.FormValue("homepage"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
 
 	sample := make([]byte, 512)

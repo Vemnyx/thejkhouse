@@ -1,9 +1,9 @@
-import { FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import BirthdaySelect from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
-import { HomepageContent, PartyRecord, getHomepage, listParties } from "../lib/api";
+import { HomepageContent, ImageRecord, PartyRecord, getHomepage, listImages, listParties, uploadImage } from "../lib/api";
 
 type MainTab = "home" | "parties" | "photos" | "events";
 type MainView = MainTab | "settings";
@@ -41,6 +41,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { appUser, firebaseUser, logout, updateProfile } = useAuth();
+  const photoFileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeView, setActiveView] = useState<MainView>(() => tabFromPath(location.pathname));
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -55,8 +56,34 @@ export default function HomePage() {
   const [parties, setParties] = useState<PartyRecord[]>([]);
   const [partiesLoading, setPartiesLoading] = useState(true);
   const [expandedPartyId, setExpandedPartyId] = useState<number | null>(null);
+  const [photos, setPhotos] = useState<ImageRecord[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(true);
+  const [photoPartyFilter, setPhotoPartyFilter] = useState("all");
+  const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(null);
+  const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
+  const [photoUploadPartyId, setPhotoUploadPartyId] = useState("");
+  const [photoUploadFile, setPhotoUploadFile] = useState<File | null>(null);
+  const [photoUploadNotes, setPhotoUploadNotes] = useState("");
+  const [photoUploadDragging, setPhotoUploadDragging] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoUploadPreviewURL, setPhotoUploadPreviewURL] = useState("");
 
   const fullName = [appUser?.firstName, appUser?.lastName].filter(Boolean).join(" ") || appUser?.email || "Account";
+  const partyOptions = useMemo(() => parties.map((party) => ({
+    ...party,
+    value: String(party.id),
+  })), [parties]);
+  const filteredPhotos = useMemo(() => {
+    const sortedPhotos = [...photos].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    if (photoPartyFilter === "all") {
+      return sortedPhotos;
+    }
+    return sortedPhotos.filter((photo) => String(photo.partyId) === photoPartyFilter);
+  }, [photoPartyFilter, photos]);
+  const selectedPhoto = selectedPhotoId ? photos.find((photo) => photo.id === selectedPhotoId) ?? null : null;
+  const selectedUploadParty = photoUploadPartyId
+    ? parties.find((party) => party.id === Number(photoUploadPartyId)) ?? null
+    : null;
 
   useEffect(() => {
     setActiveView(tabFromPath(location.pathname));
@@ -69,14 +96,16 @@ export default function HomePage() {
       if (!firebaseUser) {
         setHomepageLoading(false);
         setPartiesLoading(false);
+        setPhotosLoading(false);
         return;
       }
 
       try {
         const token = await firebaseUser.getIdToken();
-        const [content, nextParties] = await Promise.all([
+        const [content, nextParties, nextPhotos] = await Promise.all([
           getHomepage(token),
           listParties(token),
+          listImages(token),
         ]);
         if (!cancelled) {
           setHomepage({
@@ -84,17 +113,20 @@ export default function HomePage() {
             images: content.images ?? [],
           });
           setParties(nextParties);
+          setPhotos(nextPhotos);
           setExpandedPartyId((current) => current ?? nextParties[0]?.id ?? null);
         }
       } catch {
         if (!cancelled) {
           setHomepage({ html: "", images: [] });
           setParties([]);
+          setPhotos([]);
         }
       } finally {
         if (!cancelled) {
           setHomepageLoading(false);
           setPartiesLoading(false);
+          setPhotosLoading(false);
         }
       }
     }
@@ -106,6 +138,17 @@ export default function HomePage() {
     };
   }, [firebaseUser]);
 
+  useEffect(() => {
+    if (!photoUploadFile) {
+      setPhotoUploadPreviewURL("");
+      return undefined;
+    }
+
+    const objectURL = URL.createObjectURL(photoUploadFile);
+    setPhotoUploadPreviewURL(objectURL);
+    return () => URL.revokeObjectURL(objectURL);
+  }, [photoUploadFile]);
+
   const selectView = (view: MainView) => {
     setActiveView(view);
     setMobileMenuOpen(false);
@@ -114,6 +157,85 @@ export default function HomePage() {
     setError("");
     if (view !== "settings") {
       navigate(tabPaths[view]);
+    }
+  };
+
+  const openPhotoUpload = () => {
+    setError("");
+    setMessage("");
+    setPhotoUploadPartyId("");
+    setPhotoUploadFile(null);
+    setPhotoUploadNotes("");
+    setPhotoUploadDragging(false);
+    setPhotoUploadOpen(true);
+  };
+
+  const closePhotoUpload = () => {
+    if (photoUploading) {
+      return;
+    }
+    setPhotoUploadOpen(false);
+    setPhotoUploadDragging(false);
+  };
+
+  const handlePhotoFile = (file: File | null) => {
+    setError("");
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      return;
+    }
+    setPhotoUploadFile(file);
+  };
+
+  const handlePhotoFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    handlePhotoFile(event.target.files?.[0] ?? null);
+    event.target.value = "";
+  };
+
+  const handlePhotoDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setPhotoUploadDragging(false);
+    handlePhotoFile(event.dataTransfer.files?.[0] ?? null);
+  };
+
+  const handlePhotoUpload = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+    if (!firebaseUser) {
+      setError("You need to be signed in to upload photos.");
+      return;
+    }
+    if (!selectedUploadParty) {
+      setError("Choose a party for this photo.");
+      return;
+    }
+    if (!photoUploadFile) {
+      setError("Choose an image to upload.");
+      return;
+    }
+
+    setPhotoUploading(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const uploaded = await uploadImage(token, photoUploadFile, selectedUploadParty.date.slice(0, 10), {
+        partyId: selectedUploadParty.id,
+        notes: photoUploadNotes.trim(),
+      });
+      setPhotos((current) => [uploaded, ...current.filter((photo) => photo.id !== uploaded.id)]);
+      setPhotoPartyFilter(String(selectedUploadParty.id));
+      setPhotoUploadOpen(false);
+      setPhotoUploadFile(null);
+      setPhotoUploadNotes("");
+      setMessage("Photo uploaded.");
+    } catch (err) {
+      const nextError = err instanceof Error ? err.message : "failed to upload photo";
+      setError(nextError);
+    } finally {
+      setPhotoUploading(false);
     }
   };
 
@@ -305,6 +427,59 @@ export default function HomePage() {
                 </div>
               )}
             </div>
+          ) : activeView === "photos" ? (
+            <div className="dashboard-photos">
+              <div className="host-panel-header">
+                <label className="image-filter">
+                  <span>Party</span>
+                  <select value={photoPartyFilter} onChange={(event) => setPhotoPartyFilter(event.target.value)}>
+                    <option value="all">All Images</option>
+                    {partyOptions.map((party) => (
+                      <option value={party.value} key={party.id}>
+                        {party.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button className="auth-submit dashboard-photo-upload" type="button" onClick={openPhotoUpload} disabled={partyOptions.length === 0}>
+                  Add New Image
+                </button>
+              </div>
+              {message ? <p className="host-success">{message}</p> : null}
+              {error ? <p className="auth-error">{error}</p> : null}
+              {photosLoading ? (
+                <p className="dashboard-copy">Loading photos...</p>
+              ) : filteredPhotos.length === 0 ? (
+                <p className="dashboard-copy">
+                  {photoPartyFilter === "all" ? "No photos yet." : "No photos for this party yet."}
+                </p>
+              ) : (
+                <div className="image-grid" aria-label="Party photos">
+                  {filteredPhotos.map((photo) => {
+                    const photoParty = parties.find((party) => party.id === photo.partyId);
+
+                    return (
+                      <article className="image-grid-card" key={photo.id}>
+                        <div className="image-grid-image-wrap">
+                          <button
+                            className="image-preview-trigger"
+                            type="button"
+                            onClick={() => setSelectedPhotoId(photo.id)}
+                          >
+                            <img src={photo.imageUrl} alt={photo.notes || photoParty?.label || "Party photo"} />
+                          </button>
+                        </div>
+                        <div className="image-grid-meta">
+                          <span>{photoParty?.label ?? "No party"}</span>
+                          <span>{formatDate(photo.date)}</span>
+                          {photo.notes ? <span>{photo.notes}</span> : null}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="under-construction">
               <p>Under Construction</p>
@@ -312,8 +487,98 @@ export default function HomePage() {
           )}
         </section>
       </section>
+      {selectedPhoto ? (
+        <div className="image-lightbox-backdrop" role="presentation" onMouseDown={() => setSelectedPhotoId(null)}>
+          <figure className="image-lightbox" onMouseDown={(event) => event.stopPropagation()}>
+            <img src={selectedPhoto.imageUrl} alt={selectedPhoto.notes || "Party photo preview"} />
+            <figcaption>
+              <span>{formatDate(selectedPhoto.date)}</span>
+              {selectedPhoto.notes ? <span>{selectedPhoto.notes}</span> : null}
+            </figcaption>
+          </figure>
+        </div>
+      ) : null}
+      {photoUploadOpen ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closePhotoUpload}>
+          <section className="upload-modal gothic-card" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="host-section-title">Add New Image</h2>
+              <button className="modal-close" type="button" onClick={closePhotoUpload} aria-label="Close upload modal">
+                x
+              </button>
+            </div>
+            <form className="host-email-form" onSubmit={handlePhotoUpload}>
+              <label className="auth-field">
+                <span>Party</span>
+                <select value={photoUploadPartyId} onChange={(event) => setPhotoUploadPartyId(event.target.value)} required>
+                  <option value="">Select a party</option>
+                  {partyOptions.map((party) => (
+                    <option value={party.value} key={party.id}>
+                      {party.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {selectedUploadParty ? (
+                <p className="selected-file">Using party date: {formatDate(selectedUploadParty.date)}</p>
+              ) : null}
+              {!photoUploadFile ? (
+                <div
+                  className={photoUploadDragging ? "drop-zone dragging" : "drop-zone"}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setPhotoUploadDragging(true);
+                  }}
+                  onDragLeave={() => setPhotoUploadDragging(false)}
+                  onDrop={handlePhotoDrop}
+                >
+                  <p>Drop an image here or choose one from your device.</p>
+                  <button className="auth-submit" type="button" onClick={() => photoFileInputRef.current?.click()}>
+                    Choose Image
+                  </button>
+                </div>
+              ) : (
+                <div className="upload-preview">
+                  <img src={photoUploadPreviewURL} alt="Selected upload preview" />
+                </div>
+              )}
+              <input
+                ref={photoFileInputRef}
+                className="visually-hidden"
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                onChange={handlePhotoFileChange}
+              />
+              {photoUploadFile ? (
+                <button className="auth-submit" type="button" onClick={() => photoFileInputRef.current?.click()}>
+                  Choose Different Image
+                </button>
+              ) : null}
+              <label className="auth-field">
+                <span>Notes</span>
+                <textarea
+                  value={photoUploadNotes}
+                  onChange={(event) => setPhotoUploadNotes(event.target.value)}
+                  placeholder="Optional note for this image"
+                  rows={3}
+                />
+              </label>
+              {error ? <p className="auth-error">{error}</p> : null}
+              <button className="auth-submit" type="submit" disabled={photoUploading || !photoUploadFile || !selectedUploadParty}>
+                {photoUploading ? "Uploading..." : "Upload Image"}
+              </button>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+  }).format(new Date(value));
 }
 
 function formatDateTime(value: string) {
