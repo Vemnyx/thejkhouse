@@ -80,6 +80,12 @@ type EventTeam struct {
 	Metadata json.RawMessage `json:"metadata"`
 }
 
+type EventVote struct {
+	EventID  int64           `json:"eventId"`
+	UserID   int64           `json:"userId"`
+	Metadata json.RawMessage `json:"metadata"`
+}
+
 type EventDetail struct {
 	Event Event       `json:"event"`
 	Users []EventUser `json:"users"`

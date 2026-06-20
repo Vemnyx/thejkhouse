@@ -2,13 +2,17 @@ import { type DragEvent, type FormEvent, type PointerEvent, useEffect, useMemo, 
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, PartyRecord, createEvent, createEventContestant, createParty, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
 type EventView = "list" | "setup";
 type ImageFilter = "all" | "homepage";
 type AIDraftType = "homepage" | "party";
+type EventCategory = {
+  name: string;
+  type: "individual" | "team";
+};
 type DeleteTarget =
   | { type: "image"; image: ImageRecord }
   | { type: "party"; party: PartyRecord }
@@ -194,7 +198,8 @@ export default function HostPage() {
   const [eventSummary, setEventSummary] = useState("");
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [categoryDraft, setCategoryDraft] = useState("");
-  const [eventCategories, setEventCategories] = useState<string[]>([]);
+  const [categoryType, setCategoryType] = useState<EventCategory["type"]>("individual");
+  const [eventCategories, setEventCategories] = useState<EventCategory[]>([]);
   const [contestantModalOpen, setContestantModalOpen] = useState(false);
   const [contestantCouple, setContestantCouple] = useState(false);
   const [contestantUserId, setContestantUserId] = useState("");
@@ -210,6 +215,7 @@ export default function HostPage() {
   const [uploadingContestantPhoto, setUploadingContestantPhoto] = useState(false);
   const [savingContestant, setSavingContestant] = useState(false);
   const [startingEvent, setStartingEvent] = useState(false);
+  const [completingEventId, setCompletingEventId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [loadingImages, setLoadingImages] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -463,11 +469,12 @@ export default function HostPage() {
   const addCategory = (event: FormEvent) => {
     event.preventDefault();
     const category = categoryDraft.trim();
-    if (!category || eventCategories.includes(category)) {
+    if (!category || eventCategories.some((item) => item.name === category)) {
       return;
     }
-    setEventCategories((current) => [...current, category]);
+    setEventCategories((current) => [...current, { name: category, type: categoryType }]);
     setCategoryDraft("");
+    setCategoryType("individual");
     setCategoryModalOpen(false);
   };
 
@@ -684,8 +691,11 @@ export default function HostPage() {
       const token = await firebaseUser.getIdToken();
       const croppedFile = await createContestantCroppedPhotoFile();
       const userIds = target === "couple" ? contestantUserIds : [target];
+      const costumeName = contestantName.trim();
       const uploaded = await uploadImage(token, croppedFile, toDateInputValue(new Date()), {
+        partyId: selectedEvent.partyId ?? null,
         eventId: selectedEvent.id,
+        notes: costumeName,
         userIds,
       });
       setImages((current) => [uploaded, ...current.filter((image) => image.id !== uploaded.id)]);
@@ -776,6 +786,25 @@ export default function HostPage() {
       setError(message);
     } finally {
       setStartingEvent(false);
+    }
+  };
+
+  const handleCompleteEvent = async (event: EventRecord) => {
+    if (!firebaseUser) {
+      return;
+    }
+    setError("");
+    setCompletingEventId(event.id);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const updated = await completeEvent(token, event.id);
+      setEvents((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setSelectedEventDetail((current) => current?.event.id === updated.id ? { ...current, event: updated } : current);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to complete event";
+      setError(message);
+    } finally {
+      setCompletingEventId(null);
     }
   };
 
@@ -1798,6 +1827,7 @@ export default function HostPage() {
                           <th>Start</th>
                           <th>End</th>
                           <th>Summary</th>
+                          <th aria-label="Actions" />
                         </tr>
                       </thead>
                       <tbody>
@@ -1809,11 +1839,24 @@ export default function HostPage() {
                             <td>{event.startDate ? formatDate(event.startDate) : "Not set"}</td>
                             <td>{event.endDate ? formatDate(event.endDate) : "Not set"}</td>
                             <td>{event.description || "No summary"}</td>
+                            <td>
+                              <button
+                                className="auth-secondary table-action-button"
+                                type="button"
+                                onClick={(clickEvent) => {
+                                  clickEvent.stopPropagation();
+                                  void handleCompleteEvent(event);
+                                }}
+                                disabled={Boolean(event.completedAt) || completingEventId === event.id}
+                              >
+                                {event.completedAt ? "Completed" : completingEventId === event.id ? "Completing..." : "Mark Completed"}
+                              </button>
+                            </td>
                           </tr>
                         ))}
                         {events.length === 0 ? (
                           <tr>
-                            <td colSpan={6}>No events yet.</td>
+                            <td colSpan={7}>No events yet.</td>
                           </tr>
                         ) : null}
                       </tbody>
@@ -1848,9 +1891,9 @@ export default function HostPage() {
                       </button>
                       <ul className="event-category-list event-category-bullets">
                         {eventCategories.map((category) => (
-                          <li key={category}>
-                            <span>{category}</span>
-                            <button type="button" onClick={() => setEventCategories((current) => current.filter((item) => item !== category))} aria-label={`Remove ${category}`}>
+                          <li key={`${category.name}-${category.type}`}>
+                            <span>{category.name} <small>({category.type})</small></span>
+                            <button type="button" onClick={() => setEventCategories((current) => current.filter((item) => item.name !== category.name))} aria-label={`Remove ${category.name}`}>
                               x
                             </button>
                           </li>
@@ -1873,13 +1916,14 @@ export default function HostPage() {
                       </div>
                       <div className="event-category-list">
                         {selectedEventCategories.map((category) => (
-                          <span className="tagged-user-bubble" key={category}>{category}</span>
+                          <span className="tagged-user-bubble" key={`${category.name}-${category.type}`}>{category.name} ({category.type})</span>
                         ))}
                       </div>
                       <div className="host-table-wrap">
                         <table className="host-table">
                           <thead>
                             <tr>
+                              <th>Photo</th>
                               <th>Contestant</th>
                               <th>Costume</th>
                               <th>Photos</th>
@@ -1889,6 +1933,7 @@ export default function HostPage() {
                           <tbody>
                             {selectedEventDetail?.teams.map((team) => (
                               <tr key={`team-${team.id}`}>
+                                <td>{renderContestantImagePreview(selectedEventImages.find((image) => image.teamId === team.id))}</td>
                                 <td>{team.userIds.map((userId) => userLabel(users, userId)).join(" + ")}</td>
                                 <td>{team.name}</td>
                                 <td>{selectedEventImages.filter((image) => image.teamId === team.id).length}</td>
@@ -1903,6 +1948,7 @@ export default function HostPage() {
                               .filter((eventUser) => !selectedEventDetail?.teams.some((team) => team.userIds.includes(eventUser.userId)))
                               .map((eventUser) => (
                                 <tr key={`user-${eventUser.userId}`}>
+                                  <td>{renderContestantImagePreview(selectedEventImages.find((image) => image.userIds.includes(eventUser.userId)))}</td>
                                   <td>{userLabel(users, eventUser.userId)}</td>
                                   <td>{eventUserCostume(eventUser)}</td>
                                   <td>{selectedEventImages.filter((image) => image.userIds.includes(eventUser.userId)).length}</td>
@@ -1915,7 +1961,7 @@ export default function HostPage() {
                               ))}
                             {selectedEventContestantUsers.length === 0 && selectedEventDetail?.teams.length === 0 ? (
                               <tr>
-                                <td colSpan={4}>No contestants yet.</td>
+                                <td colSpan={5}>No contestants yet.</td>
                               </tr>
                             ) : null}
                           </tbody>
@@ -2303,6 +2349,13 @@ export default function HostPage() {
                 <label className="auth-field">
                   <span>Category</span>
                   <input value={categoryDraft} onChange={(event) => setCategoryDraft(event.target.value)} autoFocus required />
+                </label>
+                <label className="auth-field">
+                  <span>Contestant type</span>
+                  <select value={categoryType} onChange={(event) => setCategoryType(event.target.value as EventCategory["type"])}>
+                    <option value="individual">Individual</option>
+                    <option value="team">Team</option>
+                  </select>
                 </label>
                 <button className="auth-submit" type="submit">Add Category</button>
               </form>
@@ -2825,12 +2878,37 @@ function taggedUserLabels(users: AppUser[], userIds: number[]) {
   return userIds.map((userId) => userLabel(users, userId));
 }
 
-function eventMetadataCategories(metadata: Record<string, unknown>) {
+function renderContestantImagePreview(image?: ImageRecord) {
+  if (!image) {
+    return <span className="selected-file">No photo</span>;
+  }
+  return (
+    <span className="contestant-table-preview">
+      <img src={image.imageUrl} alt={image.notes || "Contestant preview"} />
+    </span>
+  );
+}
+
+function eventMetadataCategories(metadata: Record<string, unknown>): EventCategory[] {
   const value = metadata.categories;
   if (!Array.isArray(value)) {
     return [];
   }
-  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  return value.flatMap((item): EventCategory[] => {
+    if (typeof item === "string" && item.trim().length > 0) {
+      return [{ name: item, type: "individual" }];
+    }
+    if (item && typeof item === "object") {
+      const category = item as { name?: unknown; type?: unknown };
+      if (typeof category.name === "string" && category.name.trim().length > 0) {
+        return [{
+          name: category.name,
+          type: category.type === "team" ? "team" : "individual",
+        }];
+      }
+    }
+    return [];
+  });
 }
 
 function eventUserCostume(eventUser: EventUserRecord) {

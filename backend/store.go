@@ -713,6 +713,35 @@ func (s *userStore) startEvent(ctx context.Context, id int64, startDate time.Tim
 	return event, nil
 }
 
+func (s *userStore) completeEvent(ctx context.Context, id int64, completedAt time.Time) (Event, error) {
+	var event Event
+	var metadata []byte
+	err := s.pool.QueryRow(
+		ctx,
+		`UPDATE events
+		 SET completed_at = COALESCE(completed_at, $2)
+		 WHERE id = $1
+		 RETURNING id, label, party_id, start_date, end_date, completed_at, type, description, metadata`,
+		id,
+		completedAt,
+	).Scan(
+		&event.ID,
+		&event.Label,
+		&event.PartyID,
+		&event.StartDate,
+		&event.EndDate,
+		&event.CompletedAt,
+		&event.Type,
+		&event.Description,
+		&metadata,
+	)
+	if err != nil {
+		return Event{}, err
+	}
+	event.Metadata = json.RawMessage(metadata)
+	return event, nil
+}
+
 func (s *userStore) getEventDetail(ctx context.Context, id int64) (EventDetail, error) {
 	event, err := s.getEventByID(ctx, id)
 	if err != nil {
@@ -848,6 +877,57 @@ func (s *userStore) deleteEventContestant(ctx context.Context, eventID int64, us
 		}
 	}
 	return tx.Commit(ctx)
+}
+
+func (s *userStore) upsertEventVote(ctx context.Context, eventID int64, userID int64, metadata json.RawMessage) (EventVote, error) {
+	var vote EventVote
+	var savedMetadata []byte
+	err := s.pool.QueryRow(
+		ctx,
+		`INSERT INTO event_votes (event_id, user_id, metadata)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (event_id, user_id)
+		 DO UPDATE SET metadata = EXCLUDED.metadata
+		 RETURNING event_id, user_id, metadata`,
+		eventID,
+		userID,
+		metadata,
+	).Scan(&vote.EventID, &vote.UserID, &savedMetadata)
+	if err != nil {
+		return EventVote{}, err
+	}
+	vote.Metadata = json.RawMessage(savedMetadata)
+	return vote, nil
+}
+
+func (s *userStore) listEventVotes(ctx context.Context, eventID int64) ([]EventVote, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT event_id, user_id, metadata
+		 FROM event_votes
+		 WHERE event_id = $1
+		 ORDER BY user_id`,
+		eventID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	votes := make([]EventVote, 0)
+	for rows.Next() {
+		var vote EventVote
+		var metadata []byte
+		if err := rows.Scan(&vote.EventID, &vote.UserID, &metadata); err != nil {
+			return nil, err
+		}
+		vote.Metadata = json.RawMessage(metadata)
+		votes = append(votes, vote)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return votes, nil
 }
 
 func (s *userStore) getHomepageHTML(ctx context.Context) (string, error) {

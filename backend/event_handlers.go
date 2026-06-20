@@ -21,8 +21,9 @@ type createEventRequest struct {
 }
 
 type updateEventRequest struct {
-	Metadata json.RawMessage `json:"metadata"`
-	StartNow bool            `json:"startNow"`
+	Metadata    json.RawMessage `json:"metadata"`
+	StartNow    bool            `json:"startNow"`
+	CompleteNow bool            `json:"completeNow"`
 }
 
 type upsertContestantRequest struct {
@@ -40,6 +41,10 @@ type upsertContestantResponse struct {
 type deleteContestantRequest struct {
 	UserIDs []int32 `json:"userIds"`
 	TeamID  *int64  `json:"teamId"`
+}
+
+type eventVoteRequest struct {
+	Metadata json.RawMessage `json:"metadata"`
 }
 
 func (s *apiServer) handleEvents(w http.ResponseWriter, r *http.Request) {
@@ -139,6 +144,10 @@ func (s *apiServer) handleEventByID(w http.ResponseWriter, r *http.Request) {
 		s.handleEventContestants(w, r, id, user)
 		return
 	}
+	if suffix == "/votes" {
+		s.handleEventVotes(w, r, id, user)
+		return
+	}
 	if suffix != "" {
 		writeError(w, http.StatusNotFound, "event not found")
 		return
@@ -170,6 +179,8 @@ func (s *apiServer) handleEventByID(w http.ResponseWriter, r *http.Request) {
 		var event Event
 		if req.StartNow {
 			event, err = s.store.startEvent(r.Context(), id, time.Now().UTC())
+		} else if req.CompleteNow {
+			event, err = s.store.completeEvent(r.Context(), id, time.Now().UTC())
 		} else if len(req.Metadata) > 0 {
 			if !json.Valid(req.Metadata) {
 				writeError(w, http.StatusBadRequest, "metadata must be valid json")
@@ -193,6 +204,57 @@ func (s *apiServer) handleEventByID(w http.ResponseWriter, r *http.Request) {
 	default:
 		methodNotAllowed(w)
 	}
+}
+
+func (s *apiServer) handleEventVotes(w http.ResponseWriter, r *http.Request, eventID int64, user *User) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+
+	if r.Method == http.MethodGet {
+		event, err := s.store.getEventByID(r.Context(), eventID)
+		if err != nil {
+			if isNotFound(err) {
+				writeError(w, http.StatusNotFound, "event not found")
+				return
+			}
+			log.Error("event vote event load", "error", err, "event_id", eventID)
+			writeError(w, http.StatusInternalServerError, "failed to load event")
+			return
+		}
+		if event.CompletedAt == nil {
+			writeError(w, http.StatusForbidden, "event results are not available yet")
+			return
+		}
+		votes, err := s.store.listEventVotes(r.Context(), eventID)
+		if err != nil {
+			log.Error("event votes list", "error", err, "event_id", eventID)
+			writeError(w, http.StatusInternalServerError, "failed to load votes")
+			return
+		}
+		writeJSON(w, votes)
+		return
+	}
+
+	var req eventVoteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid vote request")
+		return
+	}
+	if len(req.Metadata) == 0 || !json.Valid(req.Metadata) {
+		writeError(w, http.StatusBadRequest, "metadata must be valid json")
+		return
+	}
+
+	vote, err := s.store.upsertEventVote(r.Context(), eventID, user.ID, req.Metadata)
+	if err != nil {
+		log.Error("event vote upsert", "error", err, "event_id", eventID, "user_id", user.ID)
+		writeError(w, http.StatusInternalServerError, "failed to save vote")
+		return
+	}
+
+	writeJSON(w, vote)
 }
 
 func (s *apiServer) handleEventContestants(w http.ResponseWriter, r *http.Request, eventID int64, user *User) {

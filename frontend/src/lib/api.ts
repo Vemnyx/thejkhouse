@@ -95,6 +95,12 @@ export type EventTeamRecord = {
   metadata: Record<string, unknown>;
 };
 
+export type EventVoteRecord = {
+  eventId: number;
+  userId: number;
+  metadata: Record<string, unknown>;
+};
+
 export type EventDetail = {
   event: EventRecord;
   users: EventUserRecord[];
@@ -304,6 +310,13 @@ export function startEvent(token: string, id: number) {
   });
 }
 
+export function completeEvent(token: string, id: number) {
+  return apiFetch<EventRecord>(`/events/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ completeNow: true }),
+  });
+}
+
 export function createEventContestant(token: string, id: number, payload: CreateContestantPayload) {
   return apiFetch<CreateContestantResponse>(`/events/${id}/contestants`, token, {
     method: "POST",
@@ -316,6 +329,17 @@ export function deleteEventContestant(token: string, id: number, payload: { user
     method: "DELETE",
     body: JSON.stringify(payload),
   });
+}
+
+export function submitEventVote(token: string, id: number, metadata: Record<string, unknown>) {
+  return apiFetch<EventVoteRecord>(`/events/${id}/votes`, token, {
+    method: "POST",
+    body: JSON.stringify({ metadata }),
+  });
+}
+
+export function listEventVotes(token: string, id: number) {
+  return apiFetch<EventVoteRecord[] | null>(`/events/${id}/votes`, token).then((votes) => votes ?? []);
 }
 
 export function getHomepage(token: string) {
