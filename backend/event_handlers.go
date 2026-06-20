@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,12 +13,13 @@ import (
 )
 
 type createEventRequest struct {
-	Label       string `json:"label"`
-	PartyID     *int64 `json:"partyId"`
-	StartDate   string `json:"startDate"`
-	EndDate     string `json:"endDate"`
-	Type        string `json:"type"`
-	Description string `json:"description"`
+	Label       string          `json:"label"`
+	PartyID     *int64          `json:"partyId"`
+	StartDate   string          `json:"startDate"`
+	EndDate     string          `json:"endDate"`
+	Type        string          `json:"type"`
+	Description string          `json:"description"`
+	Metadata    json.RawMessage `json:"metadata"`
 }
 
 type updateEventRequest struct {
@@ -45,6 +47,34 @@ type deleteContestantRequest struct {
 
 type eventVoteRequest struct {
 	Metadata json.RawMessage `json:"metadata"`
+}
+
+type bracketParticipant struct {
+	Key     string  `json:"key"`
+	Type    string  `json:"type"`
+	UserIDs []int32 `json:"userIds"`
+	TeamID  *int64  `json:"teamId,omitempty"`
+	Label   string  `json:"label"`
+}
+
+type bracketRoundSeed struct {
+	RoundNumber    int32
+	Position       int32
+	ParticipantOne json.RawMessage
+	ParticipantTwo json.RawMessage
+}
+
+type startBracketRequest struct {
+	Participants []bracketParticipant `json:"participants"`
+}
+
+type reportBracketRequest struct {
+	RoundID   int64  `json:"roundId"`
+	WinnerKey string `json:"winnerKey"`
+}
+
+type bracketRoundMetadata struct {
+	Reports map[string]string `json:"reports"`
 }
 
 func (s *apiServer) handleEvents(w http.ResponseWriter, r *http.Request) {
@@ -112,8 +142,16 @@ func (s *apiServer) handleEvents(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "costume contest and bracket events cannot have start or end dates")
 		return
 	}
+	metadata := req.Metadata
+	if len(metadata) == 0 {
+		metadata = json.RawMessage([]byte("{}"))
+	}
+	if !json.Valid(metadata) {
+		writeError(w, http.StatusBadRequest, "metadata must be valid json")
+		return
+	}
 
-	event, err := s.store.createEvent(r.Context(), label, req.PartyID, startDate, endDate, eventType, description)
+	event, err := s.store.createEvent(r.Context(), label, req.PartyID, startDate, endDate, eventType, description, metadata)
 	if err != nil {
 		log.Error("event create", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to create event")
@@ -146,6 +184,14 @@ func (s *apiServer) handleEventByID(w http.ResponseWriter, r *http.Request) {
 	}
 	if suffix == "/votes" {
 		s.handleEventVotes(w, r, id, user)
+		return
+	}
+	if suffix == "/bracket/start" {
+		s.handleBracketStart(w, r, id, user)
+		return
+	}
+	if suffix == "/bracket/report" {
+		s.handleBracketReport(w, r, id, user)
 		return
 	}
 	if suffix != "" {
@@ -272,6 +318,147 @@ func (s *apiServer) handleEventVotes(w http.ResponseWriter, r *http.Request, eve
 	writeJSON(w, vote)
 }
 
+func (s *apiServer) handleBracketStart(w http.ResponseWriter, r *http.Request, eventID int64, user *User) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+	if user.Role != RoleHost {
+		writeError(w, http.StatusForbidden, "host access is required")
+		return
+	}
+
+	var req startBracketRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid bracket start request")
+		return
+	}
+	if len(req.Participants) < 2 || len(req.Participants)%2 != 0 {
+		writeError(w, http.StatusBadRequest, "bracket requires an even number of participants")
+		return
+	}
+	rounds, err := firstBracketRoundSeeds(req.Participants)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := s.store.replaceEventRounds(r.Context(), eventID, rounds, time.Now().UTC()); err != nil {
+		log.Error("bracket start", "error", err, "event_id", eventID)
+		writeError(w, http.StatusInternalServerError, "failed to start bracket")
+		return
+	}
+	detail, err := s.store.getEventDetail(r.Context(), eventID)
+	if err != nil {
+		log.Error("bracket detail reload", "error", err, "event_id", eventID)
+		writeError(w, http.StatusInternalServerError, "failed to load bracket")
+		return
+	}
+	writeJSON(w, detail)
+}
+
+func (s *apiServer) handleBracketReport(w http.ResponseWriter, r *http.Request, eventID int64, user *User) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+
+	var req reportBracketRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid bracket report request")
+		return
+	}
+	winnerKey := strings.TrimSpace(req.WinnerKey)
+	if req.RoundID < 1 || winnerKey == "" {
+		writeError(w, http.StatusBadRequest, "round and winner are required")
+		return
+	}
+	rounds, err := s.store.listEventRounds(r.Context(), eventID)
+	if err != nil {
+		log.Error("bracket rounds list", "error", err, "event_id", eventID)
+		writeError(w, http.StatusInternalServerError, "failed to load bracket")
+		return
+	}
+	var target *EventRound
+	for index := range rounds {
+		if rounds[index].ID == req.RoundID {
+			target = &rounds[index]
+			break
+		}
+	}
+	if target == nil {
+		writeError(w, http.StatusNotFound, "round not found")
+		return
+	}
+	if target.CompletedAt != nil {
+		detail, err := s.store.getEventDetail(r.Context(), eventID)
+		if err != nil {
+			log.Error("bracket detail reload", "error", err, "event_id", eventID)
+			writeError(w, http.StatusInternalServerError, "failed to load bracket")
+			return
+		}
+		writeJSON(w, detail)
+		return
+	}
+	participantOne, err := bracketParticipantFromRaw(target.ParticipantOne)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "invalid bracket participant")
+		return
+	}
+	participantTwo, err := bracketParticipantFromRaw(target.ParticipantTwo)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "invalid bracket participant")
+		return
+	}
+	reportSide := participantReportSide(user.ID, participantOne, participantTwo)
+	if reportSide == "" {
+		writeError(w, http.StatusForbidden, "only players in this round can report a winner")
+		return
+	}
+	if winnerKey != participantOne.Key && winnerKey != participantTwo.Key {
+		writeError(w, http.StatusBadRequest, "winner must be in this round")
+		return
+	}
+	metadata := bracketRoundMetadata{Reports: map[string]string{}}
+	if len(target.Metadata) > 0 {
+		_ = json.Unmarshal(target.Metadata, &metadata)
+	}
+	if metadata.Reports == nil {
+		metadata.Reports = map[string]string{}
+	}
+	metadata.Reports[reportSide] = winnerKey
+	rawMetadata, _ := json.Marshal(metadata)
+	updated, err := s.store.updateEventRoundReport(r.Context(), eventID, req.RoundID, rawMetadata)
+	if err != nil {
+		log.Error("bracket report", "error", err, "event_id", eventID, "round_id", req.RoundID)
+		writeError(w, http.StatusInternalServerError, "failed to save report")
+		return
+	}
+	if reportedWinner, ok := agreedBracketWinner(updated); ok {
+		winner := participantOne
+		if reportedWinner == participantTwo.Key {
+			winner = participantTwo
+		}
+		rawWinner, _ := json.Marshal(winner)
+		if err := s.store.completeEventRound(r.Context(), eventID, req.RoundID, rawWinner, time.Now().UTC()); err != nil {
+			log.Error("bracket round complete", "error", err, "event_id", eventID, "round_id", req.RoundID)
+			writeError(w, http.StatusInternalServerError, "failed to complete round")
+			return
+		}
+		if err := s.advanceBracketIfReady(r.Context(), eventID, target.RoundNumber); err != nil {
+			log.Error("bracket advance", "error", err, "event_id", eventID, "round", target.RoundNumber)
+			writeError(w, http.StatusInternalServerError, "failed to advance bracket")
+			return
+		}
+	}
+	detail, err := s.store.getEventDetail(r.Context(), eventID)
+	if err != nil {
+		log.Error("bracket detail reload", "error", err, "event_id", eventID)
+		writeError(w, http.StatusInternalServerError, "failed to load bracket")
+		return
+	}
+	writeJSON(w, detail)
+}
+
 func (s *apiServer) handleEventContestants(w http.ResponseWriter, r *http.Request, eventID int64, user *User) {
 	if user.Role != RoleHost {
 		writeError(w, http.StatusForbidden, "host access is required")
@@ -375,6 +562,117 @@ func parseEventPath(w http.ResponseWriter, r *http.Request) (int64, string, bool
 		suffix = "/" + suffix
 	}
 	return id, suffix, true
+}
+
+func firstBracketRoundSeeds(participants []bracketParticipant) ([]bracketRoundSeed, error) {
+	rounds := make([]bracketRoundSeed, 0, len(participants)/2)
+	for index, participant := range participants {
+		if strings.TrimSpace(participant.Key) == "" || strings.TrimSpace(participant.Label) == "" || len(participant.UserIDs) == 0 {
+			return nil, fmt.Errorf("bracket participants must include key, label, and users")
+		}
+		participants[index].Key = strings.TrimSpace(participant.Key)
+		participants[index].Label = strings.TrimSpace(participant.Label)
+	}
+	for index := 0; index < len(participants); index += 2 {
+		first, _ := json.Marshal(participants[index])
+		second, _ := json.Marshal(participants[index+1])
+		rounds = append(rounds, bracketRoundSeed{
+			RoundNumber:    1,
+			Position:       int32(index/2 + 1),
+			ParticipantOne: first,
+			ParticipantTwo: second,
+		})
+	}
+	return rounds, nil
+}
+
+func bracketParticipantFromRaw(raw json.RawMessage) (bracketParticipant, error) {
+	var participant bracketParticipant
+	if len(raw) == 0 {
+		return participant, fmt.Errorf("missing participant")
+	}
+	if err := json.Unmarshal(raw, &participant); err != nil {
+		return participant, err
+	}
+	return participant, nil
+}
+
+func participantReportSide(userID int64, first bracketParticipant, second bracketParticipant) string {
+	if participantHasUser(first, userID) {
+		return "one"
+	}
+	if participantHasUser(second, userID) {
+		return "two"
+	}
+	return ""
+}
+
+func participantHasUser(participant bracketParticipant, userID int64) bool {
+	for _, participantUserID := range participant.UserIDs {
+		if int64(participantUserID) == userID {
+			return true
+		}
+	}
+	return false
+}
+
+func agreedBracketWinner(round EventRound) (string, bool) {
+	var metadata bracketRoundMetadata
+	if len(round.Metadata) == 0 {
+		return "", false
+	}
+	if err := json.Unmarshal(round.Metadata, &metadata); err != nil {
+		return "", false
+	}
+	first := metadata.Reports["one"]
+	second := metadata.Reports["two"]
+	return first, first != "" && first == second
+}
+
+func (s *apiServer) advanceBracketIfReady(ctx context.Context, eventID int64, roundNumber int32) error {
+	rounds, err := s.store.listEventRounds(ctx, eventID)
+	if err != nil {
+		return err
+	}
+	currentRound := make([]EventRound, 0)
+	for _, round := range rounds {
+		if round.RoundNumber == roundNumber {
+			currentRound = append(currentRound, round)
+		}
+	}
+	if len(currentRound) == 0 {
+		return nil
+	}
+	winners := make([]bracketParticipant, 0, len(currentRound))
+	for _, round := range currentRound {
+		if round.CompletedAt == nil || len(round.Winner) == 0 {
+			return nil
+		}
+		winner, err := bracketParticipantFromRaw(round.Winner)
+		if err != nil {
+			return err
+		}
+		winners = append(winners, winner)
+	}
+	if len(winners) == 1 {
+		_, err := s.store.completeEvent(ctx, eventID, time.Now().UTC())
+		return err
+	}
+
+	nextRoundNumber := roundNumber + 1
+	for _, round := range rounds {
+		if round.RoundNumber == nextRoundNumber {
+			return nil
+		}
+	}
+	nextRounds, err := firstBracketRoundSeeds(winners)
+	if err != nil {
+		return err
+	}
+	for index := range nextRounds {
+		nextRounds[index].RoundNumber = nextRoundNumber
+	}
+	return s.store.insertEventRounds(ctx, eventID, nextRounds)
 }
 
 func parseOptionalEventDate(value string, field string) (*time.Time, error) {

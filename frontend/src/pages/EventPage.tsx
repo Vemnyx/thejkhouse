@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, EventDetail, EventVoteRecord, ImageRecord, eventRouteIdentifier, getEventDetail, listEventVotes, listEvents, listImages, listUsers, submitEventVote } from "../lib/api";
+import { AppUser, BracketParticipant, EventDetail, EventRoundRecord, EventVoteRecord, ImageRecord, eventRouteIdentifier, getEventDetail, listEventVotes, listEvents, listImages, listUsers, reportBracketWinner, submitEventVote } from "../lib/api";
 
 type EventCategory = {
   name: string;
@@ -10,7 +10,7 @@ type EventCategory = {
 
 export default function EventPage() {
   const { eventId } = useParams();
-  const { firebaseUser } = useAuth();
+  const { appUser, firebaseUser } = useAuth();
   const [eventDetail, setEventDetail] = useState<EventDetail | null>(null);
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -27,6 +27,7 @@ export default function EventPage() {
   const [selectedContestantId, setSelectedContestantId] = useState<string | null>(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
   const [slideshowIndex, setSlideshowIndex] = useState(0);
+  const [reportingRoundId, setReportingRoundId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,6 +128,7 @@ export default function EventPage() {
   }, [slideshowOpen, slideshowIndex, costumeContestEntries.length]);
 
   const showCostumeContestGrid = event?.type === "0" && (isActiveEvent(event) || Boolean(event.completedAt));
+  const showBracket = event?.type === "1";
   const categories = event ? eventMetadataCategories(event.metadata) : [];
   const selectedWinner = selectedResultCategory
     ? computeWinner(selectedResultCategory, votes, costumeContestEntries)
@@ -204,6 +206,24 @@ export default function EventPage() {
     }
   };
 
+  const submitBracketReport = async (round: EventRoundRecord, winnerKey: string) => {
+    if (!firebaseUser || !event) {
+      return;
+    }
+    setError("");
+    setReportingRoundId(round.id);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const detail = await reportBracketWinner(token, event.id, round.id, winnerKey);
+      setEventDetail(detail);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to report winner";
+      setError(message);
+    } finally {
+      setReportingRoundId(null);
+    }
+  };
+
   return (
     <main className="page app-shell-page">
       <div className="page-vignette" aria-hidden="true" />
@@ -259,6 +279,24 @@ export default function EventPage() {
             ) : (
               <p className="dashboard-copy">No contestant photos yet.</p>
             )}
+          </section>
+        ) : showBracket && eventDetail ? (
+          <section className="event-contest-preview">
+            <div className="event-title-row">
+              <Link className="auth-secondary back-text-link event-detail-back" to="/events">
+                Back to Events
+              </Link>
+              <div>
+                <p className="eyebrow">Bracket</p>
+                <h1>{event.label}</h1>
+              </div>
+            </div>
+            <BracketEventView
+              appUserId={appUser?.id ?? null}
+              eventDetail={eventDetail}
+              reportingRoundId={reportingRoundId}
+              onReport={(round, winnerKey) => void submitBracketReport(round, winnerKey)}
+            />
           </section>
         ) : (
           <div className="under-construction">
@@ -390,6 +428,74 @@ export default function EventPage() {
       ) : null}
     </main>
   );
+}
+
+function BracketEventView({
+  appUserId,
+  eventDetail,
+  reportingRoundId,
+  onReport,
+}: {
+  appUserId: number | null;
+  eventDetail: EventDetail;
+  reportingRoundId: number | null;
+  onReport: (round: EventRoundRecord, winnerKey: string) => void;
+}) {
+  const rounds = eventDetail.rounds;
+  if (rounds.length === 0) {
+    return <p className="dashboard-copy">Bracket has not started yet.</p>;
+  }
+  const activeRounds = rounds.filter((round) => !round.completedAt);
+  const userRound = appUserId ? activeRounds.find((round) => participantHasUser(round.participantOne, appUserId) || participantHasUser(round.participantTwo, appUserId)) : null;
+  const roundNumbers = Array.from(new Set(rounds.map((round) => round.roundNumber)));
+  const champion = rounds.find((round) => round.winner && round.roundNumber === Math.max(...roundNumbers) && round.completedAt)?.winner ?? null;
+
+  return (
+    <div className="bracket-event-view">
+      {champion ? (
+        <section className="bracket-user-matchup">
+          <p className="eyebrow">Winner</p>
+          <h2>{champion.label}</h2>
+        </section>
+      ) : userRound ? (
+        <section className="bracket-user-matchup">
+          <p className="eyebrow">Your Matchup</p>
+          <h2>{participantLabel(userRound.participantOne)} vs {participantLabel(userRound.participantTwo)}</h2>
+          <div className="event-action-row">
+            {[userRound.participantOne, userRound.participantTwo].filter((participant): participant is BracketParticipant => Boolean(participant)).map((participant) => (
+              <button className="auth-submit event-vote-button" type="button" key={participant.key} onClick={() => onReport(userRound, participant.key)} disabled={reportingRoundId === userRound.id}>
+                {reportingRoundId === userRound.id ? "Reporting..." : `${participant.label} Won`}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <p className="dashboard-copy">You are not playing in the current round.</p>
+      )}
+      <div className="bracket-rounds">
+        {roundNumbers.map((roundNumber) => (
+          <section className="bracket-round-column" key={roundNumber}>
+            <h3>Round {roundNumber}</h3>
+            {rounds.filter((round) => round.roundNumber === roundNumber).map((round) => (
+              <article className="bracket-match-card" key={round.id}>
+                <span className={round.winner?.key === round.participantOne?.key ? "bracket-winner" : undefined}>{participantLabel(round.participantOne)}</span>
+                <span className={round.winner?.key === round.participantTwo?.key ? "bracket-winner" : undefined}>{participantLabel(round.participantTwo)}</span>
+                <small>{round.completedAt ? "Complete" : "In progress"}</small>
+              </article>
+            ))}
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function participantLabel(participant: BracketParticipant | null) {
+  return participant?.label ?? "TBD";
+}
+
+function participantHasUser(participant: BracketParticipant | null, userId: number) {
+  return participant?.userIds.includes(userId) ?? false;
 }
 
 function isActiveEvent(event: EventDetail["event"]) {

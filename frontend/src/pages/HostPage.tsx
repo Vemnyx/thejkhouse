@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, BracketParticipant, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, startBracketEvent, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
@@ -13,6 +13,12 @@ type AIDraftType = "homepage" | "party";
 type EventCategory = {
   name: string;
   type: "individual" | "team";
+};
+type BracketMode = "individual" | "team";
+type BracketMetadata = {
+  size: number;
+  mode: BracketMode;
+  teamSize: number;
 };
 type DeleteTarget =
   | { type: "image"; image: ImageRecord }
@@ -47,6 +53,8 @@ const partyCalendarYears = Array.from({ length: 10 }, (_, index) => currentYear 
 const partyHours = Array.from({ length: 12 }, (_, index) => String(index + 1));
 const partyMinutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"));
 const partyPeriods = ["AM", "PM"] as const;
+const bracketSizes = [4, 8, 16];
+const bracketTeamSizes = [2, 3, 4];
 const defaultPartyHTML = `<section class="party-template">
   <header class="party-template-hero">
     <p class="party-template-kicker">The JK House Presents</p>
@@ -198,6 +206,11 @@ export default function HostPage() {
   const [eventStartDate, setEventStartDate] = useState("");
   const [eventEndDate, setEventEndDate] = useState("");
   const [eventSummary, setEventSummary] = useState("");
+  const [bracketSize, setBracketSize] = useState(4);
+  const [bracketMode, setBracketMode] = useState<BracketMode>("individual");
+  const [bracketTeamSize, setBracketTeamSize] = useState(2);
+  const [bracketAssignments, setBracketAssignments] = useState<Record<number, string>>({});
+  const [bracketTeamAssignments, setBracketTeamAssignments] = useState<Record<number, string[]>>({});
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [categoryDraft, setCategoryDraft] = useState("");
   const [categoryType, setCategoryType] = useState<EventCategory["type"]>("individual");
@@ -444,6 +457,9 @@ export default function HostPage() {
     setEventStartDate("");
     setEventEndDate("");
     setEventSummary("");
+    setBracketSize(4);
+    setBracketMode("individual");
+    setBracketTeamSize(2);
   };
 
   const openEventModal = () => {
@@ -482,6 +498,13 @@ export default function HostPage() {
         startDate: eventAllowsDates && eventStartDate ? dateOnlyToISO(eventStartDate) : "",
         endDate: eventAllowsDates && eventEndDate ? dateOnlyToISO(eventEndDate) : "",
         description: eventSummary.trim(),
+        metadata: eventType === "1" ? {
+          bracket: {
+            size: bracketSize,
+            mode: bracketMode,
+            teamSize: bracketMode === "team" ? bracketTeamSize : 1,
+          },
+        } : undefined,
       });
       setEvents((current) => [created, ...current]);
       setEventModalOpen(false);
@@ -505,6 +528,9 @@ export default function HostPage() {
       const detail = await getEventDetail(token, event.id);
       setSelectedEventDetail(detail);
       setEventCategories(eventMetadataCategories(detail.event.metadata));
+      const bracket = eventMetadataBracket(detail.event.metadata);
+      setBracketAssignments(bracketAssignmentsFromMetadata(detail.event.metadata, bracket.size));
+      setBracketTeamAssignments(bracketTeamAssignmentsFromMetadata(detail.event.metadata, bracket.size));
       setEventView("setup");
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to load event";
@@ -845,6 +871,72 @@ export default function HostPage() {
     }
   };
 
+  const saveBracketSetup = async () => {
+    if (!firebaseUser || !selectedEvent) {
+      return;
+    }
+    setError("");
+    setSavingEvent(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const metadata = {
+        ...selectedEvent.metadata,
+        bracket: {
+          ...selectedBracket,
+          participants: selectedBracketParticipants,
+        },
+      };
+      const updated = await updateEventMetadata(token, selectedEvent.id, metadata);
+      setEvents((current) => current.map((event) => (event.id === updated.id ? updated : event)));
+      setSelectedEventDetail((current) => current ? { ...current, event: updated } : current);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to save bracket setup";
+      setError(message);
+    } finally {
+      setSavingEvent(false);
+    }
+  };
+
+  const handleStartBracketEvent = async () => {
+    if (!firebaseUser || !selectedEvent) {
+      return;
+    }
+    if (selectedBracketParticipants.length !== selectedBracket.size) {
+      setError("fill every bracket slot before starting");
+      return;
+    }
+    setError("");
+    setStartingEvent(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      await saveBracketSetup();
+      const detail = await startBracketEvent(token, selectedEvent.id, selectedBracketParticipants);
+      setSelectedEventDetail(detail);
+      setEvents((current) => current.map((event) => (event.id === detail.event.id ? detail.event : event)));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to start bracket";
+      setError(message);
+    } finally {
+      setStartingEvent(false);
+    }
+  };
+
+  const randomizeBracketAssignments = () => {
+    if (selectedBracket.mode === "team") {
+      const slots = bracketSlots(selectedBracket.size);
+      const filledTeams = slots
+        .map((slot) => bracketTeamAssignments[slot] ?? [])
+        .filter((team) => team.length > 0);
+      const shuffled = shuffleItems(filledTeams);
+      setBracketTeamAssignments(Object.fromEntries(slots.map((slot, index) => [slot, shuffled[index] ?? []])));
+      return;
+    }
+    const slots = bracketSlots(selectedBracket.size);
+    const filled = slots.map((slot) => bracketAssignments[slot]).filter(Boolean);
+    const shuffled = shuffleItems(filled);
+    setBracketAssignments(Object.fromEntries(slots.map((slot, index) => [slot, shuffled[index] ?? ""])));
+  };
+
   const handleCompleteEvent = async (event: EventRecord) => {
     if (!firebaseUser) {
       return;
@@ -1123,6 +1215,8 @@ export default function HostPage() {
   const selectedEventCategories = selectedEvent ? eventMetadataCategories(selectedEvent.metadata) : [];
   const selectedEventContestantUsers = selectedEventDetail?.users.filter((eventUser) => eventUser.contestant && eventUserHasCostume(eventUser)) ?? [];
   const selectedEventImages = selectedEvent ? images.filter((image) => image.eventId === selectedEvent.id) : [];
+  const selectedBracket = selectedEvent ? eventMetadataBracket(selectedEvent.metadata) : { size: 4, mode: "individual" as BracketMode, teamSize: 1 };
+  const selectedBracketParticipants = selectedEvent ? bracketParticipantsFromSetup(selectedBracket, bracketAssignments, bracketTeamAssignments, users) : [];
 
   const handleSendEmail = async (event: FormEvent) => {
     event.preventDefault();
@@ -1984,7 +2078,72 @@ export default function HostPage() {
 
                   {error ? <p className="auth-error">{error}</p> : null}
 
-                  {selectedEventCategories.length === 0 ? (
+                  {selectedEvent.type === "1" ? (
+                    <section className="event-setup-step">
+                      <div className="host-panel-header">
+                        <div>
+                          <h3 className="host-section-title">Bracket Setup</h3>
+                          <p className="host-section-copy">
+                            {selectedBracket.size} {selectedBracket.mode === "team" ? `${selectedBracket.teamSize}-person team` : "individual"} bracket
+                          </p>
+                        </div>
+                        <div className="host-panel-actions">
+                          <button className="auth-secondary" type="button" onClick={randomizeBracketAssignments} disabled={Boolean(selectedEvent.startDate)}>
+                            Randomize
+                          </button>
+                          <button className="auth-secondary" type="button" onClick={() => void saveBracketSetup()} disabled={savingEvent || Boolean(selectedEvent.startDate)}>
+                            {savingEvent ? "Saving..." : "Save Setup"}
+                          </button>
+                          <button className="auth-submit" type="button" onClick={() => void handleStartBracketEvent()} disabled={startingEvent || Boolean(selectedEvent.startDate)}>
+                            {selectedEvent.startDate ? "Bracket Started" : startingEvent ? "Starting..." : "Start Event"}
+                          </button>
+                        </div>
+                      </div>
+                      {!selectedEvent.startDate ? (
+                        <div className="bracket-seed-grid">
+                          {bracketSlots(selectedBracket.size).map((slot) => (
+                            <div className="bracket-seed-card" key={slot}>
+                              <span>Seed {slot}</span>
+                              {selectedBracket.mode === "team" ? (
+                                Array.from({ length: selectedBracket.teamSize }, (_, index) => (
+                                  <select
+                                    key={`${slot}-${index}`}
+                                    value={bracketTeamAssignments[slot]?.[index] ?? ""}
+                                    onChange={(changeEvent) => setBracketTeamAssignments((current) => {
+                                      const team = [...(current[slot] ?? [])];
+                                      team[index] = changeEvent.target.value;
+                                      return { ...current, [slot]: team };
+                                    })}
+                                  >
+                                    <option value="">Select teammate</option>
+                                    {users.map((user) => (
+                                      <option value={user.id} key={user.id}>
+                                        {userDisplayName(user)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ))
+                              ) : (
+                                <select
+                                  value={bracketAssignments[slot] ?? ""}
+                                  onChange={(changeEvent) => setBracketAssignments((current) => ({ ...current, [slot]: changeEvent.target.value }))}
+                                >
+                                  <option value="">Select user</option>
+                                  {users.map((user) => (
+                                    <option value={user.id} key={user.id}>
+                                      {userDisplayName(user)}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <BracketRoundsView rounds={selectedEventDetail?.rounds ?? []} />
+                      )}
+                    </section>
+                  ) : selectedEventCategories.length === 0 ? (
                     <section className="event-setup-step">
                       <h3 className="host-section-title">Categories</h3>
                       <button className="auth-submit event-setup-small-button" type="button" onClick={() => setCategoryModalOpen(true)}>
@@ -2382,6 +2541,38 @@ export default function HostPage() {
                     ))}
                   </select>
                 </label>
+
+                {eventType === "1" ? (
+                  <div className="event-setup-step">
+                    <label className="auth-field">
+                      <span>Bracket size</span>
+                      <select value={bracketSize} onChange={(event) => setBracketSize(Number(event.target.value))}>
+                        {bracketSizes.map((size) => (
+                          <option value={size} key={size}>{size}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="auth-password-toggle">
+                      <input
+                        type="checkbox"
+                        checked={bracketMode === "team"}
+                        onChange={(event) => setBracketMode(event.target.checked ? "team" : "individual")}
+                      />
+                      <span className="toggle-switch" aria-hidden="true" />
+                      <span>Team bracket</span>
+                    </label>
+                    {bracketMode === "team" ? (
+                      <label className="auth-field">
+                        <span>People per team</span>
+                        <select value={bracketTeamSize} onChange={(event) => setBracketTeamSize(Number(event.target.value))}>
+                          {bracketTeamSizes.map((size) => (
+                            <option value={size} key={size}>{size}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 {eventAllowsDates ? (
                   <>
@@ -3048,6 +3239,130 @@ function eventUserCostume(eventUser: EventUserRecord) {
 function eventUserHasCostume(eventUser: EventUserRecord) {
   const costume = eventUser.metadata.costume;
   return typeof costume === "string" && costume.trim().length > 0;
+}
+
+function eventMetadataBracket(metadata: Record<string, unknown>): BracketMetadata {
+  const bracket = metadata.bracket;
+  if (!bracket || typeof bracket !== "object") {
+    return { size: 4, mode: "individual", teamSize: 1 };
+  }
+  const value = bracket as { size?: unknown; mode?: unknown; teamSize?: unknown };
+  const size = typeof value.size === "number" && bracketSizes.includes(value.size) ? value.size : 4;
+  const mode = value.mode === "team" ? "team" : "individual";
+  const teamSize = mode === "team" && typeof value.teamSize === "number" && bracketTeamSizes.includes(value.teamSize) ? value.teamSize : 1;
+  return { size, mode, teamSize };
+}
+
+function bracketSlots(size: number) {
+  return Array.from({ length: size }, (_, index) => index + 1);
+}
+
+function bracketAssignmentsFromMetadata(metadata: Record<string, unknown>, size: number) {
+  const participants = bracketParticipantsFromMetadata(metadata);
+  const assignments: Record<number, string> = {};
+  for (const [index, participant] of participants.entries()) {
+    if (index < size && participant.type === "individual") {
+      assignments[index + 1] = String(participant.userIds[0] ?? "");
+    }
+  }
+  return assignments;
+}
+
+function bracketTeamAssignmentsFromMetadata(metadata: Record<string, unknown>, size: number) {
+  const participants = bracketParticipantsFromMetadata(metadata);
+  const assignments: Record<number, string[]> = {};
+  for (const [index, participant] of participants.entries()) {
+    if (index < size && participant.type === "team") {
+      assignments[index + 1] = participant.userIds.map(String);
+    }
+  }
+  return assignments;
+}
+
+function bracketParticipantsFromMetadata(metadata: Record<string, unknown>): BracketParticipant[] {
+  const bracket = metadata.bracket;
+  if (!bracket || typeof bracket !== "object") {
+    return [];
+  }
+  const participants = (bracket as { participants?: unknown }).participants;
+  if (!Array.isArray(participants)) {
+    return [];
+  }
+  return participants.flatMap((item): BracketParticipant[] => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+    const participant = item as BracketParticipant;
+    return typeof participant.key === "string" && Array.isArray(participant.userIds) ? [participant] : [];
+  });
+}
+
+function bracketParticipantsFromSetup(
+  bracket: BracketMetadata,
+  assignments: Record<number, string>,
+  teamAssignments: Record<number, string[]>,
+  users: AppUser[],
+) {
+  return bracketSlots(bracket.size).flatMap((slot): BracketParticipant[] => {
+    if (bracket.mode === "team") {
+      const userIds = (teamAssignments[slot] ?? []).map(Number).filter(Boolean);
+      if (userIds.length !== bracket.teamSize) {
+        return [];
+      }
+      return [{
+        key: `team-${slot}`,
+        type: "team",
+        userIds,
+        label: userIds.map((userId) => userLabel(users, userId)).join(" + "),
+      }];
+    }
+    const userId = Number(assignments[slot]);
+    if (!userId) {
+      return [];
+    }
+    return [{
+      key: `user-${userId}`,
+      type: "individual",
+      userIds: [userId],
+      label: userLabel(users, userId),
+    }];
+  });
+}
+
+function shuffleItems<T>(items: T[]) {
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+  return copy;
+}
+
+function BracketRoundsView({ rounds }: { rounds: EventDetail["rounds"] }) {
+  if (rounds.length === 0) {
+    return <p className="selected-file">No bracket rounds yet.</p>;
+  }
+  const roundNumbers = Array.from(new Set(rounds.map((round) => round.roundNumber)));
+  return (
+    <div className="bracket-rounds">
+      {roundNumbers.map((roundNumber) => (
+        <section className="bracket-round-column" key={roundNumber}>
+          <h4>Round {roundNumber}</h4>
+          {rounds.filter((round) => round.roundNumber === roundNumber).map((round) => (
+            <article className="bracket-match-card" key={round.id}>
+              <span className={round.winner?.key === round.participantOne?.key ? "bracket-winner" : undefined}>
+                {round.participantOne?.label ?? "TBD"}
+              </span>
+              <span className={round.winner?.key === round.participantTwo?.key ? "bracket-winner" : undefined}>
+                {round.participantTwo?.label ?? "TBD"}
+              </span>
+              <small>{round.completedAt ? "Complete" : "Awaiting results"}</small>
+            </article>
+          ))}
+        </section>
+      ))}
+    </div>
+  );
 }
 
 function loadImage(src: string) {

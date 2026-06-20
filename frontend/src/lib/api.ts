@@ -111,10 +111,32 @@ export type EventVoteRecord = {
   metadata: Record<string, unknown>;
 };
 
+export type BracketParticipant = {
+  key: string;
+  type: "individual" | "team";
+  userIds: number[];
+  teamId?: number | null;
+  label: string;
+};
+
+export type EventRoundRecord = {
+  id: number;
+  eventId: number;
+  roundNumber: number;
+  position: number;
+  participantOne: BracketParticipant | null;
+  participantTwo: BracketParticipant | null;
+  winner: BracketParticipant | null;
+  completedAt: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
 export type EventDetail = {
   event: EventRecord;
   users: EventUserRecord[];
   teams: EventTeamRecord[];
+  rounds: EventRoundRecord[];
 };
 
 export type CreateContestantPayload = {
@@ -142,6 +164,7 @@ export type CreateEventPayload = {
   endDate?: string;
   type: EventType;
   description: string;
+  metadata?: Record<string, unknown>;
 };
 
 export type UploadImageOptions = {
@@ -305,6 +328,20 @@ export function createEvent(token: string, payload: CreateEventPayload) {
 export function deleteEvent(token: string, id: number) {
   return apiFetch<Record<string, never>>(`/events/${id}`, token, {
     method: "DELETE",
+  });
+}
+
+export function startBracketEvent(token: string, id: number, participants: BracketParticipant[]) {
+  return apiFetch<EventDetail>(`/events/${id}/bracket/start`, token, {
+    method: "POST",
+    body: JSON.stringify({ participants }),
+  });
+}
+
+export function reportBracketWinner(token: string, id: number, roundId: number, winnerKey: string) {
+  return apiFetch<EventDetail>(`/events/${id}/bracket/report`, token, {
+    method: "POST",
+    body: JSON.stringify({ roundId, winnerKey }),
   });
 }
 

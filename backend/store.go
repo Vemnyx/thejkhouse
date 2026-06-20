@@ -596,13 +596,13 @@ func (s *userStore) listEvents(ctx context.Context) ([]Event, error) {
 	return events, nil
 }
 
-func (s *userStore) createEvent(ctx context.Context, label string, partyID *int64, startDate *time.Time, endDate *time.Time, eventType EventType, description string) (Event, error) {
+func (s *userStore) createEvent(ctx context.Context, label string, partyID *int64, startDate *time.Time, endDate *time.Time, eventType EventType, description string, eventMetadata json.RawMessage) (Event, error) {
 	var event Event
 	var metadata []byte
 	err := s.pool.QueryRow(
 		ctx,
-		`INSERT INTO events (label, party_id, start_date, end_date, type, description)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		`INSERT INTO events (label, party_id, start_date, end_date, type, description, metadata)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 RETURNING id, label, party_id, start_date, end_date, completed_at, type, description, metadata`,
 		label,
 		partyID,
@@ -610,6 +610,7 @@ func (s *userStore) createEvent(ctx context.Context, label string, partyID *int6
 		endDate,
 		eventType,
 		description,
+		eventMetadata,
 	).Scan(
 		&event.ID,
 		&event.Label,
@@ -766,7 +767,58 @@ func (s *userStore) getEventDetail(ctx context.Context, id int64) (EventDetail, 
 	if err != nil {
 		return EventDetail{}, err
 	}
-	return EventDetail{Event: event, Users: users, Teams: teams}, nil
+	rounds, err := s.listEventRounds(ctx, id)
+	if err != nil {
+		return EventDetail{}, err
+	}
+	return EventDetail{Event: event, Users: users, Teams: teams, Rounds: rounds}, nil
+}
+
+func (s *userStore) listEventRounds(ctx context.Context, eventID int64) ([]EventRound, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT id, event_id, round_number, position, participant_one, participant_two, winner, completed_at, metadata, created_at
+		 FROM event_rounds
+		 WHERE event_id = $1
+		 ORDER BY round_number, position`,
+		eventID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	rounds := make([]EventRound, 0)
+	for rows.Next() {
+		var round EventRound
+		var participantOne []byte
+		var participantTwo []byte
+		var winner []byte
+		var metadata []byte
+		if err := rows.Scan(
+			&round.ID,
+			&round.EventID,
+			&round.RoundNumber,
+			&round.Position,
+			&participantOne,
+			&participantTwo,
+			&winner,
+			&round.CompletedAt,
+			&metadata,
+			&round.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		round.ParticipantOne = nullableRawMessage(participantOne)
+		round.ParticipantTwo = nullableRawMessage(participantTwo)
+		round.Winner = nullableRawMessage(winner)
+		round.Metadata = json.RawMessage(metadata)
+		rounds = append(rounds, round)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return rounds, nil
 }
 
 func (s *userStore) listEventUsers(ctx context.Context, eventID int64) ([]EventUser, error) {
@@ -939,6 +991,127 @@ func (s *userStore) listEventVotes(ctx context.Context, eventID int64) ([]EventV
 		return nil, err
 	}
 	return votes, nil
+}
+
+func (s *userStore) replaceEventRounds(ctx context.Context, eventID int64, rounds []bracketRoundSeed, startedAt time.Time) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `DELETE FROM event_rounds WHERE event_id = $1`, eventID); err != nil {
+		return err
+	}
+	for _, round := range rounds {
+		if _, err := tx.Exec(
+			ctx,
+			`INSERT INTO event_rounds (event_id, round_number, position, participant_one, participant_two, metadata)
+			 VALUES ($1, $2, $3, $4, $5, $6)`,
+			eventID,
+			round.RoundNumber,
+			round.Position,
+			round.ParticipantOne,
+			round.ParticipantTwo,
+			json.RawMessage([]byte("{}")),
+		); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(ctx, `UPDATE events SET start_date = COALESCE(start_date, $2) WHERE id = $1`, eventID, startedAt); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (s *userStore) updateEventRoundReport(ctx context.Context, eventID int64, roundID int64, metadata json.RawMessage) (EventRound, error) {
+	var round EventRound
+	var participantOne []byte
+	var participantTwo []byte
+	var winner []byte
+	var savedMetadata []byte
+	err := s.pool.QueryRow(
+		ctx,
+		`UPDATE event_rounds
+		 SET metadata = $3
+		 WHERE event_id = $1 AND id = $2
+		 RETURNING id, event_id, round_number, position, participant_one, participant_two, winner, completed_at, metadata, created_at`,
+		eventID,
+		roundID,
+		metadata,
+	).Scan(
+		&round.ID,
+		&round.EventID,
+		&round.RoundNumber,
+		&round.Position,
+		&participantOne,
+		&participantTwo,
+		&winner,
+		&round.CompletedAt,
+		&savedMetadata,
+		&round.CreatedAt,
+	)
+	if err != nil {
+		return EventRound{}, err
+	}
+	round.ParticipantOne = nullableRawMessage(participantOne)
+	round.ParticipantTwo = nullableRawMessage(participantTwo)
+	round.Winner = nullableRawMessage(winner)
+	round.Metadata = json.RawMessage(savedMetadata)
+	return round, nil
+}
+
+func (s *userStore) completeEventRound(ctx context.Context, eventID int64, roundID int64, winner json.RawMessage, completedAt time.Time) error {
+	tag, err := s.pool.Exec(
+		ctx,
+		`UPDATE event_rounds
+		 SET winner = $3, completed_at = COALESCE(completed_at, $4)
+		 WHERE event_id = $1 AND id = $2`,
+		eventID,
+		roundID,
+		winner,
+		completedAt,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func (s *userStore) insertEventRounds(ctx context.Context, eventID int64, rounds []bracketRoundSeed) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	for _, round := range rounds {
+		if _, err := tx.Exec(
+			ctx,
+			`INSERT INTO event_rounds (event_id, round_number, position, participant_one, participant_two, metadata)
+			 VALUES ($1, $2, $3, $4, $5, $6)
+			 ON CONFLICT (event_id, round_number, position) DO NOTHING`,
+			eventID,
+			round.RoundNumber,
+			round.Position,
+			round.ParticipantOne,
+			round.ParticipantTwo,
+			json.RawMessage([]byte("{}")),
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+func nullableRawMessage(value []byte) json.RawMessage {
+	if value == nil {
+		return nil
+	}
+	return json.RawMessage(value)
 }
 
 func (s *userStore) getHomepageHTML(ctx context.Context) (string, error) {

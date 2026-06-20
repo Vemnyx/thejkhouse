@@ -86,10 +86,24 @@ type EventVote struct {
 	Metadata json.RawMessage `json:"metadata"`
 }
 
+type EventRound struct {
+	ID             int64           `json:"id"`
+	EventID        int64           `json:"eventId"`
+	RoundNumber    int32           `json:"roundNumber"`
+	Position       int32           `json:"position"`
+	ParticipantOne json.RawMessage `json:"participantOne"`
+	ParticipantTwo json.RawMessage `json:"participantTwo"`
+	Winner         json.RawMessage `json:"winner"`
+	CompletedAt    *time.Time      `json:"completedAt"`
+	Metadata       json.RawMessage `json:"metadata"`
+	CreatedAt      time.Time       `json:"createdAt"`
+}
+
 type EventDetail struct {
-	Event Event       `json:"event"`
-	Users []EventUser `json:"users"`
-	Teams []EventTeam `json:"teams"`
+	Event  Event        `json:"event"`
+	Users  []EventUser  `json:"users"`
+	Teams  []EventTeam  `json:"teams"`
+	Rounds []EventRound `json:"rounds"`
 }
 
 type Homepage struct {
