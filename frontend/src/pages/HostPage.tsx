@@ -734,7 +734,7 @@ export default function HostPage() {
       return;
     }
     if (contestantCouple && !couplePhoto) {
-      setError("add a couple photo before submitting");
+      setError("add a team photo before submitting");
       return;
     }
     if (!contestantCouple && contestantUserIds.some((userId) => !contestantPhotos[userId])) {
@@ -829,7 +829,7 @@ export default function HostPage() {
     try {
       const token = await firebaseUser.getIdToken();
       const detail = await deleteEventContestant(token, selectedEvent.id, {
-        userIds: team ? team.userIds : eventUser ? [eventUser.userId] : [],
+        userIds: team ? [] : eventUser ? [eventUser.userId] : [],
         teamId: team?.id ?? null,
       });
       setSelectedEventDetail(detail);
@@ -1075,7 +1075,7 @@ export default function HostPage() {
     .filter((user): user is AppUser => Boolean(user));
   const selectedEvent = selectedEventDetail?.event ?? null;
   const selectedEventCategories = selectedEvent ? eventMetadataCategories(selectedEvent.metadata) : [];
-  const selectedEventContestantUsers = selectedEventDetail?.users.filter((eventUser) => eventUser.contestant) ?? [];
+  const selectedEventContestantUsers = selectedEventDetail?.users.filter((eventUser) => eventUser.contestant && eventUserHasCostume(eventUser)) ?? [];
   const selectedEventImages = selectedEvent ? images.filter((image) => image.eventId === selectedEvent.id) : [];
 
   const handleSendEmail = async (event: FormEvent) => {
@@ -1993,7 +1993,6 @@ export default function HostPage() {
                               </tr>
                             ))}
                             {selectedEventContestantUsers
-                              .filter((eventUser) => !selectedEventDetail?.teams.some((team) => team.userIds.includes(eventUser.userId)))
                               .map((eventUser) => (
                                 <tr key={`user-${eventUser.userId}`}>
                                   <td>{renderContestantImagePreview(selectedEventImages.find((image) => image.userIds.includes(eventUser.userId)))}</td>
@@ -2469,7 +2468,7 @@ export default function HostPage() {
                 </label>
 
                 <div className="contestant-photo-actions">
-                  {contestantUserIds.map((userId) => (
+                  {!contestantCouple ? contestantUserIds.map((userId) => (
                     <div className="contestant-photo-row" key={userId}>
                       <span>{userLabel(users, userId)}</span>
                       <button className="auth-secondary contestant-add-photo-button" type="button" onClick={() => openContestantPhotoModal(userId)}>
@@ -2481,16 +2480,16 @@ export default function HostPage() {
                         </div>
                       ) : null}
                     </div>
-                  ))}
+                  )) : null}
                   {contestantCouple ? (
                     <div className="contestant-photo-row">
-                      <span>Couple</span>
+                      <span>Team</span>
                       <button className="auth-secondary contestant-add-photo-button" type="button" onClick={() => openContestantPhotoModal("couple")}>
-                        Add Couple Photo
+                        Add Team Photo
                       </button>
                       {couplePhoto ? (
                         <div className="contestant-photo-preview">
-                          <img src={couplePhoto.imageUrl} alt="Couple contestant preview" />
+                          <img src={couplePhoto.imageUrl} alt="Team contestant preview" />
                         </div>
                       ) : null}
                     </div>
@@ -2963,6 +2962,11 @@ function eventMetadataCategories(metadata: Record<string, unknown>): EventCatego
 function eventUserCostume(eventUser: EventUserRecord) {
   const costume = eventUser.metadata.costume;
   return typeof costume === "string" && costume.trim() ? costume : "No costume name";
+}
+
+function eventUserHasCostume(eventUser: EventUserRecord) {
+  const costume = eventUser.metadata.costume;
+  return typeof costume === "string" && costume.trim().length > 0;
 }
 
 function loadImage(src: string) {

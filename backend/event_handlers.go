@@ -309,17 +309,19 @@ func (s *apiServer) handleEventContestants(w http.ResponseWriter, r *http.Reques
 			}
 			team = &created
 		}
-		costume := strings.TrimSpace(req.Costume)
-		for _, userID := range userIDs {
-			metadata := json.RawMessage([]byte("{}"))
-			if !req.Team && costume != "" {
-				raw, _ := json.Marshal(map[string]string{"costume": costume})
-				metadata = raw
-			}
-			if _, err := s.store.upsertEventUser(r.Context(), eventID, int64(userID), true, metadata); err != nil {
-				log.Error("event user upsert", "error", err, "event_id", eventID, "user_id", userID)
-				writeError(w, http.StatusInternalServerError, "failed to save contestant")
-				return
+		if !req.Team {
+			costume := strings.TrimSpace(req.Costume)
+			for _, userID := range userIDs {
+				metadata := json.RawMessage([]byte("{}"))
+				if costume != "" {
+					raw, _ := json.Marshal(map[string]string{"costume": costume})
+					metadata = raw
+				}
+				if _, err := s.store.upsertEventUser(r.Context(), eventID, int64(userID), true, metadata); err != nil {
+					log.Error("event user upsert", "error", err, "event_id", eventID, "user_id", userID)
+					writeError(w, http.StatusInternalServerError, "failed to save contestant")
+					return
+				}
 			}
 		}
 		detail, err := s.store.getEventDetail(r.Context(), eventID)

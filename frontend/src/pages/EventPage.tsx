@@ -101,9 +101,8 @@ export default function EventPage() {
         image,
       }] : [];
     });
-    const teamUserIds = new Set(eventDetail.teams.flatMap((team) => team.userIds));
     const userEntries = eventDetail.users
-      .filter((eventUser) => eventUser.contestant && !teamUserIds.has(eventUser.userId))
+      .filter((eventUser) => eventUser.contestant && eventUserHasCostume(eventUser.metadata))
       .flatMap((eventUser) => {
         const image = eventImages.find((item) => item.userIds.includes(eventUser.userId) && item.teamId === null);
         return image ? [{
@@ -397,6 +396,11 @@ function isActiveEvent(event: EventDetail["event"]) {
 function eventUserCostume(metadata: Record<string, unknown>) {
   const costume = metadata.costume;
   return typeof costume === "string" && costume.trim() ? costume : "Contestant";
+}
+
+function eventUserHasCostume(metadata: Record<string, unknown>) {
+  const costume = metadata.costume;
+  return typeof costume === "string" && costume.trim().length > 0;
 }
 
 function userDisplayName(users: AppUser[], userId: number) {
