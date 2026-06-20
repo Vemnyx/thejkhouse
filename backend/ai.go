@@ -185,7 +185,7 @@ func (c *aiClient) generateHTML(ctx context.Context, blockType string, instructi
 		return "", newPublicAIError("The AI returned an empty draft. Try adding more detail to the prompt.", fmt.Errorf("cursor returned empty html"))
 	}
 	html = ensureUploadedImagesIncluded(html, imageURLs)
-	if err := validateGeneratedHTML(html); err != nil {
+	if err := validateGeneratedHTML(blockType, html); err != nil {
 		return "", newPublicAIError(err.Error(), err)
 	}
 
@@ -263,14 +263,17 @@ func buildHTMLPrompt(blockType string, instructions string, existingHTML string,
 	var target string
 	var addressInstructions string
 	var templateInstructions string
+	var markupInstructions string
 	if blockType == "party" {
 		target = "a party announcement block"
 		addressInstructions = partyAddress
 		templateInstructions = partyHTMLTemplate
+		markupInstructions = "Party drafts may include script tags, javascript: URLs, and inline event handlers when useful. Do not include iframes."
 	} else {
 		target = "a homepage announcement block"
 		addressInstructions = "No party address applies."
 		templateInstructions = "No fixed template applies."
+		markupInstructions = "Do not include scripts, javascript: URLs, inline event handlers, or iframes."
 	}
 
 	imageInstructions := "No uploaded images were provided."
@@ -284,8 +287,9 @@ Use the repository context to match the existing frontend aesthetic and CSS conv
 
 Rules:
 - Do not edit files.
-- Return only a safe HTML fragment, not a full document.
-- Do not include markdown fences, explanations, scripts, inline event handlers, or iframes.
+- Return only an HTML fragment, not a full document.
+- Do not include markdown fences or explanations.
+- %s
 - Do not use external assets except the uploaded CDN image URLs listed below.
 - If uploaded images are provided, include every uploaded image in the fragment.
 - Any uploaded image URL omitted from your draft will be appended automatically at the end, so place them intentionally in the layout instead.
@@ -306,7 +310,7 @@ Uploaded images:
 %s
 
 Existing HTML, if any:
-%s`, target, instructions, addressInstructions, templateInstructions, imageInstructions, existingHTML)
+%s`, target, markupInstructions, instructions, addressInstructions, templateInstructions, imageInstructions, existingHTML)
 }
 
 func cleanGeneratedHTML(value string) string {
@@ -340,16 +344,19 @@ func ensureUploadedImagesIncluded(html string, imageURLs []string) string {
 	return builder.String()
 }
 
-func validateGeneratedHTML(html string) error {
+func validateGeneratedHTML(blockType string, html string) error {
 	lower := strings.ToLower(html)
+	if strings.Contains(lower, "<iframe") {
+		return fmt.Errorf("The AI returned an iframe, which is not allowed. Ask it to describe embeds as plain links instead.")
+	}
+	if blockType == "party" {
+		return nil
+	}
 	if strings.Contains(lower, "<script") {
 		return fmt.Errorf("The AI returned a script tag, which is not allowed. Ask it for static HTML only.")
 	}
 	if strings.Contains(lower, "javascript:") {
 		return fmt.Errorf("The AI returned a javascript link, which is not allowed. Ask it for static links or plain text.")
-	}
-	if strings.Contains(lower, "<iframe") {
-		return fmt.Errorf("The AI returned an iframe, which is not allowed. Ask it to describe embeds as plain links instead.")
 	}
 	eventHandler := regexp.MustCompile(`(?i)\son[a-z]+\s*=`)
 	if eventHandler.MatchString(html) {
