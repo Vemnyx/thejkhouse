@@ -458,12 +458,7 @@ function BracketEventView({
 
   return (
     <div className="bracket-event-view">
-      {champion ? (
-        <section className="bracket-user-matchup">
-          <p className="eyebrow">Winner</p>
-          <h2>{champion.label}</h2>
-        </section>
-      ) : userRound ? (
+      {champion ? null : userRound ? (
         <section className="bracket-user-matchup">
           <p className="eyebrow">Your Matchup</p>
           <h2>{participantLabel(userRound.participantOne)} vs {participantLabel(userRound.participantTwo)}</h2>
@@ -478,25 +473,82 @@ function BracketEventView({
       ) : (
         <p className="dashboard-copy">You are not playing in the current round.</p>
       )}
-      <div className="bracket-visual-scroll">
-        <div className="bracket-visual">
-          <BracketConnectorOverlay roundCounts={roundNumbers.map((roundNumber) => rounds.filter((round) => round.roundNumber === roundNumber).length)} />
-          {roundNumbers.map((roundNumber) => (
-            <section className="bracket-round-column" key={roundNumber}>
-              <h3>{roundTitle(roundNumber, roundNumbers.length)}</h3>
-              {rounds.filter((round) => round.roundNumber === roundNumber).map((round) => (
-                <article className="bracket-match-card" key={round.id}>
-                  <span className={round.winner?.key === round.participantOne?.key ? "bracket-winner" : undefined}>{participantLabel(round.participantOne)}</span>
-                  <span className={round.winner?.key === round.participantTwo?.key ? "bracket-winner" : undefined}>{participantLabel(round.participantTwo)}</span>
-                  <small>{round.completedAt ? "Complete" : "In progress"}</small>
-                </article>
-              ))}
-            </section>
-          ))}
-        </div>
-      </div>
+      <BracketVisual rounds={rounds} />
     </div>
   );
+}
+
+function BracketVisual({ rounds }: { rounds: EventRoundRecord[] }) {
+  const roundNumbers = Array.from(new Set(rounds.map((round) => round.roundNumber)));
+  const finalRoundNumber = Math.max(...roundNumbers);
+  const finalRounds = rounds.filter((round) => round.roundNumber === finalRoundNumber);
+  const champion = finalRounds.find((round) => round.winner && round.completedAt)?.winner ?? null;
+  const sideRoundNumbers = roundNumbers.filter((roundNumber) => roundNumber !== finalRoundNumber);
+  return (
+    <div className="bracket-visual-stack">
+      {champion ? (
+        <section className="bracket-winner-banner bracket-winner-banner-compact">
+          <p className="eyebrow">Winner</p>
+          <h2>{champion.label}</h2>
+        </section>
+      ) : null}
+      <div className="bracket-visual-scroll">
+        <div className="tournament-bracket" style={{ gridTemplateColumns: `${sideRoundNumbers.map(() => "minmax(12rem, 1fr)").join(" ")} minmax(13rem, 0.8fr) ${sideRoundNumbers.map(() => "minmax(12rem, 1fr)").join(" ")}` }}>
+          <div className="bracket-side bracket-side-left">
+            {sideRoundNumbers.map((roundNumber) => {
+              const { left } = splitRoundMatches(rounds.filter((round) => round.roundNumber === roundNumber));
+              return <BracketRoundColumn key={`left-${roundNumber}`} rounds={left} title={roundTitle(roundNumber, roundNumbers.length)} />;
+            })}
+          </div>
+          <section className="bracket-final-column">
+            <h3>Final</h3>
+            {finalRounds.map((round) => <BracketMatchCard round={round} key={round.id} />)}
+          </section>
+          <div className="bracket-side bracket-side-right">
+            {[...sideRoundNumbers].reverse().map((roundNumber) => {
+              const { right } = splitRoundMatches(rounds.filter((round) => round.roundNumber === roundNumber));
+              return <BracketRoundColumn key={`right-${roundNumber}`} rounds={right} title={roundTitle(roundNumber, roundNumbers.length)} />;
+            })}
+          </div>
+        </div>
+      </div>  
+    </div>
+  );
+}
+
+function BracketRoundColumn({ rounds, title }: { rounds: EventRoundRecord[]; title: string }) {
+  return (
+    <section className="bracket-round-column">
+      <h3>{title}</h3>
+      {rounds.map((round) => <BracketMatchCard round={round} key={round.id} />)}
+    </section>
+  );
+}
+
+function BracketMatchCard({ round }: { round: EventRoundRecord }) {
+  return (
+    <article className="bracket-match-card">
+      <span className={round.winner?.key === round.participantOne?.key ? "bracket-winner" : undefined}>{participantLabel(round.participantOne)}</span>
+      <span className={round.winner?.key === round.participantTwo?.key ? "bracket-winner" : undefined}>{participantLabel(round.participantTwo)}</span>
+      <small>{round.completedAt ? "Complete" : "In progress"}</small>
+    </article>
+  );
+}
+
+function splitRoundMatches<T>(rounds: T[]) {
+  const midpoint = Math.ceil(rounds.length / 2);
+  return {
+    left: rounds.slice(0, midpoint),
+    right: rounds.slice(midpoint),
+  };
+}
+
+function splitBracketItems<T>(items: T[]) {
+  const midpoint = Math.ceil(items.length / 2);
+  return {
+    left: items.slice(0, midpoint),
+    right: items.slice(midpoint),
+  };
 }
 
 function BracketConnectorOverlay({ roundCounts }: { roundCounts: number[] }) {

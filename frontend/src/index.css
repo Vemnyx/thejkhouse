@@ -1043,9 +1043,37 @@ body {
   min-width: 100%;
 }
 
+.tournament-bracket {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) minmax(12rem, 0.75fr) minmax(14rem, 1fr);
+  gap: 2.4rem;
+  align-items: stretch;
+  min-width: min(56rem, max-content);
+  padding: 1rem;
+}
+
+.tournament-bracket-setup {
+  min-width: min(100%, 56rem);
+}
+
+.bracket-side {
+  display: flex;
+  gap: 2rem;
+  align-items: stretch;
+}
+
+.bracket-side-left {
+  justify-content: flex-end;
+}
+
+.bracket-side-right {
+  justify-content: flex-start;
+}
+
 .bracket-seed-card,
 .bracket-match-card,
 .bracket-user-matchup {
+  position: relative;
   display: grid;
   gap: 0.65rem;
   border: 1px solid rgba(232, 120, 143, 0.18);
@@ -1078,7 +1106,7 @@ body {
   flex-direction: column;
   justify-content: space-around;
   gap: 1.25rem;
-  min-width: 15rem;
+  min-width: 13.5rem;
 }
 
 .bracket-round-column h3,
@@ -1088,23 +1116,67 @@ body {
 }
 
 .bracket-match-card {
-  position: relative;
   min-height: 6.4rem;
 }
 
-.bracket-connector-overlay {
+.bracket-side-left .bracket-match-card::after,
+.bracket-side-left .bracket-seed-card::after {
+  content: "";
   position: absolute;
-  inset: 3.5rem 1.5rem 1rem;
-  z-index: 0;
-  min-width: 100%;
-  pointer-events: none;
+  top: 50%;
+  right: -1.25rem;
+  width: 1.25rem;
+  height: 1px;
+  background: rgba(249, 214, 143, 0.46);
 }
 
-.bracket-connector-overlay path {
-  fill: none;
-  stroke: rgba(249, 214, 143, 0.48);
-  stroke-width: 0.28;
-  vector-effect: non-scaling-stroke;
+.bracket-side-right .bracket-match-card::before,
+.bracket-side-right .bracket-seed-card::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -1.25rem;
+  width: 1.25rem;
+  height: 1px;
+  background: rgba(249, 214, 143, 0.46);
+}
+
+.bracket-final-column {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+  min-width: 12rem;
+}
+
+.bracket-final-column::before,
+.bracket-final-column::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.5rem;
+  height: 1px;
+  background: rgba(249, 214, 143, 0.56);
+}
+
+.bracket-final-column::before {
+  left: -1.5rem;
+}
+
+.bracket-final-column::after {
+  right: -1.5rem;
+}
+
+.bracket-final-column h3,
+.bracket-final-column h4 {
+  margin: 0;
+  color: var(--gold);
+  font-family: var(--display-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
 }
 
 .bracket-setup-match {
@@ -1137,6 +1209,38 @@ body {
 .bracket-event-view {
   display: grid;
   gap: 1.25rem;
+}
+
+.bracket-visual-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.bracket-winner-banner {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  border: 1px solid rgba(249, 214, 143, 0.34);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(249, 214, 143, 0.2), transparent 68%),
+    rgba(42, 8, 16, 0.72);
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
+.bracket-winner-banner h2 {
+  margin: 0;
+  color: var(--rose-pale);
+  font-family: var(--decorative-font);
+  font-size: clamp(1.7rem, 5vw, 3rem);
+  letter-spacing: 0.08em;
+}
+
+.bracket-winner-banner-compact {
+  justify-self: center;
+  width: min(100%, 28rem);
 }
 
 .bracket-user-matchup h2 {
@@ -1665,6 +1769,23 @@ body {
 .event-date-field {
   display: grid;
   gap: 0.75rem;
+}
+
+.event-create-modal {
+  max-height: min(92dvh, 44rem);
+}
+
+.event-bracket-options {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid rgba(232, 120, 143, 0.14);
+  border-radius: 1rem;
+  background: rgba(3, 3, 3, 0.18);
+  padding: 0.85rem;
+}
+
+.event-create-modal .host-email-form {
+  gap: 0.8rem;
 }
 
 .event-setup-panel,
