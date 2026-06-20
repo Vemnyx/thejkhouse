@@ -478,6 +478,7 @@ function BracketVisual({ rounds }: { rounds: EventRoundRecord[] }) {
   const finalRounds = rounds.filter((round) => round.roundNumber === finalRoundNumber);
   const champion = finalRounds.find((round) => round.winner && round.completedAt)?.winner ?? null;
   const firstRoundMatchCount = rounds.filter((round) => round.roundNumber === 1).length;
+  const sideRoundCounts = bracketSideRoundCounts(firstRoundMatchCount, totalRounds);
   return (
     <div className="bracket-visual-stack">
       {champion ? (
@@ -487,7 +488,7 @@ function BracketVisual({ rounds }: { rounds: EventRoundRecord[] }) {
         </section>
       ) : null}
       <div className="bracket-visual-scroll">
-        <div className="tournament-bracket" style={{ gridTemplateColumns: `${sideRoundNumbers.map(() => "minmax(12rem, 1fr)").join(" ")} minmax(13rem, 0.8fr) ${sideRoundNumbers.map(() => "minmax(12rem, 1fr)").join(" ")}` }}>
+        <div className="tournament-bracket" style={{ gridTemplateColumns: `${sideRoundNumbers.map(() => "minmax(9.5rem, 1fr)").join(" ")} minmax(8.5rem, 0.8fr) ${sideRoundNumbers.map(() => "minmax(9.5rem, 1fr)").join(" ")}` }}>
           <div className="bracket-side bracket-side-left">
             {sideRoundNumbers.map((roundNumber) => {
               const { left } = splitRoundMatches(rounds.filter((round) => round.roundNumber === roundNumber));
@@ -495,6 +496,7 @@ function BracketVisual({ rounds }: { rounds: EventRoundRecord[] }) {
                 ? <BracketRoundColumn key={`left-${roundNumber}`} rounds={left} title={roundTitle(roundNumber, totalRounds)} />
                 : <BracketPlaceholderColumn key={`left-${roundNumber}`} count={bracketSidePlaceholderCount(firstRoundMatchCount, roundNumber)} title={roundTitle(roundNumber, totalRounds)} />;
             })}
+            <BracketConnectorOverlay roundCounts={sideRoundCounts} />
           </div>
           <section className="bracket-final-column">
             <h3>Final</h3>
@@ -507,6 +509,7 @@ function BracketVisual({ rounds }: { rounds: EventRoundRecord[] }) {
                 ? <BracketRoundColumn key={`right-${roundNumber}`} rounds={right} title={roundTitle(roundNumber, totalRounds)} />
                 : <BracketPlaceholderColumn key={`right-${roundNumber}`} count={bracketSidePlaceholderCount(firstRoundMatchCount, roundNumber)} title={roundTitle(roundNumber, totalRounds)} />;
             })}
+            <BracketConnectorOverlay roundCounts={sideRoundCounts} flipped />
           </div>
         </div>
       </div>  
@@ -558,6 +561,10 @@ function bracketSidePlaceholderCount(firstRoundMatchCount: number, roundNumber: 
   return Math.max(1, Math.floor(firstRoundMatchCount / 2 ** roundNumber));
 }
 
+function bracketSideRoundCounts(firstRoundMatchCount: number, totalRounds: number) {
+  return Array.from({ length: Math.max(totalRounds - 1, 0) }, (_, index) => bracketSidePlaceholderCount(firstRoundMatchCount, index + 1));
+}
+
 function BracketFinalPlaceholder() {
   return (
     <article className="bracket-match-card bracket-final-placeholder">
@@ -584,9 +591,9 @@ function splitBracketItems<T>(items: T[]) {
   };
 }
 
-function BracketConnectorOverlay({ roundCounts }: { roundCounts: number[] }) {
+function BracketConnectorOverlay({ roundCounts, flipped = false }: { roundCounts: number[]; flipped?: boolean }) {
   return (
-    <svg className="bracket-connector-overlay" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <svg className={flipped ? "bracket-connector-overlay bracket-connector-overlay-flipped" : "bracket-connector-overlay"} aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
       {bracketConnectorPaths(roundCounts).map((path, index) => (
         <path d={path} key={`${path}-${index}`} />
       ))}

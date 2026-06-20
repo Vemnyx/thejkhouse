@@ -3345,6 +3345,7 @@ function BracketSetupVisual({
   const { left, right } = splitBracketItems(pairs);
   const totalRounds = Math.ceil(Math.log2(bracket.size));
   const innerRoundNumbers = Array.from({ length: Math.max(totalRounds - 2, 0) }, (_, index) => index + 2);
+  const sideRoundCounts = bracketSideRoundCounts(pairs.length, totalRounds);
   return (
     <div className="bracket-visual-scroll">
       <div className="tournament-bracket tournament-bracket-setup">
@@ -3372,6 +3373,7 @@ function BracketSetupVisual({
               key={`left-placeholder-${roundNumber}`}
             />
           ))}
+          <BracketConnectorOverlay roundCounts={sideRoundCounts} />
         </div>
         <section className="bracket-final-column">
           <h3>Final</h3>
@@ -3401,6 +3403,7 @@ function BracketSetupVisual({
               />
             ))}
           </section>
+          <BracketConnectorOverlay roundCounts={sideRoundCounts} flipped />
         </div>
       </div>
     </div>
@@ -3480,6 +3483,7 @@ function BracketRoundsView({ rounds }: { rounds: EventDetail["rounds"] }) {
   const finalRounds = rounds.filter((round) => round.roundNumber === finalRoundNumber);
   const champion = finalRounds.find((round) => round.winner && round.completedAt)?.winner ?? null;
   const firstRoundMatchCount = rounds.filter((round) => round.roundNumber === 1).length;
+  const sideRoundCounts = bracketSideRoundCounts(firstRoundMatchCount, totalRounds);
   return (
     <div className="bracket-visual-stack">
       {champion ? (
@@ -3489,7 +3493,7 @@ function BracketRoundsView({ rounds }: { rounds: EventDetail["rounds"] }) {
         </section>
       ) : null}
       <div className="bracket-visual-scroll">
-        <div className="tournament-bracket" style={{ gridTemplateColumns: `${sideRoundNumbers.map(() => "minmax(12rem, 1fr)").join(" ")} minmax(13rem, 0.8fr) ${sideRoundNumbers.map(() => "minmax(12rem, 1fr)").join(" ")}` }}>
+        <div className="tournament-bracket" style={{ gridTemplateColumns: `${sideRoundNumbers.map(() => "minmax(9.5rem, 1fr)").join(" ")} minmax(8.5rem, 0.8fr) ${sideRoundNumbers.map(() => "minmax(9.5rem, 1fr)").join(" ")}` }}>
           <div className="bracket-side bracket-side-left">
             {sideRoundNumbers.map((roundNumber) => {
               const { left } = splitBracketItems(rounds.filter((round) => round.roundNumber === roundNumber));
@@ -3497,6 +3501,7 @@ function BracketRoundsView({ rounds }: { rounds: EventDetail["rounds"] }) {
                 ? <BracketRoundColumn rounds={left} title={bracketRoundTitle(roundNumber, totalRounds)} key={`left-${roundNumber}`} />
                 : <BracketPlaceholderColumn count={bracketSidePlaceholderCount(firstRoundMatchCount, roundNumber)} title={bracketRoundTitle(roundNumber, totalRounds)} key={`left-${roundNumber}`} />;
             })}
+            <BracketConnectorOverlay roundCounts={sideRoundCounts} />
           </div>
           <section className="bracket-final-column">
             <h4>Final</h4>
@@ -3509,6 +3514,7 @@ function BracketRoundsView({ rounds }: { rounds: EventDetail["rounds"] }) {
                 ? <BracketRoundColumn rounds={right} title={bracketRoundTitle(roundNumber, totalRounds)} key={`right-${roundNumber}`} />
                 : <BracketPlaceholderColumn count={bracketSidePlaceholderCount(firstRoundMatchCount, roundNumber)} title={bracketRoundTitle(roundNumber, totalRounds)} key={`right-${roundNumber}`} />;
             })}
+            <BracketConnectorOverlay roundCounts={sideRoundCounts} flipped />
           </div>
         </div>
       </div>
@@ -3568,6 +3574,10 @@ function bracketSetupPlaceholderCount(sideSlotCount: number, roundNumber: number
   return Math.max(1, Math.floor(sideSlotCount / 2 ** (roundNumber - 1)));
 }
 
+function bracketSideRoundCounts(firstRoundMatchCount: number, totalRounds: number) {
+  return Array.from({ length: Math.max(totalRounds - 1, 0) }, (_, index) => bracketSidePlaceholderCount(firstRoundMatchCount, index + 1));
+}
+
 function BracketFinalPlaceholder() {
   return (
     <article className="bracket-match-card bracket-final-placeholder">
@@ -3588,9 +3598,9 @@ function bracketRoundTitle(roundNumber: number, totalRounds: number) {
   return `Round ${roundNumber}`;
 }
 
-function BracketConnectorOverlay({ roundCounts }: { roundCounts: number[] }) {
+function BracketConnectorOverlay({ roundCounts, flipped = false }: { roundCounts: number[]; flipped?: boolean }) {
   return (
-    <svg className="bracket-connector-overlay" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <svg className={flipped ? "bracket-connector-overlay bracket-connector-overlay-flipped" : "bracket-connector-overlay"} aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
       {bracketConnectorPaths(roundCounts).map((path, index) => (
         <path d={path} key={`${path}-${index}`} />
       ))}
