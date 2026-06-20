@@ -414,6 +414,23 @@ body {
   cursor: wait;
 }
 
+.back-text-link {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  padding: 0;
+  box-shadow: none;
+  text-decoration: underline;
+  text-underline-offset: 0.24em;
+}
+
+.back-text-link:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: transparent;
+  background: transparent;
+}
+
 .auth-password-toggle {
   display: flex;
   align-items: center;
@@ -2157,6 +2174,36 @@ body {
   margin: 0;
   color: var(--ink-muted);
   line-height: 1.7;
+}
+
+.qr-code-modal {
+  width: min(100%, 30rem);
+}
+
+.qr-code-content {
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.qr-code-image {
+  display: block;
+  width: min(100%, 18rem);
+  aspect-ratio: 1;
+  border: 0.75rem solid #fff;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.42);
+}
+
+.qr-code-url {
+  max-width: 100%;
+  color: var(--rose-pale);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 0.22em;
 }
 
 .ai-loading-backdrop {

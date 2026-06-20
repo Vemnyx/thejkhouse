@@ -1,8 +1,9 @@
 import { type DragEvent, type FormEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
@@ -239,6 +240,9 @@ export default function HostPage() {
   const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [qrEvent, setQrEvent] = useState<EventRecord | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [qrError, setQrError] = useState("");
   const [previewImage, setPreviewImage] = useState<ImageRecord | null>(null);
   const [previewParty, setPreviewParty] = useState<PartyRecord | null>(null);
   const [tagEditImage, setTagEditImage] = useState<ImageRecord | null>(null);
@@ -275,6 +279,48 @@ export default function HostPage() {
       }
     };
   }, [contestantPhotoPreviewUrl]);
+
+  const qrEventUrl = useMemo(() => {
+    if (!qrEvent) {
+      return "";
+    }
+    return `${window.location.origin}/events/${eventRouteIdentifier(qrEvent)}`;
+  }, [qrEvent]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!qrEventUrl) {
+      setQrCodeUrl("");
+      setQrError("");
+      return undefined;
+    }
+
+    setQrCodeUrl("");
+    setQrError("");
+    QRCode.toDataURL(qrEventUrl, {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      width: 360,
+      color: {
+        dark: "#030303",
+        light: "#ffffff",
+      },
+    })
+      .then((url) => {
+        if (!cancelled) {
+          setQrCodeUrl(url);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setQrError("failed to generate QR code");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [qrEventUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1776,7 +1822,7 @@ export default function HostPage() {
               ) : (
                 <form className="party-form" onSubmit={handleCreateParty}>
                   <div className="host-panel-header">
-                    <button className="auth-secondary" type="button" onClick={() => {
+                    <button className="auth-secondary back-text-link" type="button" onClick={() => {
                       setPartyView("list");
                       resetPartyForm();
                       setError("");
@@ -1917,17 +1963,22 @@ export default function HostPage() {
               ) : selectedEvent ? (
                 <div className="event-setup-panel">
                   <div className="host-panel-header">
-                    <button className="auth-secondary" type="button" onClick={() => {
-                      setEventView("list");
-                      setSelectedEventDetail(null);
-                      setEventCategories([]);
-                      setError("");
-                    }}>
-                      Back to Events
-                    </button>
                     <div>
                       <h2 className="host-section-title">{selectedEvent.label}</h2>
                       <p className="host-section-copy">{eventTypeLabels[selectedEvent.type]}</p>
+                    </div>
+                    <div className="host-panel-actions">
+                      <button className="auth-secondary" type="button" onClick={() => setQrEvent(selectedEvent)}>
+                        Show QR Code
+                      </button>
+                      <button className="auth-secondary back-text-link" type="button" onClick={() => {
+                        setEventView("list");
+                        setSelectedEventDetail(null);
+                        setEventCategories([]);
+                        setError("");
+                      }}>
+                        Back to Events
+                      </button>
                     </div>
                   </div>
 
@@ -2825,6 +2876,30 @@ export default function HostPage() {
                   />
                 </div>
               </article>
+            </section>
+          </div>
+        ) : null}
+        {qrEvent ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={() => setQrEvent(null)}>
+            <section className="upload-modal gothic-card qr-code-modal" role="dialog" aria-modal="true" aria-labelledby="qr-code-title" onMouseDown={(event) => event.stopPropagation()}>
+              <div className="modal-header">
+                <h2 className="host-section-title" id="qr-code-title">Event QR Code</h2>
+                <button className="modal-close" type="button" onClick={() => setQrEvent(null)} aria-label="Close QR code modal">
+                  x
+                </button>
+              </div>
+              <div className="qr-code-content">
+                <p className="host-section-copy">{qrEvent.label}</p>
+                {qrError ? <p className="auth-error">{qrError}</p> : null}
+                {qrCodeUrl ? (
+                  <img className="qr-code-image" src={qrCodeUrl} alt={`QR code for ${qrEvent.label}`} />
+                ) : qrError ? null : (
+                  <p className="loading-text">Generating QR code...</p>
+                )}
+                <a className="qr-code-url" href={qrEventUrl} target="_blank" rel="noreferrer">
+                  {qrEventUrl}
+                </a>
+              </div>
             </section>
           </div>
         ) : null}

@@ -208,7 +208,7 @@ export default function EventPage() {
           <span className="corner corner-br" />
         </div>
         {!showCostumeContestGrid ? (
-          <Link className="auth-secondary event-detail-back" to="/events">
+          <Link className="auth-secondary back-text-link event-detail-back" to="/events">
             Back to Events
           </Link>
         ) : null}
@@ -219,7 +219,7 @@ export default function EventPage() {
         ) : showCostumeContestGrid ? (
           <section className="event-contest-preview">
             <div className="event-title-row">
-              <Link className="auth-secondary event-detail-back" to="/events">
+              <Link className="auth-secondary back-text-link event-detail-back" to="/events">
                 Back to Events
               </Link>
               <div>

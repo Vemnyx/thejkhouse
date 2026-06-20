@@ -206,7 +206,7 @@ export default function LoginPage() {
             >
               {resendingConfirmation ? "Sending..." : "Send New Confirmation Email"}
             </button>
-            <button className="auth-secondary" type="button" onClick={() => switchMode("login")}>
+            <button className="auth-secondary back-text-link" type="button" onClick={() => switchMode("login")}>
               Back to Log In
             </button>
           </div>
