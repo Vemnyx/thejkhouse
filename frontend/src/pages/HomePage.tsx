@@ -429,10 +429,13 @@ export default function HomePage() {
             </div>
           ) : activeView === "photos" ? (
             <div className="dashboard-photos">
-              <div className="host-panel-header">
-                <label className="image-filter">
-                  <span>Party</span>
-                  <select value={photoPartyFilter} onChange={(event) => setPhotoPartyFilter(event.target.value)}>
+              <div className="host-panel-header dashboard-photo-controls">
+                <label className="image-filter dashboard-photo-filter">
+                  <select
+                    value={photoPartyFilter}
+                    onChange={(event) => setPhotoPartyFilter(event.target.value)}
+                    aria-label="Filter photos by party"
+                  >
                     <option value="all">All Images</option>
                     {partyOptions.map((party) => (
                       <option value={party.value} key={party.id}>
@@ -442,7 +445,7 @@ export default function HomePage() {
                   </select>
                 </label>
                 <button className="auth-submit dashboard-photo-upload" type="button" onClick={openPhotoUpload} disabled={partyOptions.length === 0}>
-                  Add New Image
+                  Add Photo
                 </button>
               </div>
               {message ? <p className="host-success">{message}</p> : null}
