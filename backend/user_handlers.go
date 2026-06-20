@@ -14,7 +14,7 @@ func (s *apiServer) handleUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := s.loadUserFromRequest(r)
+	_, err := s.loadUserFromRequest(r)
 	if err != nil {
 		if authErr, ok := err.(*authRequestError); ok {
 			writeError(w, authErr.status, authErr.message)
@@ -24,11 +24,6 @@ func (s *apiServer) handleUsers(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to authorize users")
 		return
 	}
-	if user.Role != RoleHost {
-		writeError(w, http.StatusForbidden, "host access is required")
-		return
-	}
-
 	users, err := s.store.listUsers(r.Context())
 	if err != nil {
 		log.Error("users list", "error", err)

@@ -2,9 +2,9 @@ import { type DragEvent, type FormEvent, type PointerEvent, useEffect, useMemo, 
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, ImageRecord, PartyRecord, createParty, deleteImage, deleteParty, deleteUser, generateHTMLDraft, getHomepage, listImages, listParties, listUsers, sendHostEmail, updateHomepage, updateImageHomepage, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, EventRecord, EventType, ImageRecord, PartyRecord, createEvent, createParty, deleteImage, deleteParty, deleteUser, eventTypeLabels, generateHTMLDraft, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, updateHomepage, updateImageHomepage, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 
-type HostTab = "images" | "parties" | "homepage" | "users" | "email";
+type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
 type ImageFilter = "all" | "homepage";
 type AIDraftType = "homepage" | "party";
@@ -115,6 +115,11 @@ function partyDateTimeToISO(value: string, hour: string, minute: string, period:
   return new Date(year, month - 1, day, hour24, Number(minute), 0, 0).toISOString();
 }
 
+function dateOnlyToISO(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0).toISOString();
+}
+
 function timePartsFromISO(value: string) {
   const date = new Date(value);
   const hours = date.getHours();
@@ -141,6 +146,7 @@ export default function HostPage() {
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [imageFilter, setImageFilter] = useState<ImageFilter>("all");
   const [parties, setParties] = useState<PartyRecord[]>([]);
+  const [events, setEvents] = useState<EventRecord[]>([]);
   const [partyView, setPartyView] = useState<PartyView>("list");
   const [editingParty, setEditingParty] = useState<PartyRecord | null>(null);
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -169,12 +175,20 @@ export default function HostPage() {
   const [partyHtml, setPartyHtml] = useState("");
   const [partyDraftPrompt, setPartyDraftPrompt] = useState("");
   const [partyDraftImageUrls, setPartyDraftImageUrls] = useState<string[]>([]);
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [eventType, setEventType] = useState<EventType>("0");
+  const [eventLabel, setEventLabel] = useState("");
+  const [eventPartyId, setEventPartyId] = useState("");
+  const [eventStartDate, setEventStartDate] = useState("");
+  const [eventEndDate, setEventEndDate] = useState("");
+  const [eventSummary, setEventSummary] = useState("");
   const [error, setError] = useState("");
   const [loadingImages, setLoadingImages] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [savingHomepage, setSavingHomepage] = useState(false);
   const [savingParty, setSavingParty] = useState(false);
+  const [savingEvent, setSavingEvent] = useState(false);
   const [generatingHomepageDraft, setGeneratingHomepageDraft] = useState(false);
   const [generatingPartyDraft, setGeneratingPartyDraft] = useState(false);
   const [uploadingAIImages, setUploadingAIImages] = useState<AIDraftType | null>(null);
@@ -218,17 +232,19 @@ export default function HostPage() {
 
       try {
         const token = await firebaseUser.getIdToken();
-        const [nextImages, nextParties, nextHomepage, nextUsers] = await Promise.all([
+        const [nextImages, nextParties, nextHomepage, nextUsers, nextEvents] = await Promise.all([
           listImages(token),
           listParties(token),
           getHomepage(token),
           listUsers(token),
+          listEvents(token),
         ]);
         if (!cancelled) {
           setImages(nextImages);
           setParties(nextParties);
           setHomepageHtml(nextHomepage.html);
           setUsers(nextUsers);
+          setEvents(nextEvents);
           setError("");
         }
       } catch (err) {
@@ -314,6 +330,63 @@ export default function HostPage() {
     setPartyView("edit");
     setError("");
     setPartySuccess("");
+  };
+
+  const resetEventForm = () => {
+    setEventType("0");
+    setEventLabel("");
+    setEventPartyId("");
+    setEventStartDate("");
+    setEventEndDate("");
+    setEventSummary("");
+  };
+
+  const openEventModal = () => {
+    resetEventForm();
+    setEventModalOpen(true);
+    setError("");
+  };
+
+  const closeEventModal = () => {
+    if (savingEvent) {
+      return;
+    }
+    setEventModalOpen(false);
+  };
+
+  const handleCreateEvent = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    if (!firebaseUser) {
+      setError("host session is required");
+      return;
+    }
+    const label = eventLabel.trim();
+    if (!label) {
+      setError("event label is required");
+      return;
+    }
+
+    setSavingEvent(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const created = await createEvent(token, {
+        label,
+        type: eventType,
+        partyId: eventPartyId ? Number(eventPartyId) : null,
+        startDate: eventAllowsDates && eventStartDate ? dateOnlyToISO(eventStartDate) : "",
+        endDate: eventAllowsDates && eventEndDate ? dateOnlyToISO(eventEndDate) : "",
+        description: eventSummary.trim(),
+      });
+      setEvents((current) => [created, ...current]);
+      setEventModalOpen(false);
+      resetEventForm();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to create event";
+      setError(message);
+    } finally {
+      setSavingEvent(false);
+    }
   };
 
   const handleUpload = async (event: FormEvent) => {
@@ -458,6 +531,7 @@ export default function HostPage() {
         ? deletingUserId === deleteTarget.user.id
         : false;
   const generatingHTMLDraft = generatingHomepageDraft || generatingPartyDraft;
+  const eventAllowsDates = eventType !== "0" && eventType !== "1";
 
   const filteredImages = imageFilter === "homepage"
     ? images.filter((image) => image.homepage)
@@ -918,6 +992,15 @@ export default function HostPage() {
               Parties
             </button>
             <button
+              className={activeTab === "events" ? "main-tab active" : "main-tab"}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "events"}
+              onClick={() => selectHostTab("events")}
+            >
+              Events
+            </button>
+            <button
               className={activeTab === "email" ? "main-tab active" : "main-tab"}
               type="button"
               role="tab"
@@ -1181,6 +1264,48 @@ export default function HostPage() {
                 </form>
               )}
             </section>
+          ) : activeTab === "events" ? (
+            <section className="host-panel" role="tabpanel">
+              <div className="host-panel-header">
+                <button className="auth-submit" type="button" onClick={openEventModal}>
+                  Add New Event
+                </button>
+              </div>
+
+              {error ? <p className="auth-error">{error}</p> : null}
+
+              <div className="host-table-wrap">
+                <table className="host-table">
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Label</th>
+                      <th>Party</th>
+                      <th>Start</th>
+                      <th>End</th>
+                      <th>Summary</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {events.map((event) => (
+                      <tr key={event.id}>
+                        <td>{eventTypeLabels[event.type]}</td>
+                        <td>{event.label}</td>
+                        <td>{event.partyId ? partyLabel(parties, event.partyId) : "No party"}</td>
+                        <td>{event.startDate ? formatDate(event.startDate) : "Not set"}</td>
+                        <td>{event.endDate ? formatDate(event.endDate) : "Not set"}</td>
+                        <td>{event.description || "No summary"}</td>
+                      </tr>
+                    ))}
+                    {events.length === 0 ? (
+                      <tr>
+                        <td colSpan={6}>No events yet.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           ) : activeTab === "homepage" ? (
             <section className="host-panel" role="tabpanel">
             <form className="homepage-editor" onSubmit={handleSaveHomepage}>
@@ -1431,6 +1556,116 @@ export default function HostPage() {
               <button className="auth-submit party-calendar-done" type="button" onClick={() => setPartyDateModalOpen(false)} disabled={!partyDate}>
                 Done
               </button>
+            </section>
+          </div>
+        ) : null}
+
+        {eventModalOpen ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={closeEventModal}>
+            <section
+              className="upload-modal gothic-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="event-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="card-frame" aria-hidden="true">
+                <span className="corner corner-tl" />
+                <span className="corner corner-tr" />
+                <span className="corner corner-bl" />
+                <span className="corner corner-br" />
+              </div>
+
+              <div className="modal-header">
+                <h2 className="host-section-title" id="event-modal-title">Add New Event</h2>
+                <button className="modal-close" type="button" onClick={closeEventModal} aria-label="Close event dialog">
+                  x
+                </button>
+              </div>
+
+              <form className="host-email-form" onSubmit={handleCreateEvent}>
+                <label className="auth-field">
+                  <span>Event type</span>
+                  <select
+                    value={eventType}
+                    onChange={(event) => {
+                      setEventType(event.target.value as EventType);
+                      setEventStartDate("");
+                      setEventEndDate("");
+                    }}
+                    required
+                  >
+                    {(Object.keys(eventTypeLabels) as EventType[]).map((type) => (
+                      <option key={type} value={type}>
+                        {eventTypeLabels[type]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="auth-field">
+                  <span>Label</span>
+                  <input value={eventLabel} onChange={(event) => setEventLabel(event.target.value)} required />
+                </label>
+
+                <label className="auth-field">
+                  <span>Party</span>
+                  <select value={eventPartyId} onChange={(event) => setEventPartyId(event.target.value)}>
+                    <option value="">No party</option>
+                    {parties.map((party) => (
+                      <option key={party.id} value={party.id}>
+                        {party.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {eventAllowsDates ? (
+                  <>
+                    {eventStartDate ? (
+                      <div className="event-date-field">
+                        <ImageDateSelect value={eventStartDate} onChange={setEventStartDate} />
+                        <button className="auth-secondary" type="button" onClick={() => setEventStartDate("")}>
+                          Remove Start Date
+                        </button>
+                      </div>
+                    ) : (
+                      <button className="auth-secondary" type="button" onClick={() => setEventStartDate(toDateInputValue(new Date()))}>
+                        Add Start Date
+                      </button>
+                    )}
+
+                    {eventEndDate ? (
+                      <div className="event-date-field">
+                        <ImageDateSelect value={eventEndDate} onChange={setEventEndDate} />
+                        <button className="auth-secondary" type="button" onClick={() => setEventEndDate("")}>
+                          Remove End Date
+                        </button>
+                      </div>
+                    ) : (
+                      <button className="auth-secondary" type="button" onClick={() => setEventEndDate(toDateInputValue(new Date()))}>
+                        Add End Date
+                      </button>
+                    )}
+                  </>
+                ) : null}
+
+                <label className="auth-field host-message-field">
+                  <span>Summary</span>
+                  <textarea
+                    value={eventSummary}
+                    onChange={(event) => setEventSummary(event.target.value)}
+                    rows={4}
+                    placeholder="Short summary for this event"
+                  />
+                </label>
+
+                {error ? <p className="auth-error">{error}</p> : null}
+
+                <button className="auth-submit" type="submit" disabled={savingEvent}>
+                  {savingEvent ? "Saving..." : "Create Event"}
+                </button>
+              </form>
             </section>
           </div>
         ) : null}

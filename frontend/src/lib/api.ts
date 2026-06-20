@@ -46,6 +46,8 @@ export type ImageRecord = {
   imageUrl: string;
   date: string;
   partyId: number | null;
+  eventId: number | null;
+  userIds: number[];
   homepage: boolean;
   notes: string;
   uploadedAt: string;
@@ -58,16 +60,45 @@ export type PartyRecord = {
   html: string;
 };
 
+export type EventType = "0" | "1";
+
+export const eventTypeLabels: Record<EventType, string> = {
+  "0": "Costume Contest",
+  "1": "Bracket",
+};
+
+export type EventRecord = {
+  id: number;
+  label: string;
+  partyId: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  completedAt: string | null;
+  type: EventType;
+  description: string;
+  metadata: Record<string, unknown>;
+};
+
 export type CreatePartyPayload = {
   label: string;
   date: string;
   html: string;
 };
 
+export type CreateEventPayload = {
+  label: string;
+  partyId?: number | null;
+  startDate?: string;
+  endDate?: string;
+  type: EventType;
+  description: string;
+};
+
 export type UploadImageOptions = {
   partyId?: number | null;
   homepage?: boolean;
   notes?: string;
+  userIds?: number[];
 };
 
 export type SendEmailPayload = {
@@ -208,6 +239,17 @@ export function deleteParty(token: string, id: number) {
   });
 }
 
+export function listEvents(token: string) {
+  return apiFetch<EventRecord[] | null>("/events", token).then((events) => events ?? []);
+}
+
+export function createEvent(token: string, payload: CreateEventPayload) {
+  return apiFetch<EventRecord>("/events", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getHomepage(token: string) {
   return apiFetch<HomepageContent>("/homepage", token);
 }
@@ -264,6 +306,9 @@ export function uploadImage(token: string, file: File, date: string, options: Up
   }
   if (options.notes) {
     formData.append("notes", options.notes);
+  }
+  if (options.userIds) {
+    options.userIds.forEach((userId) => formData.append("userIds", String(userId)));
   }
 
   return apiFetch<ImageRecord>("/images", token, {

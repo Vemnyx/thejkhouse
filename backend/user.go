@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type User struct {
 	ID          int64      `json:"id"`
@@ -24,6 +27,8 @@ type Image struct {
 	ImageURL   string    `json:"imageUrl"`
 	Date       time.Time `json:"date"`
 	PartyID    *int64    `json:"partyId"`
+	EventID    *int64    `json:"eventId"`
+	UserIDs    []int32   `json:"userIds"`
 	Homepage   bool      `json:"homepage"`
 	Notes      string    `json:"notes"`
 	UploadedAt time.Time `json:"uploadedAt"`
@@ -34,6 +39,29 @@ type Party struct {
 	Label string    `json:"label"`
 	Date  time.Time `json:"date"`
 	HTML  string    `json:"html"`
+}
+
+type EventType string
+
+const (
+	EventTypeCostumeContest EventType = "0"
+	EventTypeBracket        EventType = "1"
+)
+
+func (t EventType) Valid() bool {
+	return t == EventTypeCostumeContest || t == EventTypeBracket
+}
+
+type Event struct {
+	ID          int64           `json:"id"`
+	Label       string          `json:"label"`
+	PartyID     *int64          `json:"partyId"`
+	StartDate   *time.Time      `json:"startDate"`
+	EndDate     *time.Time      `json:"endDate"`
+	CompletedAt *time.Time      `json:"completedAt"`
+	Type        EventType       `json:"type"`
+	Description string          `json:"description"`
+	Metadata    json.RawMessage `json:"metadata"`
 }
 
 type Homepage struct {

@@ -201,6 +201,11 @@ func (s *apiServer) handleCreateImage(w http.ResponseWriter, r *http.Request) {
 	}
 	homepage := user.Role == RoleHost && parseFormBool(r.FormValue("homepage"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
+	userIDs, err := parseImageUserIDs(r.MultipartForm.Value["userIds"])
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	sample := make([]byte, 512)
 	n, readErr := file.Read(sample)
@@ -223,7 +228,7 @@ func (s *apiServer) handleCreateImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	image, err := s.store.createImage(r.Context(), imageURL, imageDate, partyID, homepage, notes)
+	image, err := s.store.createImage(r.Context(), imageURL, imageDate, partyID, homepage, notes, userIDs)
 	if err != nil {
 		log.Error("image create row", "error", err, "image_url", imageURL)
 		writeError(w, http.StatusInternalServerError, "failed to save image")
@@ -231,6 +236,30 @@ func (s *apiServer) handleCreateImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSONStatus(w, http.StatusCreated, image)
+}
+
+func parseImageUserIDs(values []string) ([]int32, error) {
+	userIDs := make([]int32, 0)
+	seen := make(map[int32]struct{})
+	for _, value := range values {
+		for _, part := range strings.Split(value, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			id, err := strconv.ParseInt(part, 10, 32)
+			if err != nil || id < 1 {
+				return nil, errors.New("tagged user ids must be positive integers")
+			}
+			userID := int32(id)
+			if _, ok := seen[userID]; ok {
+				continue
+			}
+			seen[userID] = struct{}{}
+			userIDs = append(userIDs, userID)
+		}
+	}
+	return userIDs, nil
 }
 
 func parseImageDate(value string) (time.Time, error) {

@@ -655,6 +655,19 @@ body {
   text-shadow: 0 0 24px rgba(232, 120, 143, 0.28);
 }
 
+.event-detail-card {
+  display: grid;
+  align-content: start;
+  gap: 2rem;
+}
+
+.event-detail-back {
+  position: relative;
+  z-index: 1;
+  width: fit-content;
+  text-decoration: none;
+}
+
 .settings-panel {
   align-self: center;
   justify-self: center;
@@ -842,6 +855,42 @@ body {
   display: grid;
   align-content: start;
   min-height: 100%;
+}
+
+.dashboard-events {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  min-height: 100%;
+}
+
+.event-dashboard-tabs {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.event-dashboard-tab {
+  border: 1px solid rgba(232, 120, 143, 0.22);
+  border-radius: 999px;
+  background: rgba(3, 3, 3, 0.42);
+  color: var(--ink-muted);
+  padding: 0.7rem 1.05rem;
+  font: inherit;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.event-dashboard-tab:hover,
+.event-dashboard-tab.active {
+  border-color: rgba(232, 120, 143, 0.55);
+  color: var(--rose-pale);
+  background: rgba(42, 8, 16, 0.72);
+}
+
+.dashboard-event-table-wrap {
+  text-align: left;
 }
 
 .party-accordion {
@@ -1054,6 +1103,11 @@ body {
 
 .party-date-field {
   grid-column: 1;
+}
+
+.event-date-field {
+  display: grid;
+  gap: 0.75rem;
 }
 
 .party-date-trigger {
@@ -1732,6 +1786,40 @@ body {
 
 .selected-file {
   font-size: 0.9rem;
+}
+
+.tagged-user-bubbles {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tagged-user-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid rgba(232, 120, 143, 0.3);
+  border-radius: 999px;
+  background: rgba(42, 8, 16, 0.58);
+  color: var(--ink);
+  padding: 0.35rem 0.45rem 0.35rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.tagged-user-bubble button {
+  display: grid;
+  place-items: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.tagged-user-bubble button:hover {
+  color: var(--rose-pale);
 }
 
 .visually-hidden {

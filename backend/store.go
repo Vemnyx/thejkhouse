@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -347,23 +348,26 @@ func (s *userStore) deletePendingSignup(ctx context.Context, id int64) error {
 	return err
 }
 
-func (s *userStore) createImage(ctx context.Context, imageURL string, date time.Time, partyID *int64, homepage bool, notes string) (*Image, error) {
+func (s *userStore) createImage(ctx context.Context, imageURL string, date time.Time, partyID *int64, homepage bool, notes string, userIDs []int32) (*Image, error) {
 	var image Image
 	err := s.pool.QueryRow(
 		ctx,
-		`INSERT INTO images (image_url, date, party_id, homepage, notes)
-		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, image_url, date, party_id, homepage, notes, uploaded_at`,
+		`INSERT INTO images (image_url, date, party_id, homepage, notes, user_ids)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING id, image_url, date, party_id, event_id, user_ids, homepage, notes, uploaded_at`,
 		imageURL,
 		date,
 		partyID,
 		homepage,
 		notes,
+		userIDs,
 	).Scan(
 		&image.ID,
 		&image.ImageURL,
 		&image.Date,
 		&image.PartyID,
+		&image.EventID,
+		&image.UserIDs,
 		&image.Homepage,
 		&image.Notes,
 		&image.UploadedAt,
@@ -378,7 +382,7 @@ func (s *userStore) createImage(ctx context.Context, imageURL string, date time.
 func (s *userStore) listImages(ctx context.Context) ([]Image, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, image_url, date, party_id, homepage, notes, uploaded_at
+		`SELECT id, image_url, date, party_id, event_id, user_ids, homepage, notes, uploaded_at
 		 FROM images
 		 ORDER BY uploaded_at DESC`,
 	)
@@ -390,7 +394,7 @@ func (s *userStore) listImages(ctx context.Context) ([]Image, error) {
 	images := make([]Image, 0)
 	for rows.Next() {
 		var image Image
-		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.Homepage, &image.Notes, &image.UploadedAt); err != nil {
+		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt); err != nil {
 			return nil, err
 		}
 		images = append(images, image)
@@ -406,10 +410,10 @@ func (s *userStore) getImage(ctx context.Context, id int64) (*Image, error) {
 	var image Image
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, image_url, date, party_id, homepage, notes, uploaded_at
+		`SELECT id, image_url, date, party_id, event_id, user_ids, homepage, notes, uploaded_at
 		 FROM images WHERE id = $1`,
 		id,
-	).Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.Homepage, &image.Notes, &image.UploadedAt)
+	).Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -424,10 +428,10 @@ func (s *userStore) updateImageHomepage(ctx context.Context, id int64, homepage 
 		`UPDATE images
 		 SET homepage = $2
 		 WHERE id = $1
-		 RETURNING id, image_url, date, party_id, homepage, notes, uploaded_at`,
+		 RETURNING id, image_url, date, party_id, event_id, user_ids, homepage, notes, uploaded_at`,
 		id,
 		homepage,
-	).Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.Homepage, &image.Notes, &image.UploadedAt)
+	).Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -524,6 +528,78 @@ func (s *userStore) deleteParty(ctx context.Context, id int64) error {
 	return nil
 }
 
+func (s *userStore) listEvents(ctx context.Context) ([]Event, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT id, label, party_id, start_date, end_date, completed_at, type, description, metadata
+		 FROM events
+		 ORDER BY COALESCE(start_date, end_date, completed_at, now()) DESC, id DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events := make([]Event, 0)
+	for rows.Next() {
+		var event Event
+		var metadata []byte
+		if err := rows.Scan(
+			&event.ID,
+			&event.Label,
+			&event.PartyID,
+			&event.StartDate,
+			&event.EndDate,
+			&event.CompletedAt,
+			&event.Type,
+			&event.Description,
+			&metadata,
+		); err != nil {
+			return nil, err
+		}
+		event.Metadata = json.RawMessage(metadata)
+		events = append(events, event)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
+func (s *userStore) createEvent(ctx context.Context, label string, partyID *int64, startDate *time.Time, endDate *time.Time, eventType EventType, description string) (Event, error) {
+	var event Event
+	var metadata []byte
+	err := s.pool.QueryRow(
+		ctx,
+		`INSERT INTO events (label, party_id, start_date, end_date, type, description)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING id, label, party_id, start_date, end_date, completed_at, type, description, metadata`,
+		label,
+		partyID,
+		startDate,
+		endDate,
+		eventType,
+		description,
+	).Scan(
+		&event.ID,
+		&event.Label,
+		&event.PartyID,
+		&event.StartDate,
+		&event.EndDate,
+		&event.CompletedAt,
+		&event.Type,
+		&event.Description,
+		&metadata,
+	)
+	if err != nil {
+		return Event{}, err
+	}
+	event.Metadata = json.RawMessage(metadata)
+
+	return event, nil
+}
+
 func (s *userStore) getHomepageHTML(ctx context.Context) (string, error) {
 	var html string
 	err := s.pool.QueryRow(ctx, `SELECT html FROM homepage LIMIT 1`).Scan(&html)
@@ -560,7 +636,7 @@ func (s *userStore) updateHomepageHTML(ctx context.Context, html string) (string
 func (s *userStore) listHomepageImages(ctx context.Context) ([]Image, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, image_url, date, party_id, homepage, notes, uploaded_at
+		`SELECT id, image_url, date, party_id, event_id, user_ids, homepage, notes, uploaded_at
 		 FROM images
 		 WHERE homepage = true
 		 ORDER BY uploaded_at DESC`,
@@ -573,7 +649,7 @@ func (s *userStore) listHomepageImages(ctx context.Context) ([]Image, error) {
 	images := make([]Image, 0)
 	for rows.Next() {
 		var image Image
-		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.Homepage, &image.Notes, &image.UploadedAt); err != nil {
+		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt); err != nil {
 			return nil, err
 		}
 		images = append(images, image)

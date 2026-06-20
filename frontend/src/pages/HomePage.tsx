@@ -3,10 +3,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import BirthdaySelect, { ImageDateSelect } from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
-import { HomepageContent, ImageRecord, PartyRecord, getHomepage, listImages, listParties, uploadImage } from "../lib/api";
+import { AppUser, EventRecord, HomepageContent, ImageRecord, PartyRecord, eventTypeLabels, getHomepage, listEvents, listImages, listParties, listUsers, uploadImage } from "../lib/api";
 
 type MainTab = "home" | "parties" | "photos" | "events";
 type MainView = MainTab | "settings";
+type EventDashboardTab = "active" | "upcoming" | "past";
 
 const tabs: Array<{ id: MainTab; label: string }> = [
   { id: "home", label: "Home" },
@@ -21,6 +22,12 @@ const tabPaths: Record<MainTab, string> = {
   photos: "/photos",
   events: "/events",
 };
+
+const eventDashboardTabs: Array<{ id: EventDashboardTab; label: string }> = [
+  { id: "active", label: "active" },
+  { id: "upcoming", label: "upcoming" },
+  { id: "past", label: "past" },
+];
 
 function tabFromPath(pathname: string): MainTab {
   switch (pathname) {
@@ -56,15 +63,22 @@ export default function HomePage() {
   const [parties, setParties] = useState<PartyRecord[]>([]);
   const [partiesLoading, setPartiesLoading] = useState(true);
   const [expandedPartyId, setExpandedPartyId] = useState<number | null>(null);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [photos, setPhotos] = useState<ImageRecord[]>([]);
   const [photosLoading, setPhotosLoading] = useState(true);
+  const [events, setEvents] = useState<EventRecord[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [activeEventTab, setActiveEventTab] = useState<EventDashboardTab>("active");
   const [photoPartyFilter, setPhotoPartyFilter] = useState("all");
+  const [photoUserFilter, setPhotoUserFilter] = useState("all");
   const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(null);
   const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
   const [photoUploadPartyId, setPhotoUploadPartyId] = useState("");
   const [photoUploadDate, setPhotoUploadDate] = useState(() => toDateInputValue(new Date()));
   const [photoUploadFile, setPhotoUploadFile] = useState<File | null>(null);
   const [photoUploadNotes, setPhotoUploadNotes] = useState("");
+  const [photoUploadUserId, setPhotoUploadUserId] = useState("");
+  const [photoUploadUserIds, setPhotoUploadUserIds] = useState<number[]>([]);
   const [photoUploadDragging, setPhotoUploadDragging] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoUploadPreviewURL, setPhotoUploadPreviewURL] = useState("");
@@ -74,17 +88,53 @@ export default function HomePage() {
     ...party,
     value: String(party.id),
   })), [parties]);
+  const userOptions = useMemo(() => users.map((user) => ({
+    ...user,
+    label: userDisplayName(user),
+    value: String(user.id),
+  })), [users]);
   const filteredPhotos = useMemo(() => {
     const sortedPhotos = [...photos].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    if (photoPartyFilter === "all") {
-      return sortedPhotos;
-    }
-    return sortedPhotos.filter((photo) => String(photo.partyId) === photoPartyFilter);
-  }, [photoPartyFilter, photos]);
+    return sortedPhotos.filter((photo) => {
+      const matchesParty = photoPartyFilter === "all" || String(photo.partyId) === photoPartyFilter;
+      const matchesUser = photoUserFilter === "all" || photo.userIds.includes(Number(photoUserFilter));
+      return matchesParty && matchesUser;
+    });
+  }, [photoPartyFilter, photoUserFilter, photos]);
   const selectedPhoto = selectedPhotoId ? photos.find((photo) => photo.id === selectedPhotoId) ?? null : null;
   const selectedUploadParty = photoUploadPartyId
     ? parties.find((party) => party.id === Number(photoUploadPartyId)) ?? null
     : null;
+  const taggedUploadUsers = photoUploadUserIds
+    .map((userId) => users.find((user) => user.id === userId))
+    .filter((user): user is AppUser => Boolean(user));
+  const eventGroups = useMemo(() => {
+    const now = Date.now();
+    const groups: Record<EventDashboardTab, EventRecord[]> = {
+      active: [],
+      upcoming: [],
+      past: [],
+    };
+
+    for (const event of events) {
+      if (event.completedAt) {
+        groups.past.push(event);
+        continue;
+      }
+
+      const startTime = event.startDate ? new Date(event.startDate).getTime() : null;
+      const endTime = event.endDate ? new Date(event.endDate).getTime() : null;
+      if (startTime !== null && startTime <= now && (endTime === null || endTime > now)) {
+        groups.active.push(event);
+        continue;
+      }
+      if (startTime === null || startTime > now) {
+        groups.upcoming.push(event);
+      }
+    }
+
+    return groups;
+  }, [events]);
 
   useEffect(() => {
     setActiveView(tabFromPath(location.pathname));
@@ -98,15 +148,18 @@ export default function HomePage() {
         setHomepageLoading(false);
         setPartiesLoading(false);
         setPhotosLoading(false);
+        setEventsLoading(false);
         return;
       }
 
       try {
         const token = await firebaseUser.getIdToken();
-        const [content, nextParties, nextPhotos] = await Promise.all([
+        const [content, nextParties, nextPhotos, nextEvents, nextUsers] = await Promise.all([
           getHomepage(token),
           listParties(token),
           listImages(token),
+          listEvents(token),
+          listUsers(token),
         ]);
         if (!cancelled) {
           setHomepage({
@@ -115,6 +168,8 @@ export default function HomePage() {
           });
           setParties(nextParties);
           setPhotos(nextPhotos);
+          setEvents(nextEvents);
+          setUsers(nextUsers);
           setExpandedPartyId((current) => current ?? nextParties[0]?.id ?? null);
         }
       } catch {
@@ -122,12 +177,15 @@ export default function HomePage() {
           setHomepage({ html: "", images: [] });
           setParties([]);
           setPhotos([]);
+          setEvents([]);
+          setUsers([]);
         }
       } finally {
         if (!cancelled) {
           setHomepageLoading(false);
           setPartiesLoading(false);
           setPhotosLoading(false);
+          setEventsLoading(false);
         }
       }
     }
@@ -168,6 +226,8 @@ export default function HomePage() {
     setPhotoUploadDate(toDateInputValue(new Date()));
     setPhotoUploadFile(null);
     setPhotoUploadNotes("");
+    setPhotoUploadUserId("");
+    setPhotoUploadUserIds([]);
     setPhotoUploadDragging(false);
     setPhotoUploadOpen(true);
   };
@@ -203,6 +263,19 @@ export default function HomePage() {
     handlePhotoFile(event.dataTransfer.files?.[0] ?? null);
   };
 
+  const addPhotoUploadUser = (value: string) => {
+    setPhotoUploadUserId("");
+    const userId = Number(value);
+    if (!userId || photoUploadUserIds.includes(userId)) {
+      return;
+    }
+    setPhotoUploadUserIds((current) => [...current, userId]);
+  };
+
+  const removePhotoUploadUser = (userId: number) => {
+    setPhotoUploadUserIds((current) => current.filter((id) => id !== userId));
+  };
+
   const handlePhotoUpload = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
@@ -226,6 +299,7 @@ export default function HomePage() {
       const uploaded = await uploadImage(token, photoUploadFile, selectedUploadParty ? selectedUploadParty.date.slice(0, 10) : photoUploadDate, {
         partyId: selectedUploadParty?.id ?? null,
         notes: photoUploadNotes.trim(),
+        userIds: photoUploadUserIds,
       });
       setPhotos((current) => [uploaded, ...current.filter((photo) => photo.id !== uploaded.id)]);
       setPhotoPartyFilter(selectedUploadParty ? String(selectedUploadParty.id) : "all");
@@ -233,6 +307,8 @@ export default function HomePage() {
       setPhotoUploadDate(toDateInputValue(new Date()));
       setPhotoUploadFile(null);
       setPhotoUploadNotes("");
+      setPhotoUploadUserId("");
+      setPhotoUploadUserIds([]);
       setMessage("Photo uploaded.");
     } catch (err) {
       const nextError = err instanceof Error ? err.message : "failed to upload photo";
@@ -447,7 +523,21 @@ export default function HomePage() {
                     ))}
                   </select>
                 </label>
-                <button className="auth-submit dashboard-photo-upload" type="button" onClick={openPhotoUpload} disabled={partyOptions.length === 0}>
+                <label className="image-filter dashboard-photo-filter">
+                  <select
+                    value={photoUserFilter}
+                    onChange={(event) => setPhotoUserFilter(event.target.value)}
+                    aria-label="Filter photos by tagged user"
+                  >
+                    <option value="all">All Tagged Users</option>
+                    {userOptions.map((user) => (
+                      <option value={user.value} key={user.id}>
+                        {user.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button className="auth-submit dashboard-photo-upload" type="button" onClick={openPhotoUpload}>
                   Add Photo
                 </button>
               </div>
@@ -463,6 +553,7 @@ export default function HomePage() {
                 <div className="image-grid" aria-label="Party photos">
                   {filteredPhotos.map((photo) => {
                     const photoParty = parties.find((party) => party.id === photo.partyId);
+                    const taggedUsers = taggedUserLabels(users, photo.userIds);
 
                     return (
                       <article className="image-grid-card" key={photo.id}>
@@ -478,12 +569,41 @@ export default function HomePage() {
                         <div className="image-grid-meta">
                           <span>{photoParty?.label ?? "No party"}</span>
                           <span>{formatDate(photo.date)}</span>
+                          {taggedUsers.length > 0 ? <span>Tagged: {taggedUsers.join(", ")}</span> : null}
                           {photo.notes ? <span>{photo.notes}</span> : null}
                         </div>
                       </article>
                     );
                   })}
                 </div>
+              )}
+            </div>
+          ) : activeView === "events" ? (
+            <div className="dashboard-events">
+              <div className="event-dashboard-tabs" role="tablist" aria-label="Event timing">
+                {eventDashboardTabs.map((tab) => (
+                  <button
+                    className={activeEventTab === tab.id ? "event-dashboard-tab active" : "event-dashboard-tab"}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeEventTab === tab.id}
+                    key={tab.id}
+                    onClick={() => setActiveEventTab(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              {eventsLoading ? (
+                <p className="dashboard-copy">Loading events...</p>
+              ) : (
+                <DashboardEventTable
+                  events={eventGroups[activeEventTab]}
+                  parties={parties}
+                  clickable={activeEventTab !== "upcoming"}
+                  emptyText={`No ${activeEventTab} events.`}
+                  onOpen={(event) => navigate(`/events/${event.id}`)}
+                />
               )}
             </div>
           ) : (
@@ -499,6 +619,9 @@ export default function HomePage() {
             <img src={selectedPhoto.imageUrl} alt={selectedPhoto.notes || "Party photo preview"} />
             <figcaption>
               <span>{formatDate(selectedPhoto.date)}</span>
+              {taggedUserLabels(users, selectedPhoto.userIds).map((label) => (
+                <span key={label}>{label}</span>
+              ))}
               {selectedPhoto.notes ? <span>{selectedPhoto.notes}</span> : null}
             </figcaption>
           </figure>
@@ -508,7 +631,7 @@ export default function HomePage() {
         <div className="modal-backdrop" role="presentation" onMouseDown={closePhotoUpload}>
           <section className="upload-modal gothic-card" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="host-section-title">Add New Image</h2>
+              <h2 className="host-section-title">Add a Photo!</h2>
               <button className="modal-close" type="button" onClick={closePhotoUpload} aria-label="Close upload modal">
                 x
               </button>
@@ -571,6 +694,31 @@ export default function HomePage() {
                   rows={3}
                 />
               </label>
+              <label className="auth-field">
+                <span>Tag users</span>
+                <select value={photoUploadUserId} onChange={(event) => addPhotoUploadUser(event.target.value)}>
+                  <option value="">Select a user</option>
+                  {userOptions
+                    .filter((user) => !photoUploadUserIds.includes(user.id))
+                    .map((user) => (
+                      <option value={user.value} key={user.id}>
+                        {user.label}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              {taggedUploadUsers.length > 0 ? (
+                <div className="tagged-user-bubbles" aria-label="Tagged users">
+                  {taggedUploadUsers.map((user) => (
+                    <span className="tagged-user-bubble" key={user.id}>
+                      {userDisplayName(user)}
+                      <button type="button" onClick={() => removePhotoUploadUser(user.id)} aria-label={`Remove ${userDisplayName(user)}`}>
+                        x
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               {error ? <p className="auth-error">{error}</p> : null}
               <button className="auth-submit" type="submit" disabled={photoUploading || !photoUploadFile || (!selectedUploadParty && !photoUploadDate)}>
                 {photoUploading ? "Uploading..." : "Upload Image"}
@@ -601,4 +749,71 @@ function formatDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function DashboardEventTable({
+  events,
+  parties,
+  clickable,
+  emptyText,
+  onOpen,
+}: {
+  events: EventRecord[];
+  parties: PartyRecord[];
+  clickable: boolean;
+  emptyText: string;
+  onOpen: (event: EventRecord) => void;
+}) {
+  return (
+    <div className="host-table-wrap dashboard-event-table-wrap">
+      <table className="host-table dashboard-event-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Label</th>
+            <th>Party</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Summary</th>
+          </tr>
+        </thead>
+        <tbody>
+          {events.map((event) => (
+            <tr
+              className={clickable ? "clickable-row" : undefined}
+              key={event.id}
+              onClick={clickable ? () => onOpen(event) : undefined}
+            >
+              <td>{eventTypeLabels[event.type]}</td>
+              <td>{event.label}</td>
+              <td>{event.partyId ? dashboardPartyLabel(parties, event.partyId) : "No party"}</td>
+              <td>{event.startDate ? formatDateTime(event.startDate) : "Not set"}</td>
+              <td>{event.endDate ? formatDateTime(event.endDate) : "Not set"}</td>
+              <td>{event.description || "No summary"}</td>
+            </tr>
+          ))}
+          {events.length === 0 ? (
+            <tr>
+              <td colSpan={6}>{emptyText}</td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function dashboardPartyLabel(parties: PartyRecord[], partyId: number) {
+  return parties.find((party) => party.id === partyId)?.label ?? "Unknown party";
+}
+
+function userDisplayName(user: AppUser) {
+  return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
+}
+
+function taggedUserLabels(users: AppUser[], userIds: number[]) {
+  return userIds
+    .map((userId) => users.find((user) => user.id === userId))
+    .filter((user): user is AppUser => Boolean(user))
+    .map(userDisplayName);
 }
