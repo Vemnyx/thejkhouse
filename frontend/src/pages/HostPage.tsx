@@ -2100,44 +2100,54 @@ export default function HostPage() {
                         </div>
                       </div>
                       {!selectedEvent.startDate ? (
-                        <div className="bracket-seed-grid">
-                          {bracketSlots(selectedBracket.size).map((slot) => (
-                            <div className="bracket-seed-card" key={slot}>
-                              <span>Seed {slot}</span>
-                              {selectedBracket.mode === "team" ? (
-                                Array.from({ length: selectedBracket.teamSize }, (_, index) => (
-                                  <select
-                                    key={`${slot}-${index}`}
-                                    value={bracketTeamAssignments[slot]?.[index] ?? ""}
-                                    onChange={(changeEvent) => setBracketTeamAssignments((current) => {
-                                      const team = [...(current[slot] ?? [])];
-                                      team[index] = changeEvent.target.value;
-                                      return { ...current, [slot]: team };
-                                    })}
-                                  >
-                                    <option value="">Select teammate</option>
-                                    {users.map((user) => (
-                                      <option value={user.id} key={user.id}>
-                                        {userDisplayName(user)}
-                                      </option>
-                                    ))}
-                                  </select>
-                                ))
-                              ) : (
-                                <select
-                                  value={bracketAssignments[slot] ?? ""}
-                                  onChange={(changeEvent) => setBracketAssignments((current) => ({ ...current, [slot]: changeEvent.target.value }))}
-                                >
-                                  <option value="">Select user</option>
-                                  {users.map((user) => (
-                                    <option value={user.id} key={user.id}>
-                                      {userDisplayName(user)}
-                                    </option>
+                        <div className="bracket-visual-scroll">
+                          <div className="bracket-visual bracket-setup-visual">
+                            <section className="bracket-round-column">
+                              <h3>Round 1</h3>
+                              {bracketSeedPairs(selectedBracket.size).map(([firstSlot, secondSlot], pairIndex) => (
+                                <article className="bracket-match-card bracket-setup-match" key={`${firstSlot}-${secondSlot}`}>
+                                  {[firstSlot, secondSlot].map((slot) => (
+                                    <div className="bracket-seed-card" key={slot}>
+                                      <span>Seed {slot}</span>
+                                      {selectedBracket.mode === "team" ? (
+                                        Array.from({ length: selectedBracket.teamSize }, (_, index) => (
+                                          <select
+                                            key={`${slot}-${index}`}
+                                            value={bracketTeamAssignments[slot]?.[index] ?? ""}
+                                            onChange={(changeEvent) => setBracketTeamAssignments((current) => {
+                                              const team = [...(current[slot] ?? [])];
+                                              team[index] = changeEvent.target.value;
+                                              return { ...current, [slot]: team };
+                                            })}
+                                          >
+                                            <option value="">Select teammate</option>
+                                            {users.map((user) => (
+                                              <option value={user.id} key={user.id}>
+                                                {userDisplayName(user)}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        ))
+                                      ) : (
+                                        <select
+                                          value={bracketAssignments[slot] ?? ""}
+                                          onChange={(changeEvent) => setBracketAssignments((current) => ({ ...current, [slot]: changeEvent.target.value }))}
+                                        >
+                                          <option value="">Select user</option>
+                                          {users.map((user) => (
+                                            <option value={user.id} key={user.id}>
+                                              {userDisplayName(user)}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      )}
+                                    </div>
                                   ))}
-                                </select>
-                              )}
-                            </div>
-                          ))}
+                                  <span className="bracket-match-label">Match {pairIndex + 1}</span>
+                                </article>
+                              ))}
+                            </section>
+                          </div>
                         </div>
                       ) : (
                         <BracketRoundsView rounds={selectedEventDetail?.rounds ?? []} />
@@ -3257,6 +3267,15 @@ function bracketSlots(size: number) {
   return Array.from({ length: size }, (_, index) => index + 1);
 }
 
+function bracketSeedPairs(size: number) {
+  const slots = bracketSlots(size);
+  const pairs: Array<[number, number]> = [];
+  for (let index = 0; index < slots.length; index += 2) {
+    pairs.push([slots[index], slots[index + 1]]);
+  }
+  return pairs;
+}
+
 function bracketAssignmentsFromMetadata(metadata: Record<string, unknown>, size: number) {
   const participants = bracketParticipantsFromMetadata(metadata);
   const assignments: Record<number, string> = {};
@@ -3344,25 +3363,37 @@ function BracketRoundsView({ rounds }: { rounds: EventDetail["rounds"] }) {
   }
   const roundNumbers = Array.from(new Set(rounds.map((round) => round.roundNumber)));
   return (
-    <div className="bracket-rounds">
-      {roundNumbers.map((roundNumber) => (
-        <section className="bracket-round-column" key={roundNumber}>
-          <h4>Round {roundNumber}</h4>
-          {rounds.filter((round) => round.roundNumber === roundNumber).map((round) => (
-            <article className="bracket-match-card" key={round.id}>
-              <span className={round.winner?.key === round.participantOne?.key ? "bracket-winner" : undefined}>
-                {round.participantOne?.label ?? "TBD"}
-              </span>
-              <span className={round.winner?.key === round.participantTwo?.key ? "bracket-winner" : undefined}>
-                {round.participantTwo?.label ?? "TBD"}
-              </span>
-              <small>{round.completedAt ? "Complete" : "Awaiting results"}</small>
-            </article>
-          ))}
-        </section>
-      ))}
+    <div className="bracket-visual-scroll">
+      <div className="bracket-visual">
+        {roundNumbers.map((roundNumber) => (
+          <section className="bracket-round-column" key={roundNumber}>
+            <h4>{bracketRoundTitle(roundNumber, roundNumbers.length)}</h4>
+            {rounds.filter((round) => round.roundNumber === roundNumber).map((round) => (
+              <article className="bracket-match-card" key={round.id}>
+                <span className={round.winner?.key === round.participantOne?.key ? "bracket-winner" : undefined}>
+                  {round.participantOne?.label ?? "TBD"}
+                </span>
+                <span className={round.winner?.key === round.participantTwo?.key ? "bracket-winner" : undefined}>
+                  {round.participantTwo?.label ?? "TBD"}
+                </span>
+                <small>{round.completedAt ? "Complete" : "Awaiting results"}</small>
+              </article>
+            ))}
+          </section>
+        ))}
+      </div>
     </div>
   );
+}
+
+function bracketRoundTitle(roundNumber: number, totalRounds: number) {
+  if (roundNumber === totalRounds) {
+    return "Final";
+  }
+  if (roundNumber === totalRounds - 1) {
+    return "Semifinal";
+  }
+  return `Round ${roundNumber}`;
 }
 
 function loadImage(src: string) {

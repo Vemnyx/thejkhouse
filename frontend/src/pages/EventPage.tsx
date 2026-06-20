@@ -363,6 +363,9 @@ export default function EventPage() {
               <p className="loading-text">Loading results...</p>
             ) : selectedResultCategory && selectedWinner ? (
               <div className="victory-card">
+                <button className="auth-secondary back-text-link results-back-button" type="button" onClick={() => setSelectedResultCategory(null)}>
+                  Back to Categories
+                </button>
                 <div className="victory-burst" aria-hidden="true" />
                 <p className="eyebrow">{selectedResultCategory.name} Winner</p>
                 <h3>{selectedWinner.entry.userIds.map((userId) => userDisplayName(users, userId)).join(" + ")}</h3>
@@ -372,6 +375,9 @@ export default function EventPage() {
               </div>
             ) : selectedResultCategory ? (
               <div className="victory-card">
+                <button className="auth-secondary back-text-link results-back-button" type="button" onClick={() => setSelectedResultCategory(null)}>
+                  Back to Categories
+                </button>
                 <p className="dashboard-copy">No votes for this category yet.</p>
               </div>
             ) : (
@@ -472,22 +478,34 @@ function BracketEventView({
       ) : (
         <p className="dashboard-copy">You are not playing in the current round.</p>
       )}
-      <div className="bracket-rounds">
-        {roundNumbers.map((roundNumber) => (
-          <section className="bracket-round-column" key={roundNumber}>
-            <h3>Round {roundNumber}</h3>
-            {rounds.filter((round) => round.roundNumber === roundNumber).map((round) => (
-              <article className="bracket-match-card" key={round.id}>
-                <span className={round.winner?.key === round.participantOne?.key ? "bracket-winner" : undefined}>{participantLabel(round.participantOne)}</span>
-                <span className={round.winner?.key === round.participantTwo?.key ? "bracket-winner" : undefined}>{participantLabel(round.participantTwo)}</span>
-                <small>{round.completedAt ? "Complete" : "In progress"}</small>
-              </article>
-            ))}
-          </section>
-        ))}
+      <div className="bracket-visual-scroll">
+        <div className="bracket-visual">
+          {roundNumbers.map((roundNumber) => (
+            <section className="bracket-round-column" key={roundNumber}>
+              <h3>{roundTitle(roundNumber, roundNumbers.length)}</h3>
+              {rounds.filter((round) => round.roundNumber === roundNumber).map((round) => (
+                <article className="bracket-match-card" key={round.id}>
+                  <span className={round.winner?.key === round.participantOne?.key ? "bracket-winner" : undefined}>{participantLabel(round.participantOne)}</span>
+                  <span className={round.winner?.key === round.participantTwo?.key ? "bracket-winner" : undefined}>{participantLabel(round.participantTwo)}</span>
+                  <small>{round.completedAt ? "Complete" : "In progress"}</small>
+                </article>
+              ))}
+            </section>
+          ))}
+        </div>
       </div>
     </div>
   );
+}
+
+function roundTitle(roundNumber: number, totalRounds: number) {
+  if (roundNumber === totalRounds) {
+    return "Final";
+  }
+  if (roundNumber === totalRounds - 1) {
+    return "Semifinal";
+  }
+  return `Round ${roundNumber}`;
 }
 
 function participantLabel(participant: BracketParticipant | null) {

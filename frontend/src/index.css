@@ -859,8 +859,8 @@ body {
 }
 
 .contestant-detail-modal {
-  width: min(100%, 28rem);
-  padding: 0 0 2rem;
+  width: min(100%, 36rem);
+  padding: 2.25rem 0 2rem;
   overflow: hidden auto;
 }
 
@@ -927,7 +927,7 @@ body {
 }
 
 .contestant-detail-modal .contestant-presentation-card > img {
-  width: min(100%, 18rem);
+  width: min(100%, 28rem);
 }
 
 .slideshow-image-frame img {
@@ -1021,11 +1021,24 @@ body {
   border-radius: 999px;
 }
 
-.bracket-seed-grid,
-.bracket-rounds {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 1rem;
+.bracket-visual-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5rem 0 1rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bracket-visual {
+  display: flex;
+  gap: 3rem;
+  align-items: stretch;
+  min-width: max-content;
+}
+
+.bracket-setup-visual {
+  min-width: 100%;
 }
 
 .bracket-seed-card,
@@ -1057,9 +1070,59 @@ body {
 }
 
 .bracket-round-column {
-  display: grid;
-  align-content: start;
-  gap: 0.75rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 1.25rem;
+  min-width: 15rem;
+}
+
+.bracket-round-column:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -2.1rem;
+  width: 2.1rem;
+  height: 1px;
+  background: rgba(249, 214, 143, 0.42);
+}
+
+.bracket-round-column h3,
+.bracket-round-column h4 {
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.bracket-match-card {
+  position: relative;
+  min-height: 6.4rem;
+}
+
+.bracket-match-card::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -1.55rem;
+  width: 1.55rem;
+  height: 1px;
+  background: rgba(232, 120, 143, 0.36);
+}
+
+.bracket-round-column:last-child .bracket-match-card::after {
+  content: none;
+}
+
+.bracket-setup-match {
+  gap: 0.8rem;
+  min-width: min(100%, 22rem);
+}
+
+.bracket-match-label {
+  color: var(--gold);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .bracket-match-card span {
@@ -1098,6 +1161,10 @@ body {
   display: grid;
   gap: 0.85rem;
   justify-items: start;
+}
+
+.results-back-button {
+  justify-self: start;
 }
 
 .victory-card {
