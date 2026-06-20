@@ -80,6 +80,16 @@ export type EventRecord = {
   metadata: Record<string, unknown>;
 };
 
+export function eventRouteIdentifier(event: EventRecord) {
+  const slug = event.label
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || `event-${event.id}`;
+}
+
 export type EventUserRecord = {
   eventId: number;
   userId: number;
@@ -289,6 +299,12 @@ export function createEvent(token: string, payload: CreateEventPayload) {
   return apiFetch<EventRecord>("/events", token, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export function deleteEvent(token: string, id: number) {
+  return apiFetch<Record<string, never>>(`/events/${id}`, token, {
+    method: "DELETE",
   });
 }
 

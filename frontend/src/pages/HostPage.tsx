@@ -2,7 +2,7 @@ import { type DragEvent, type FormEvent, type PointerEvent, useEffect, useMemo, 
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
@@ -16,6 +16,7 @@ type EventCategory = {
 type DeleteTarget =
   | { type: "image"; image: ImageRecord }
   | { type: "party"; party: PartyRecord }
+  | { type: "event"; event: EventRecord }
   | { type: "user"; user: AppUser };
 
 type CropBox = {
@@ -235,6 +236,7 @@ export default function HostPage() {
   const [updatingHomepageId, setUpdatingHomepageId] = useState<number | null>(null);
   const [updatingImageTags, setUpdatingImageTags] = useState(false);
   const [deletingPartyId, setDeletingPartyId] = useState<number | null>(null);
+  const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [previewImage, setPreviewImage] = useState<ImageRecord | null>(null);
@@ -998,6 +1000,28 @@ export default function HostPage() {
     }
   };
 
+  const handleDeleteEvent = async (event: EventRecord) => {
+    if (!firebaseUser) {
+      return;
+    }
+
+    setError("");
+    setDeletingEventId(event.id);
+    try {
+      const token = await firebaseUser.getIdToken();
+      await deleteEvent(token, event.id);
+      setEvents((current) => current.filter((item) => item.id !== event.id));
+      setSelectedEventDetail((current) => (current?.event.id === event.id ? null : current));
+      setEventView((current) => (selectedEventDetail?.event.id === event.id ? "list" : current));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to delete event";
+      setError(message);
+    } finally {
+      setDeletingEventId(null);
+      setDeleteTarget(null);
+    }
+  };
+
   const handleConfirmDelete = () => {
     if (!deleteTarget) {
       return;
@@ -1013,6 +1037,11 @@ export default function HostPage() {
       return;
     }
 
+    if (deleteTarget.type === "event") {
+      void handleDeleteEvent(deleteTarget.event);
+      return;
+    }
+
     void handleDeleteUser(deleteTarget.user);
   };
 
@@ -1021,6 +1050,8 @@ export default function HostPage() {
       ? deletingId === deleteTarget.image.id
       : deleteTarget?.type === "party"
         ? deletingPartyId === deleteTarget.party.id
+      : deleteTarget?.type === "event"
+        ? deletingEventId === deleteTarget.event.id
       : deleteTarget?.type === "user"
         ? deletingUserId === deleteTarget.user.id
         : false;
@@ -1851,6 +1882,17 @@ export default function HostPage() {
                               >
                                 {event.completedAt ? "Completed" : completingEventId === event.id ? "Completing..." : "Mark Completed"}
                               </button>
+                              <button
+                                className="auth-secondary table-action-button"
+                                type="button"
+                                onClick={(clickEvent) => {
+                                  clickEvent.stopPropagation();
+                                  setDeleteTarget({ type: "event", event });
+                                }}
+                                disabled={deletingEventId === event.id}
+                              >
+                                {deletingEventId === event.id ? "Deleting..." : "Delete"}
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -1926,7 +1968,6 @@ export default function HostPage() {
                               <th>Photo</th>
                               <th>Contestant</th>
                               <th>Costume</th>
-                              <th>Photos</th>
                               <th aria-label="Actions" />
                             </tr>
                           </thead>
@@ -1936,7 +1977,6 @@ export default function HostPage() {
                                 <td>{renderContestantImagePreview(selectedEventImages.find((image) => image.teamId === team.id))}</td>
                                 <td>{team.userIds.map((userId) => userLabel(users, userId)).join(" + ")}</td>
                                 <td>{team.name}</td>
-                                <td>{selectedEventImages.filter((image) => image.teamId === team.id).length}</td>
                                 <td>
                                   <button className="auth-secondary" type="button" onClick={() => void removeContestant(undefined, team)}>
                                     Remove
@@ -1951,7 +1991,6 @@ export default function HostPage() {
                                   <td>{renderContestantImagePreview(selectedEventImages.find((image) => image.userIds.includes(eventUser.userId)))}</td>
                                   <td>{userLabel(users, eventUser.userId)}</td>
                                   <td>{eventUserCostume(eventUser)}</td>
-                                  <td>{selectedEventImages.filter((image) => image.userIds.includes(eventUser.userId)).length}</td>
                                   <td>
                                     <button className="auth-secondary" type="button" onClick={() => void removeContestant(eventUser)}>
                                       Remove
@@ -1961,7 +2000,7 @@ export default function HostPage() {
                               ))}
                             {selectedEventContestantUsers.length === 0 && selectedEventDetail?.teams.length === 0 ? (
                               <tr>
-                                <td colSpan={5}>No contestants yet.</td>
+                                <td colSpan={4}>No contestants yet.</td>
                               </tr>
                             ) : null}
                           </tbody>
@@ -2828,6 +2867,8 @@ export default function HostPage() {
                   ? "Delete this image from the library and storage?"
                   : deleteTarget.type === "party"
                     ? `Delete ${deleteTarget.party.label}?`
+                  : deleteTarget.type === "event"
+                    ? `Delete ${deleteTarget.event.label}? This will remove the event setup, contestants, teams, and votes.`
                     : `Delete ${deleteTarget.user.firstName} ${deleteTarget.user.lastName}? This will remove their account access.`}
               </p>
               <div className="confirmation-actions">

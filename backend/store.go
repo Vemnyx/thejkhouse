@@ -742,6 +742,17 @@ func (s *userStore) completeEvent(ctx context.Context, id int64, completedAt tim
 	return event, nil
 }
 
+func (s *userStore) deleteEvent(ctx context.Context, id int64) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM events WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
 func (s *userStore) getEventDetail(ctx context.Context, id int64) (EventDetail, error) {
 	event, err := s.getEventByID(ctx, id)
 	if err != nil {

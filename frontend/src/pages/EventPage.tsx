@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, EventDetail, EventVoteRecord, ImageRecord, getEventDetail, listEventVotes, listImages, listUsers, submitEventVote } from "../lib/api";
+import { AppUser, EventDetail, EventVoteRecord, ImageRecord, eventRouteIdentifier, getEventDetail, listEventVotes, listEvents, listImages, listUsers, submitEventVote } from "../lib/api";
 
 type EventCategory = {
   name: string;
@@ -27,13 +27,12 @@ export default function EventPage() {
   const [selectedContestantId, setSelectedContestantId] = useState<string | null>(null);
   const [slideshowOpen, setSlideshowOpen] = useState(false);
   const [slideshowIndex, setSlideshowIndex] = useState(0);
-  const parsedEventId = Number(eventId);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadEvent() {
-      if (!firebaseUser || !parsedEventId) {
+      if (!firebaseUser || !eventId) {
         setLoading(false);
         return;
       }
@@ -42,8 +41,18 @@ export default function EventPage() {
       setError("");
       try {
         const token = await firebaseUser.getIdToken();
+        const numericEventId = Number(eventId);
+        let resolvedEventId = Number.isInteger(numericEventId) && numericEventId > 0 ? numericEventId : null;
+        if (!resolvedEventId) {
+          const events = await listEvents(token);
+          const matchedEvent = events.find((item) => eventRouteIdentifier(item) === eventId);
+          if (!matchedEvent) {
+            throw new Error("event not found");
+          }
+          resolvedEventId = matchedEvent.id;
+        }
         const [detail, nextImages, nextUsers] = await Promise.all([
-          getEventDetail(token, parsedEventId),
+          getEventDetail(token, resolvedEventId),
           listImages(token),
           listUsers(token),
         ]);
@@ -68,7 +77,7 @@ export default function EventPage() {
     return () => {
       cancelled = true;
     };
-  }, [firebaseUser, parsedEventId]);
+  }, [firebaseUser, eventId]);
 
   const event = eventDetail?.event ?? null;
   const eventImages = useMemo(() => {
@@ -211,16 +220,16 @@ export default function EventPage() {
         ) : showCostumeContestGrid ? (
           <section className="event-contest-preview">
             <div className="event-title-row">
+              <Link className="auth-secondary event-detail-back" to="/events">
+                Back to Events
+              </Link>
               <div>
                 <p className="eyebrow">Costume Contest</p>
                 <h1>{event.label}</h1>
               </div>
-              <Link className="auth-secondary event-detail-back" to="/events">
-                Back to Events
-              </Link>
             </div>
             <div className="event-action-row">
-              <button className="auth-submit event-vote-button" type="button" onClick={openSlideshow} disabled={costumeContestEntries.length === 0}>
+              <button className="auth-submit event-vote-button event-slideshow-button" type="button" onClick={openSlideshow} disabled={costumeContestEntries.length === 0}>
                 Slide Show
               </button>
               <button className="auth-submit event-vote-button" type="button" onClick={() => setVoteModalOpen(true)} disabled={Boolean(event.completedAt) || costumeContestEntries.length === 0 || categories.length === 0}>
@@ -237,6 +246,7 @@ export default function EventPage() {
                   <button className="event-contest-card" type="button" key={entry.id} onClick={() => setSelectedContestantId(entry.id)}>
                     <img src={entry.image.imageUrl} alt={entry.costumeName} />
                     <h2>{entry.costumeName}</h2>
+                    <p>{entry.userIds.map((userId) => userDisplayName(users, userId)).join(" + ")}</p>
                   </button>
                 ))}
               </div>
@@ -334,24 +344,18 @@ export default function EventPage() {
       ) : null}
       {slideshowEntry ? (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setSlideshowOpen(false)}>
-          <section className="upload-modal gothic-card contestant-presentation-modal slideshow-modal" role="dialog" aria-modal="true" onMouseDown={(modalEvent) => modalEvent.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="host-section-title">Slide Show</h2>
-              <button className="modal-close" type="button" onClick={() => setSlideshowOpen(false)} aria-label="Close slideshow modal">
-                x
-              </button>
-            </div>
+          <section className="upload-modal gothic-card contestant-presentation-modal contestant-detail-modal slideshow-modal" role="dialog" aria-modal="true" onMouseDown={(modalEvent) => modalEvent.stopPropagation()}>
+            <button className="presentation-close" type="button" onClick={() => setSlideshowOpen(false)} aria-label="Close slideshow modal">
+              x
+            </button>
             <article className="contestant-presentation-card slideshow-card" key={slideshowEntry.id}>
               <button className="slideshow-image-button" type="button" onClick={advanceSlideshow} aria-label="Show next contestant">
                 <img src={slideshowEntry.image.imageUrl} alt={slideshowEntry.costumeName} />
               </button>
               <div>
-                <p className="eyebrow">
-                  {slideshowIndex + 1} / {costumeContestEntries.length}
-                </p>
                 <h3>{slideshowEntry.costumeName}</h3>
                 <p className="contestant-wearers">
-                  Worn by {slideshowEntry.userIds.map((userId) => userDisplayName(users, userId)).join(" + ")}
+                  By {slideshowEntry.userIds.map((userId) => userDisplayName(users, userId)).join(" + ")}
                 </p>
               </div>
             </article>
@@ -360,20 +364,16 @@ export default function EventPage() {
       ) : null}
       {selectedContestant ? (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => setSelectedContestantId(null)}>
-          <section className="upload-modal gothic-card contestant-presentation-modal" role="dialog" aria-modal="true" onMouseDown={(modalEvent) => modalEvent.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="host-section-title">Contestant</h2>
-              <button className="modal-close" type="button" onClick={() => setSelectedContestantId(null)} aria-label="Close contestant modal">
-                x
-              </button>
-            </div>
+          <section className="upload-modal gothic-card contestant-presentation-modal contestant-detail-modal" role="dialog" aria-modal="true" onMouseDown={(modalEvent) => modalEvent.stopPropagation()}>
+            <button className="presentation-close" type="button" onClick={() => setSelectedContestantId(null)} aria-label="Close contestant modal">
+              x
+            </button>
             <article className="contestant-presentation-card">
               <img src={selectedContestant.image.imageUrl} alt={selectedContestant.costumeName} />
               <div>
-                <p className="eyebrow">Costume</p>
                 <h3>{selectedContestant.costumeName}</h3>
                 <p className="contestant-wearers">
-                  Worn by {selectedContestant.userIds.map((userId) => userDisplayName(users, userId)).join(" + ")}
+                  By {selectedContestant.userIds.map((userId) => userDisplayName(users, userId)).join(" + ")}
                 </p>
               </div>
             </article>

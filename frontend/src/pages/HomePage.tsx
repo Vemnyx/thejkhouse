@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import BirthdaySelect, { ImageDateSelect } from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, EventRecord, HomepageContent, ImageRecord, PartyRecord, eventTypeLabels, getHomepage, listEvents, listImages, listParties, listUsers, uploadImage } from "../lib/api";
+import { AppUser, EventRecord, HomepageContent, ImageRecord, PartyRecord, eventRouteIdentifier, eventTypeLabels, getHomepage, listEvents, listImages, listParties, listUsers, uploadImage } from "../lib/api";
 
 type MainTab = "home" | "parties" | "photos" | "events";
 type MainView = MainTab | "settings";
@@ -602,7 +602,7 @@ export default function HomePage() {
                   parties={parties}
                   clickable={activeEventTab !== "upcoming"}
                   emptyText={`No ${activeEventTab} events.`}
-                  onOpen={(event) => navigate(`/events/${event.id}`)}
+                  onOpen={(event) => navigate(`/events/${eventRouteIdentifier(event)}`)}
                 />
               )}
             </div>

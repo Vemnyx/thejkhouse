@@ -36,6 +36,10 @@ select {
   background-size: 1rem;
 }
 
+button {
+  border-radius: 0.85rem;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -528,6 +532,7 @@ body {
 
 .app-shell-card {
   width: min(100%, 72rem);
+  min-width: 0;
   min-height: calc(100vh - 4rem);
   display: grid;
   grid-template-rows: auto 1fr;
@@ -692,6 +697,7 @@ body {
   position: relative;
   z-index: 1;
   display: grid;
+  min-width: 0;
   min-height: 26rem;
   padding-top: 2rem;
 }
@@ -722,6 +728,7 @@ body {
   position: relative;
   z-index: 1;
   width: fit-content;
+  border-radius: 999px;
   text-decoration: none;
 }
 
@@ -736,8 +743,12 @@ body {
   margin: 0.35rem 0 0;
   color: var(--rose-pale);
   font-family: var(--decorative-font);
-  font-size: clamp(1.55rem, 4vw, 2.8rem);
+  font-size: clamp(1.25rem, 3.3vw, 2.25rem);
   letter-spacing: 0.08em;
+}
+
+.event-contest-preview .eyebrow {
+  font-size: 0.82rem;
 }
 
 .event-title-row {
@@ -745,6 +756,10 @@ body {
   gap: 1rem;
   align-items: flex-start;
   justify-content: space-between;
+}
+
+.event-title-row > div {
+  text-align: right;
 }
 
 .event-vote-button {
@@ -763,10 +778,14 @@ body {
   width: 100%;
 }
 
+.event-slideshow-button {
+  margin-right: auto;
+}
+
 .event-contest-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 1.15rem;
 }
 
 .event-contest-card {
@@ -811,8 +830,41 @@ body {
   text-transform: uppercase;
 }
 
+.event-contest-card p {
+  margin: -0.3rem 0 0;
+  color: var(--gold);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+}
+
 .contestant-presentation-modal {
   width: min(100%, 34rem);
+}
+
+.contestant-detail-modal {
+  padding: 0 0 2rem;
+  overflow: hidden auto;
+}
+
+.presentation-close {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.8rem;
+  z-index: 3;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.86);
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+  cursor: pointer;
+}
+
+.presentation-close:hover,
+.presentation-close:focus-visible {
+  color: #fff;
 }
 
 .slideshow-modal {
@@ -823,6 +875,14 @@ body {
   display: grid;
   gap: 1rem;
   text-align: center;
+}
+
+.contestant-detail-modal .contestant-presentation-card {
+  gap: 1.35rem;
+}
+
+.contestant-detail-modal .contestant-presentation-card > div {
+  padding: 0 2rem;
 }
 
 .slideshow-card {
@@ -851,7 +911,17 @@ body {
     0 22px 52px rgba(0, 0, 0, 0.38);
 }
 
+.contestant-detail-modal .contestant-presentation-card > img {
+  width: 100%;
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+
 .slideshow-image-button img {
+  width: 100%;
+}
+
+.contestant-detail-modal .slideshow-image-button {
   width: 100%;
 }
 
@@ -1310,6 +1380,7 @@ body {
 
 .host-panel {
   width: 100%;
+  min-width: 0;
   text-align: left;
 }
 
@@ -1524,10 +1595,10 @@ body {
 
 .contestant-table-preview {
   display: block;
-  width: 3.4rem;
+  width: 5.25rem;
   overflow: hidden;
   border: 1px solid rgba(232, 120, 143, 0.22);
-  border-radius: 0.7rem;
+  border-radius: 0.85rem;
   background: rgba(0, 0, 0, 0.32);
 }
 
@@ -1756,7 +1827,22 @@ body {
 }
 
 .host-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.host-table-wrap::-webkit-scrollbar {
+  height: 0.55rem;
+}
+
+.host-table-wrap::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(232, 120, 143, 0.34);
 }
 
 .host-table {

@@ -201,6 +201,21 @@ func (s *apiServer) handleEventByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, event)
+	case http.MethodDelete:
+		if user.Role != RoleHost {
+			writeError(w, http.StatusForbidden, "host access is required")
+			return
+		}
+		if err := s.store.deleteEvent(r.Context(), id); err != nil {
+			if isNotFound(err) {
+				writeError(w, http.StatusNotFound, "event not found")
+				return
+			}
+			log.Error("event delete", "error", err, "event_id", id)
+			writeError(w, http.StatusInternalServerError, "failed to delete event")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	default:
 		methodNotAllowed(w)
 	}
