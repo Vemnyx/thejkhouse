@@ -1025,9 +1025,17 @@ body {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: auto;
+  max-height: min(74vh, 44rem);
   padding: 0.5rem 0 1rem;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  cursor: grab;
+  touch-action: pan-x pan-y;
+}
+
+.bracket-visual-scroll:active {
+  cursor: grabbing;
 }
 
 .bracket-visual {
@@ -1170,6 +1178,61 @@ body {
   background: rgba(249, 214, 143, 0.46);
 }
 
+.bracket-side-left .bracket-match-card:has(.bracket-participant-node + .bracket-participant-node)::before,
+.bracket-side-left .bracket-setup-match:has(.bracket-seed-card + .bracket-seed-card)::before {
+  content: "";
+  position: absolute;
+  top: 1.55rem;
+  right: -1.25rem;
+  width: 1px;
+  height: 4.2rem;
+  background: rgba(249, 214, 143, 0.5);
+}
+
+.bracket-side-left .bracket-match-card:has(.bracket-participant-node + .bracket-participant-node)::after,
+.bracket-side-left .bracket-setup-match:has(.bracket-seed-card + .bracket-seed-card)::after {
+  content: "";
+  position: absolute;
+  top: 3.65rem;
+  right: -2.4rem;
+  width: 1.15rem;
+  height: 1px;
+  background: rgba(249, 214, 143, 0.5);
+}
+
+.bracket-side-right .bracket-match-card:has(.bracket-participant-node + .bracket-participant-node)::before,
+.bracket-side-right .bracket-setup-match:has(.bracket-seed-card + .bracket-seed-card)::before {
+  content: "";
+  position: absolute;
+  top: 1.55rem;
+  left: -1.25rem;
+  width: 1px;
+  height: 4.2rem;
+  background: rgba(249, 214, 143, 0.5);
+}
+
+.bracket-side-right .bracket-match-card:has(.bracket-participant-node + .bracket-participant-node)::after,
+.bracket-side-right .bracket-setup-match:has(.bracket-seed-card + .bracket-seed-card)::after {
+  content: "";
+  position: absolute;
+  top: 3.65rem;
+  left: -2.4rem;
+  width: 1.15rem;
+  height: 1px;
+  background: rgba(249, 214, 143, 0.5);
+}
+
+.bracket-side-left .bracket-setup-match:has(.bracket-seed-card + .bracket-seed-card)::before,
+.bracket-side-right .bracket-setup-match:has(.bracket-seed-card + .bracket-seed-card)::before {
+  top: 2rem;
+  height: calc(100% - 5rem);
+}
+
+.bracket-side-left .bracket-setup-match:has(.bracket-seed-card + .bracket-seed-card)::after,
+.bracket-side-right .bracket-setup-match:has(.bracket-seed-card + .bracket-seed-card)::after {
+  top: 50%;
+}
+
 .bracket-final-column {
   position: relative;
   display: flex;
@@ -1297,6 +1360,13 @@ body {
   padding: 0;
 }
 
+.results-modal.victory-reveal .results-back-button {
+  position: absolute;
+  top: 0.85rem;
+  left: 1rem;
+  z-index: 2;
+}
+
 .victory-card {
   position: relative;
   display: grid;
@@ -1309,7 +1379,7 @@ body {
 .victory-card .eyebrow {
   margin: 0;
   color: var(--gold);
-  font-size: 1rem;
+  font-size: clamp(1.15rem, 3vw, 1.45rem);
   letter-spacing: 0.16em;
 }
 

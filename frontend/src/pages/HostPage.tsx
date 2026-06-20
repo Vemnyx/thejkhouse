@@ -3340,11 +3340,7 @@ function BracketSetupVisual({
   onTeamAssignmentsChange: Dispatch<SetStateAction<Record<number, string[]>>>;
 }) {
   const pairs = bracketSeedPairs(bracket.size);
-  const slots = Array.from({ length: bracket.size }, (_, index) => index + 1);
-  const { left: leftSlots, right: rightSlots } = splitBracketItems(slots);
   const { left, right } = splitBracketItems(pairs);
-  const totalRounds = Math.ceil(Math.log2(bracket.size));
-  const innerRoundNumbers = Array.from({ length: Math.max(totalRounds - 2, 0) }, (_, index) => index + 2);
   return (
     <div className="bracket-visual-scroll">
       <div className="tournament-bracket tournament-bracket-setup">
@@ -3365,30 +3361,12 @@ function BracketSetupVisual({
               />
             ))}
           </section>
-          {innerRoundNumbers.map((roundNumber) => (
-            <BracketPlaceholderColumn
-              count={bracketSetupPlaceholderCount(leftSlots.length, roundNumber)}
-              title={bracketRoundTitle(roundNumber, totalRounds)}
-              key={`left-placeholder-${roundNumber}`}
-            />
-          ))}
         </div>
         <section className="bracket-final-column">
           <h3>Final</h3>
-          <article className="bracket-match-card bracket-final-placeholder">
-            <span className="bracket-participant-node">Left winner</span>
-            <span className="bracket-participant-node">Right winner</span>
-            <small>Final matchup</small>
-          </article>
+          <p className="selected-file">Winners appear here after the bracket starts.</p>
         </section>
         <div className="bracket-side bracket-side-right">
-          {[...innerRoundNumbers].reverse().map((roundNumber) => (
-            <BracketPlaceholderColumn
-              count={bracketSetupPlaceholderCount(rightSlots.length, roundNumber)}
-              title={bracketRoundTitle(roundNumber, totalRounds)}
-              key={`right-placeholder-${roundNumber}`}
-            />
-          ))}
           <section className="bracket-round-column">
             <h3>Round 1</h3>
             {right.map((pair, index) => (
@@ -3474,29 +3452,15 @@ function BracketSetupMatch({
   );
 }
 
-function BracketPlaceholderColumn({ count, title }: { count: number; title: string }) {
-  return (
-    <section className="bracket-round-column">
-      <h3>{title}</h3>
-      {Array.from({ length: count }, (_, index) => (
-        <article className="bracket-match-card" key={`${title}-${index}`}>
-          <span className="bracket-participant-node">Winner</span>
-        </article>
-      ))}
-    </section>
-  );
-}
-
 function BracketRoundsView({ rounds }: { rounds: EventDetail["rounds"] }) {
   if (rounds.length === 0) {
     return <p className="selected-file">No bracket rounds yet.</p>;
   }
   const totalRounds = bracketTotalRounds(rounds);
-  const sideRoundNumbers = Array.from({ length: Math.max(totalRounds - 1, 0) }, (_, index) => index + 1);
+  const sideRoundNumbers = Array.from(new Set(rounds.map((round) => round.roundNumber))).filter((roundNumber) => roundNumber !== totalRounds);
   const finalRoundNumber = totalRounds;
   const finalRounds = rounds.filter((round) => round.roundNumber === finalRoundNumber);
   const champion = finalRounds.find((round) => round.winner && round.completedAt)?.winner ?? null;
-  const firstRoundMatchCount = rounds.filter((round) => round.roundNumber === 1).length;
   return (
     <div className="bracket-visual-stack">
       {champion ? (
@@ -3510,22 +3474,17 @@ function BracketRoundsView({ rounds }: { rounds: EventDetail["rounds"] }) {
           <div className="bracket-side bracket-side-left">
             {sideRoundNumbers.map((roundNumber) => {
               const { left } = splitBracketItems(rounds.filter((round) => round.roundNumber === roundNumber));
-              return <BracketRoundColumn rounds={left} placeholderCount={bracketSidePlaceholderCount(firstRoundMatchCount, roundNumber)} title={bracketRoundTitle(roundNumber, totalRounds)} key={`left-${roundNumber}`} />;
+              return left.length > 0 ? <BracketRoundColumn rounds={left} title={bracketRoundTitle(roundNumber, totalRounds)} key={`left-${roundNumber}`} /> : null;
             })}
           </div>
           <section className="bracket-final-column">
             <h4>Final</h4>
-            {finalRounds.length > 0 ? finalRounds.map((round) => <BracketRoundMatch round={round} key={round.id} />) : (
-              <article className="bracket-match-card">
-                <span className="bracket-participant-node">Left winner</span>
-                <span className="bracket-participant-node">Right winner</span>
-              </article>
-            )}
+            {finalRounds.map((round) => <BracketRoundMatch round={round} key={round.id} />)}
           </section>
           <div className="bracket-side bracket-side-right">
             {[...sideRoundNumbers].reverse().map((roundNumber) => {
               const { right } = splitBracketItems(rounds.filter((round) => round.roundNumber === roundNumber));
-              return <BracketRoundColumn rounds={right} placeholderCount={bracketSidePlaceholderCount(firstRoundMatchCount, roundNumber)} title={bracketRoundTitle(roundNumber, totalRounds)} key={`right-${roundNumber}`} />;
+              return right.length > 0 ? <BracketRoundColumn rounds={right} title={bracketRoundTitle(roundNumber, totalRounds)} key={`right-${roundNumber}`} /> : null;
             })}
           </div>
         </div>
@@ -3534,17 +3493,11 @@ function BracketRoundsView({ rounds }: { rounds: EventDetail["rounds"] }) {
   );
 }
 
-function BracketRoundColumn({ rounds, title, placeholderCount }: { rounds: EventDetail["rounds"]; title: string; placeholderCount: number }) {
+function BracketRoundColumn({ rounds, title }: { rounds: EventDetail["rounds"]; title: string }) {
   return (
     <section className="bracket-round-column">
       <h4>{title}</h4>
-      {rounds.length > 0
-        ? rounds.map((round) => <BracketRoundMatch round={round} key={round.id} />)
-        : Array.from({ length: placeholderCount }, (_, index) => (
-          <article className="bracket-match-card" key={`placeholder-${index}`}>
-            <span className="bracket-participant-node">Winner</span>
-          </article>
-        ))}
+      {rounds.map((round) => <BracketRoundMatch round={round} key={round.id} />)}
     </section>
   );
 }
@@ -3566,17 +3519,6 @@ function BracketRoundMatch({ round }: { round: EventDetail["rounds"][number] }) 
 function bracketTotalRounds(rounds: EventDetail["rounds"]) {
   const firstRoundMatchCount = rounds.filter((round) => round.roundNumber === 1).length;
   return Math.max(1, Math.ceil(Math.log2(Math.max(firstRoundMatchCount * 2, 2))));
-}
-
-function bracketSidePlaceholderCount(firstRoundMatchCount: number, roundNumber: number) {
-  if (roundNumber <= 1) {
-    return 0;
-  }
-  return Math.max(1, Math.floor(firstRoundMatchCount / 2 ** roundNumber));
-}
-
-function bracketSetupPlaceholderCount(sideSlotCount: number, roundNumber: number) {
-  return Math.max(1, Math.floor(sideSlotCount / 2 ** (roundNumber - 1)));
 }
 
 function bracketRoundTitle(roundNumber: number, totalRounds: number) {

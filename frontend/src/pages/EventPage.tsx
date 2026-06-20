@@ -473,11 +473,10 @@ function BracketEventView({
 
 function BracketVisual({ rounds }: { rounds: EventRoundRecord[] }) {
   const totalRounds = bracketTotalRounds(rounds);
-  const sideRoundNumbers = Array.from({ length: Math.max(totalRounds - 1, 0) }, (_, index) => index + 1);
+  const sideRoundNumbers = Array.from(new Set(rounds.map((round) => round.roundNumber))).filter((roundNumber) => roundNumber !== totalRounds);
   const finalRoundNumber = totalRounds;
   const finalRounds = rounds.filter((round) => round.roundNumber === finalRoundNumber);
   const champion = finalRounds.find((round) => round.winner && round.completedAt)?.winner ?? null;
-  const firstRoundMatchCount = rounds.filter((round) => round.roundNumber === 1).length;
   return (
     <div className="bracket-visual-stack">
       {champion ? (
@@ -491,22 +490,17 @@ function BracketVisual({ rounds }: { rounds: EventRoundRecord[] }) {
           <div className="bracket-side bracket-side-left">
             {sideRoundNumbers.map((roundNumber) => {
               const { left } = splitRoundMatches(rounds.filter((round) => round.roundNumber === roundNumber));
-              return <BracketRoundColumn key={`left-${roundNumber}`} rounds={left} placeholderCount={bracketSidePlaceholderCount(firstRoundMatchCount, roundNumber)} title={roundTitle(roundNumber, totalRounds)} />;
+              return left.length > 0 ? <BracketRoundColumn key={`left-${roundNumber}`} rounds={left} title={roundTitle(roundNumber, totalRounds)} /> : null;
             })}
           </div>
           <section className="bracket-final-column">
             <h3>Final</h3>
-            {finalRounds.length > 0 ? finalRounds.map((round) => <BracketMatchCard round={round} key={round.id} />) : (
-              <article className="bracket-match-card">
-                <span className="bracket-participant-node">Left winner</span>
-                <span className="bracket-participant-node">Right winner</span>
-              </article>
-            )}
+            {finalRounds.map((round) => <BracketMatchCard round={round} key={round.id} />)}
           </section>
           <div className="bracket-side bracket-side-right">
             {[...sideRoundNumbers].reverse().map((roundNumber) => {
               const { right } = splitRoundMatches(rounds.filter((round) => round.roundNumber === roundNumber));
-              return <BracketRoundColumn key={`right-${roundNumber}`} rounds={right} placeholderCount={bracketSidePlaceholderCount(firstRoundMatchCount, roundNumber)} title={roundTitle(roundNumber, totalRounds)} />;
+              return right.length > 0 ? <BracketRoundColumn key={`right-${roundNumber}`} rounds={right} title={roundTitle(roundNumber, totalRounds)} /> : null;
             })}
           </div>
         </div>
@@ -515,17 +509,11 @@ function BracketVisual({ rounds }: { rounds: EventRoundRecord[] }) {
   );
 }
 
-function BracketRoundColumn({ rounds, title, placeholderCount }: { rounds: EventRoundRecord[]; title: string; placeholderCount: number }) {
+function BracketRoundColumn({ rounds, title }: { rounds: EventRoundRecord[]; title: string }) {
   return (
     <section className="bracket-round-column">
       <h3>{title}</h3>
-      {rounds.length > 0
-        ? rounds.map((round) => <BracketMatchCard round={round} key={round.id} />)
-        : Array.from({ length: placeholderCount }, (_, index) => (
-          <article className="bracket-match-card" key={`placeholder-${index}`}>
-            <span className="bracket-participant-node">Winner</span>
-          </article>
-        ))}
+      {rounds.map((round) => <BracketMatchCard round={round} key={round.id} />)}
     </section>
   );
 }
@@ -543,13 +531,6 @@ function BracketMatchCard({ round }: { round: EventRoundRecord }) {
 function bracketTotalRounds(rounds: EventRoundRecord[]) {
   const firstRoundMatchCount = rounds.filter((round) => round.roundNumber === 1).length;
   return Math.max(1, Math.ceil(Math.log2(Math.max(firstRoundMatchCount * 2, 2))));
-}
-
-function bracketSidePlaceholderCount(firstRoundMatchCount: number, roundNumber: number) {
-  if (roundNumber <= 1) {
-    return 0;
-  }
-  return Math.max(1, Math.floor(firstRoundMatchCount / 2 ** roundNumber));
 }
 
 function splitRoundMatches<T>(rounds: T[]) {
