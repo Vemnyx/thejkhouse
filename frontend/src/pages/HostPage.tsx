@@ -2102,6 +2102,7 @@ export default function HostPage() {
                       {!selectedEvent.startDate ? (
                         <div className="bracket-visual-scroll">
                           <div className="bracket-visual bracket-setup-visual">
+                            <BracketConnectorOverlay roundCounts={[selectedBracket.size / 2, selectedBracket.size / 4, selectedBracket.size / 8].filter((count) => count >= 1)} />
                             <section className="bracket-round-column">
                               <h3>Round 1</h3>
                               {bracketSeedPairs(selectedBracket.size).map(([firstSlot, secondSlot], pairIndex) => (
@@ -3365,6 +3366,7 @@ function BracketRoundsView({ rounds }: { rounds: EventDetail["rounds"] }) {
   return (
     <div className="bracket-visual-scroll">
       <div className="bracket-visual">
+        <BracketConnectorOverlay roundCounts={roundNumbers.map((roundNumber) => rounds.filter((round) => round.roundNumber === roundNumber).length)} />
         {roundNumbers.map((roundNumber) => (
           <section className="bracket-round-column" key={roundNumber}>
             <h4>{bracketRoundTitle(roundNumber, roundNumbers.length)}</h4>
@@ -3394,6 +3396,39 @@ function bracketRoundTitle(roundNumber: number, totalRounds: number) {
     return "Semifinal";
   }
   return `Round ${roundNumber}`;
+}
+
+function BracketConnectorOverlay({ roundCounts }: { roundCounts: number[] }) {
+  return (
+    <svg className="bracket-connector-overlay" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
+      {bracketConnectorPaths(roundCounts).map((path, index) => (
+        <path d={path} key={`${path}-${index}`} />
+      ))}
+    </svg>
+  );
+}
+
+function bracketConnectorPaths(roundCounts: number[]) {
+  const columnCount = roundCounts.length;
+  if (columnCount < 2) {
+    return [];
+  }
+  const columnWidth = 100 / columnCount;
+  const paths: string[] = [];
+  for (let roundIndex = 0; roundIndex < columnCount - 1; roundIndex += 1) {
+    const currentCount = roundCounts[roundIndex];
+    const nextCount = roundCounts[roundIndex + 1];
+    const xStart = (roundIndex + 1) * columnWidth - columnWidth * 0.12;
+    const xEnd = (roundIndex + 1) * columnWidth + columnWidth * 0.12;
+    for (let matchIndex = 0; matchIndex < currentCount; matchIndex += 2) {
+      const topY = ((matchIndex + 0.5) / currentCount) * 100;
+      const bottomY = ((matchIndex + 1.5) / currentCount) * 100;
+      const nextY = (((matchIndex / 2) + 0.5) / Math.max(nextCount, 1)) * 100;
+      paths.push(`M ${xStart} ${topY} H ${(xStart + xEnd) / 2} V ${bottomY} H ${xStart}`);
+      paths.push(`M ${(xStart + xEnd) / 2} ${nextY} H ${xEnd}`);
+    }
+  }
+  return paths;
 }
 
 function loadImage(src: string) {

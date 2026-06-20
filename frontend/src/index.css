@@ -1031,10 +1031,12 @@ body {
 }
 
 .bracket-visual {
+  position: relative;
   display: flex;
   gap: 3rem;
   align-items: stretch;
   min-width: max-content;
+  padding: 1rem 1.5rem;
 }
 
 .bracket-setup-visual {
@@ -1071,21 +1073,12 @@ body {
 
 .bracket-round-column {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   justify-content: space-around;
   gap: 1.25rem;
   min-width: 15rem;
-}
-
-.bracket-round-column:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: -2.1rem;
-  width: 2.1rem;
-  height: 1px;
-  background: rgba(249, 214, 143, 0.42);
 }
 
 .bracket-round-column h3,
@@ -1099,18 +1092,19 @@ body {
   min-height: 6.4rem;
 }
 
-.bracket-match-card::after {
-  content: "";
+.bracket-connector-overlay {
   position: absolute;
-  top: 50%;
-  right: -1.55rem;
-  width: 1.55rem;
-  height: 1px;
-  background: rgba(232, 120, 143, 0.36);
+  inset: 3.5rem 1.5rem 1rem;
+  z-index: 0;
+  min-width: 100%;
+  pointer-events: none;
 }
 
-.bracket-round-column:last-child .bracket-match-card::after {
-  content: none;
+.bracket-connector-overlay path {
+  fill: none;
+  stroke: rgba(249, 214, 143, 0.48);
+  stroke-width: 0.28;
+  vector-effect: non-scaling-stroke;
 }
 
 .bracket-setup-match {

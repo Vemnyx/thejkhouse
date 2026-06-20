@@ -234,7 +234,7 @@ export default function EventPage() {
           <span className="corner corner-bl" />
           <span className="corner corner-br" />
         </div>
-        {!showCostumeContestGrid ? (
+        {!showCostumeContestGrid && !showBracket ? (
           <Link className="auth-secondary back-text-link event-detail-back" to="/events">
             Back to Events
           </Link>
@@ -480,6 +480,7 @@ function BracketEventView({
       )}
       <div className="bracket-visual-scroll">
         <div className="bracket-visual">
+          <BracketConnectorOverlay roundCounts={roundNumbers.map((roundNumber) => rounds.filter((round) => round.roundNumber === roundNumber).length)} />
           {roundNumbers.map((roundNumber) => (
             <section className="bracket-round-column" key={roundNumber}>
               <h3>{roundTitle(roundNumber, roundNumbers.length)}</h3>
@@ -496,6 +497,39 @@ function BracketEventView({
       </div>
     </div>
   );
+}
+
+function BracketConnectorOverlay({ roundCounts }: { roundCounts: number[] }) {
+  return (
+    <svg className="bracket-connector-overlay" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
+      {bracketConnectorPaths(roundCounts).map((path, index) => (
+        <path d={path} key={`${path}-${index}`} />
+      ))}
+    </svg>
+  );
+}
+
+function bracketConnectorPaths(roundCounts: number[]) {
+  const columnCount = roundCounts.length;
+  if (columnCount < 2) {
+    return [];
+  }
+  const columnWidth = 100 / columnCount;
+  const paths: string[] = [];
+  for (let roundIndex = 0; roundIndex < columnCount - 1; roundIndex += 1) {
+    const currentCount = roundCounts[roundIndex];
+    const nextCount = roundCounts[roundIndex + 1];
+    const xStart = (roundIndex + 1) * columnWidth - columnWidth * 0.12;
+    const xEnd = (roundIndex + 1) * columnWidth + columnWidth * 0.12;
+    for (let matchIndex = 0; matchIndex < currentCount; matchIndex += 2) {
+      const topY = ((matchIndex + 0.5) / currentCount) * 100;
+      const bottomY = ((matchIndex + 1.5) / currentCount) * 100;
+      const nextY = (((matchIndex / 2) + 0.5) / Math.max(nextCount, 1)) * 100;
+      paths.push(`M ${xStart} ${topY} H ${(xStart + xEnd) / 2} V ${bottomY} H ${xStart}`);
+      paths.push(`M ${(xStart + xEnd) / 2} ${nextY} H ${xEnd}`);
+    }
+  }
+  return paths;
 }
 
 function roundTitle(roundNumber: number, totalRounds: number) {
