@@ -24,6 +24,9 @@ export default function EventPage() {
   const [selectedResultCategory, setSelectedResultCategory] = useState<EventCategory | null>(null);
   const [votes, setVotes] = useState<EventVoteRecord[]>([]);
   const [loadingResults, setLoadingResults] = useState(false);
+  const [selectedContestantId, setSelectedContestantId] = useState<string | null>(null);
+  const [slideshowOpen, setSlideshowOpen] = useState(false);
+  const [slideshowIndex, setSlideshowIndex] = useState(0);
   const parsedEventId = Number(eventId);
 
   useEffect(() => {
@@ -104,10 +107,27 @@ export default function EventPage() {
       });
     return [...teamEntries, ...userEntries];
   }, [eventDetail, eventImages]);
+
+  useEffect(() => {
+    if (!slideshowOpen || costumeContestEntries.length === 0) {
+      return undefined;
+    }
+    const interval = window.setInterval(() => {
+      setSlideshowIndex((current) => (current + 1) % costumeContestEntries.length);
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, [slideshowOpen, costumeContestEntries.length]);
+
   const showCostumeContestGrid = event?.type === "0" && (isActiveEvent(event) || Boolean(event.completedAt));
   const categories = event ? eventMetadataCategories(event.metadata) : [];
   const selectedWinner = selectedResultCategory
     ? computeWinner(selectedResultCategory, votes, costumeContestEntries)
+    : null;
+  const selectedContestant = selectedContestantId
+    ? costumeContestEntries.find((entry) => entry.id === selectedContestantId) ?? null
+    : null;
+  const slideshowEntry = slideshowOpen && costumeContestEntries.length > 0
+    ? costumeContestEntries[slideshowIndex % costumeContestEntries.length]
     : null;
 
   const openResults = async () => {
@@ -128,6 +148,18 @@ export default function EventPage() {
     } finally {
       setLoadingResults(false);
     }
+  };
+
+  const openSlideshow = () => {
+    setSlideshowIndex(0);
+    setSlideshowOpen(true);
+  };
+
+  const advanceSlideshow = () => {
+    if (costumeContestEntries.length === 0) {
+      return;
+    }
+    setSlideshowIndex((current) => (current + 1) % costumeContestEntries.length);
   };
 
   const submitVote = async (submitEvent: FormEvent) => {
@@ -167,20 +199,30 @@ export default function EventPage() {
           <span className="corner corner-bl" />
           <span className="corner corner-br" />
         </div>
-        <Link className="auth-secondary event-detail-back" to="/events">
-          Back to Events
-        </Link>
+        {!showCostumeContestGrid ? (
+          <Link className="auth-secondary event-detail-back" to="/events">
+            Back to Events
+          </Link>
+        ) : null}
         {loading ? (
           <p className="loading-text">Loading event...</p>
         ) : error ? (
           <p className="auth-error">{error}</p>
         ) : showCostumeContestGrid ? (
           <section className="event-contest-preview">
-            <div>
-              <p className="eyebrow">Costume Contest</p>
-              <h1>{event.label}</h1>
+            <div className="event-title-row">
+              <div>
+                <p className="eyebrow">Costume Contest</p>
+                <h1>{event.label}</h1>
+              </div>
+              <Link className="auth-secondary event-detail-back" to="/events">
+                Back to Events
+              </Link>
             </div>
             <div className="event-action-row">
+              <button className="auth-submit event-vote-button" type="button" onClick={openSlideshow} disabled={costumeContestEntries.length === 0}>
+                Slide Show
+              </button>
               <button className="auth-submit event-vote-button" type="button" onClick={() => setVoteModalOpen(true)} disabled={Boolean(event.completedAt) || costumeContestEntries.length === 0 || categories.length === 0}>
                 Vote Now
               </button>
@@ -192,10 +234,10 @@ export default function EventPage() {
             {costumeContestEntries.length > 0 ? (
               <div className="event-contest-grid" aria-label="Costume contest entries">
                 {costumeContestEntries.map((entry) => (
-                  <article className="event-contest-card" key={entry.id}>
+                  <button className="event-contest-card" type="button" key={entry.id} onClick={() => setSelectedContestantId(entry.id)}>
                     <img src={entry.image.imageUrl} alt={entry.costumeName} />
                     <h2>{entry.costumeName}</h2>
-                  </article>
+                  </button>
                 ))}
               </div>
             ) : (
@@ -220,28 +262,34 @@ export default function EventPage() {
             <form className="host-email-form" onSubmit={submitVote}>
               {categories.map((category) => {
                 const entries = costumeContestEntries.filter((entry) => entry.type === category.type);
+                const selectedEntry = entries.find((entry) => entry.id === voteSelections[category.name]);
                 return (
-                <label className="auth-field" key={`${category.name}-${category.type}`}>
-                  <span>{category.name}</span>
-                  <select
-                    value={voteSelections[category.name] ?? ""}
-                    onChange={(changeEvent) => setVoteSelections((current) => ({
-                      ...current,
-                      [category.name]: changeEvent.target.value,
-                    }))}
-                    required
-                  >
-                    <option value="">Select a contestant</option>
-                    {entries.map((entry) => (
-                      <option value={entry.id} key={entry.id}>
-                        {entry.costumeName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <div className="vote-choice-row" key={`${category.name}-${category.type}`}>
+                    <label className="auth-field vote-choice-field">
+                      <span>{category.name}</span>
+                      <select
+                        value={voteSelections[category.name] ?? ""}
+                        onChange={(changeEvent) => setVoteSelections((current) => ({
+                          ...current,
+                          [category.name]: changeEvent.target.value,
+                        }))}
+                        required
+                      >
+                        <option value="">Select a contestant</option>
+                        {entries.map((entry) => (
+                          <option value={entry.id} key={entry.id}>
+                            {contestantOptionLabel(entry, users)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="vote-choice-preview" aria-label={selectedEntry ? `${selectedEntry.costumeName} preview` : `${category.name} preview`}>
+                      {selectedEntry ? <img src={selectedEntry.image.imageUrl} alt={selectedEntry.costumeName} /> : <span>No pick</span>}
+                    </div>
+                  </div>
               );})}
               {error ? <p className="auth-error">{error}</p> : null}
-              <button className="auth-submit" type="submit" disabled={voting || categories.some((category) => !voteSelections[category.name])}>
+              <button className="auth-submit vote-submit-button" type="submit" disabled={voting || categories.some((category) => !voteSelections[category.name])}>
                 {voting ? "Saving..." : "Submit Vote"}
               </button>
             </form>
@@ -284,6 +332,54 @@ export default function EventPage() {
           </section>
         </div>
       ) : null}
+      {slideshowEntry ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setSlideshowOpen(false)}>
+          <section className="upload-modal gothic-card contestant-presentation-modal slideshow-modal" role="dialog" aria-modal="true" onMouseDown={(modalEvent) => modalEvent.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="host-section-title">Slide Show</h2>
+              <button className="modal-close" type="button" onClick={() => setSlideshowOpen(false)} aria-label="Close slideshow modal">
+                x
+              </button>
+            </div>
+            <article className="contestant-presentation-card slideshow-card" key={slideshowEntry.id}>
+              <button className="slideshow-image-button" type="button" onClick={advanceSlideshow} aria-label="Show next contestant">
+                <img src={slideshowEntry.image.imageUrl} alt={slideshowEntry.costumeName} />
+              </button>
+              <div>
+                <p className="eyebrow">
+                  {slideshowIndex + 1} / {costumeContestEntries.length}
+                </p>
+                <h3>{slideshowEntry.costumeName}</h3>
+                <p className="contestant-wearers">
+                  Worn by {slideshowEntry.userIds.map((userId) => userDisplayName(users, userId)).join(" + ")}
+                </p>
+              </div>
+            </article>
+          </section>
+        </div>
+      ) : null}
+      {selectedContestant ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setSelectedContestantId(null)}>
+          <section className="upload-modal gothic-card contestant-presentation-modal" role="dialog" aria-modal="true" onMouseDown={(modalEvent) => modalEvent.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="host-section-title">Contestant</h2>
+              <button className="modal-close" type="button" onClick={() => setSelectedContestantId(null)} aria-label="Close contestant modal">
+                x
+              </button>
+            </div>
+            <article className="contestant-presentation-card">
+              <img src={selectedContestant.image.imageUrl} alt={selectedContestant.costumeName} />
+              <div>
+                <p className="eyebrow">Costume</p>
+                <h3>{selectedContestant.costumeName}</h3>
+                <p className="contestant-wearers">
+                  Worn by {selectedContestant.userIds.map((userId) => userDisplayName(users, userId)).join(" + ")}
+                </p>
+              </div>
+            </article>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -306,6 +402,17 @@ function eventUserCostume(metadata: Record<string, unknown>) {
 function userDisplayName(users: AppUser[], userId: number) {
   const user = users.find((item) => item.id === userId);
   return user ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email : `User #${userId}`;
+}
+
+function contestantOptionLabel(
+  entry: {
+    costumeName: string;
+    userIds: number[];
+  },
+  users: AppUser[],
+) {
+  const wearerNames = entry.userIds.map((userId) => userDisplayName(users, userId)).join(" + ");
+  return wearerNames ? `${entry.costumeName} - ${wearerNames}` : entry.costumeName;
 }
 
 function computeWinner(
