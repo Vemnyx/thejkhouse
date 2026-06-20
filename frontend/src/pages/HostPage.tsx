@@ -733,6 +733,14 @@ export default function HostPage() {
       setError(contestantCouple ? "couple costume is required" : "costume name is required");
       return;
     }
+    if (contestantCouple && !couplePhoto) {
+      setError("add a couple photo before submitting");
+      return;
+    }
+    if (!contestantCouple && contestantUserIds.some((userId) => !contestantPhotos[userId])) {
+      setError("add a photo for the contestant before submitting");
+      return;
+    }
 
     setError("");
     setSavingContestant(true);
