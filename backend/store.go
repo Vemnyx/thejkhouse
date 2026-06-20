@@ -348,16 +348,18 @@ func (s *userStore) deletePendingSignup(ctx context.Context, id int64) error {
 	return err
 }
 
-func (s *userStore) createImage(ctx context.Context, imageURL string, date time.Time, partyID *int64, homepage bool, notes string, userIDs []int32) (*Image, error) {
+func (s *userStore) createImage(ctx context.Context, imageURL string, date time.Time, partyID *int64, eventID *int64, teamID *int64, homepage bool, notes string, userIDs []int32) (*Image, error) {
 	var image Image
 	err := s.pool.QueryRow(
 		ctx,
-		`INSERT INTO images (image_url, date, party_id, homepage, notes, user_ids)
-		 VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING id, image_url, date, party_id, event_id, user_ids, homepage, notes, uploaded_at`,
+		`INSERT INTO images (image_url, date, party_id, event_id, team_id, homepage, notes, user_ids)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		 RETURNING id, image_url, date, party_id, event_id, team_id, user_ids, homepage, notes, uploaded_at`,
 		imageURL,
 		date,
 		partyID,
+		eventID,
+		teamID,
 		homepage,
 		notes,
 		userIDs,
@@ -367,6 +369,7 @@ func (s *userStore) createImage(ctx context.Context, imageURL string, date time.
 		&image.Date,
 		&image.PartyID,
 		&image.EventID,
+		&image.TeamID,
 		&image.UserIDs,
 		&image.Homepage,
 		&image.Notes,
@@ -382,7 +385,7 @@ func (s *userStore) createImage(ctx context.Context, imageURL string, date time.
 func (s *userStore) listImages(ctx context.Context) ([]Image, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, image_url, date, party_id, event_id, user_ids, homepage, notes, uploaded_at
+		`SELECT id, image_url, date, party_id, event_id, team_id, user_ids, homepage, notes, uploaded_at
 		 FROM images
 		 ORDER BY uploaded_at DESC`,
 	)
@@ -394,7 +397,7 @@ func (s *userStore) listImages(ctx context.Context) ([]Image, error) {
 	images := make([]Image, 0)
 	for rows.Next() {
 		var image Image
-		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt); err != nil {
+		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.TeamID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt); err != nil {
 			return nil, err
 		}
 		images = append(images, image)
@@ -410,10 +413,10 @@ func (s *userStore) getImage(ctx context.Context, id int64) (*Image, error) {
 	var image Image
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, image_url, date, party_id, event_id, user_ids, homepage, notes, uploaded_at
+		`SELECT id, image_url, date, party_id, event_id, team_id, user_ids, homepage, notes, uploaded_at
 		 FROM images WHERE id = $1`,
 		id,
-	).Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt)
+	).Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.TeamID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -422,16 +425,30 @@ func (s *userStore) getImage(ctx context.Context, id int64) (*Image, error) {
 }
 
 func (s *userStore) updateImageHomepage(ctx context.Context, id int64, homepage bool) (*Image, error) {
+	return s.updateImage(ctx, id, &homepage, nil)
+}
+
+func (s *userStore) updateImage(ctx context.Context, id int64, homepage *bool, userIDs *[]int32) (*Image, error) {
 	var image Image
+	var homepageArg any
+	if homepage != nil {
+		homepageArg = *homepage
+	}
+	var userIDsArg any
+	if userIDs != nil {
+		userIDsArg = *userIDs
+	}
 	err := s.pool.QueryRow(
 		ctx,
 		`UPDATE images
-		 SET homepage = $2
+		 SET homepage = COALESCE($2::boolean, homepage),
+		     user_ids = COALESCE($3::integer[], user_ids)
 		 WHERE id = $1
-		 RETURNING id, image_url, date, party_id, event_id, user_ids, homepage, notes, uploaded_at`,
+		 RETURNING id, image_url, date, party_id, event_id, team_id, user_ids, homepage, notes, uploaded_at`,
 		id,
-		homepage,
-	).Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt)
+		homepageArg,
+		userIDsArg,
+	).Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.TeamID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -600,6 +617,227 @@ func (s *userStore) createEvent(ctx context.Context, label string, partyID *int6
 	return event, nil
 }
 
+func (s *userStore) getEventByID(ctx context.Context, id int64) (Event, error) {
+	var event Event
+	var metadata []byte
+	err := s.pool.QueryRow(
+		ctx,
+		`SELECT id, label, party_id, start_date, end_date, completed_at, type, description, metadata
+		 FROM events WHERE id = $1`,
+		id,
+	).Scan(
+		&event.ID,
+		&event.Label,
+		&event.PartyID,
+		&event.StartDate,
+		&event.EndDate,
+		&event.CompletedAt,
+		&event.Type,
+		&event.Description,
+		&metadata,
+	)
+	if err != nil {
+		return Event{}, err
+	}
+	event.Metadata = json.RawMessage(metadata)
+	return event, nil
+}
+
+func (s *userStore) updateEventMetadata(ctx context.Context, id int64, metadata json.RawMessage) (Event, error) {
+	var event Event
+	var savedMetadata []byte
+	err := s.pool.QueryRow(
+		ctx,
+		`UPDATE events
+		 SET metadata = $2
+		 WHERE id = $1
+		 RETURNING id, label, party_id, start_date, end_date, completed_at, type, description, metadata`,
+		id,
+		metadata,
+	).Scan(
+		&event.ID,
+		&event.Label,
+		&event.PartyID,
+		&event.StartDate,
+		&event.EndDate,
+		&event.CompletedAt,
+		&event.Type,
+		&event.Description,
+		&savedMetadata,
+	)
+	if err != nil {
+		return Event{}, err
+	}
+	event.Metadata = json.RawMessage(savedMetadata)
+	return event, nil
+}
+
+func (s *userStore) startEvent(ctx context.Context, id int64, startDate time.Time) (Event, error) {
+	var event Event
+	var metadata []byte
+	err := s.pool.QueryRow(
+		ctx,
+		`UPDATE events
+		 SET start_date = COALESCE(start_date, $2)
+		 WHERE id = $1
+		 RETURNING id, label, party_id, start_date, end_date, completed_at, type, description, metadata`,
+		id,
+		startDate,
+	).Scan(
+		&event.ID,
+		&event.Label,
+		&event.PartyID,
+		&event.StartDate,
+		&event.EndDate,
+		&event.CompletedAt,
+		&event.Type,
+		&event.Description,
+		&metadata,
+	)
+	if err != nil {
+		return Event{}, err
+	}
+	event.Metadata = json.RawMessage(metadata)
+	return event, nil
+}
+
+func (s *userStore) getEventDetail(ctx context.Context, id int64) (EventDetail, error) {
+	event, err := s.getEventByID(ctx, id)
+	if err != nil {
+		return EventDetail{}, err
+	}
+	users, err := s.listEventUsers(ctx, id)
+	if err != nil {
+		return EventDetail{}, err
+	}
+	teams, err := s.listEventTeams(ctx, id)
+	if err != nil {
+		return EventDetail{}, err
+	}
+	return EventDetail{Event: event, Users: users, Teams: teams}, nil
+}
+
+func (s *userStore) listEventUsers(ctx context.Context, eventID int64) ([]EventUser, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT event_id, user_id, contestant, metadata
+		 FROM event_user
+		 WHERE event_id = $1
+		 ORDER BY user_id`,
+		eventID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := make([]EventUser, 0)
+	for rows.Next() {
+		var user EventUser
+		var metadata []byte
+		if err := rows.Scan(&user.EventID, &user.UserID, &user.Contestant, &metadata); err != nil {
+			return nil, err
+		}
+		user.Metadata = json.RawMessage(metadata)
+		users = append(users, user)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func (s *userStore) listEventTeams(ctx context.Context, eventID int64) ([]EventTeam, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT id, event_id, name, user_ids, metadata
+		 FROM event_teams
+		 WHERE event_id = $1
+		 ORDER BY id`,
+		eventID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	teams := make([]EventTeam, 0)
+	for rows.Next() {
+		var team EventTeam
+		var metadata []byte
+		if err := rows.Scan(&team.ID, &team.EventID, &team.Name, &team.UserIDs, &metadata); err != nil {
+			return nil, err
+		}
+		team.Metadata = json.RawMessage(metadata)
+		teams = append(teams, team)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return teams, nil
+}
+
+func (s *userStore) createEventTeam(ctx context.Context, eventID int64, name string, userIDs []int32) (EventTeam, error) {
+	var team EventTeam
+	var metadata []byte
+	err := s.pool.QueryRow(
+		ctx,
+		`INSERT INTO event_teams (event_id, name, user_ids)
+		 VALUES ($1, $2, $3)
+		 RETURNING id, event_id, name, user_ids, metadata`,
+		eventID,
+		name,
+		userIDs,
+	).Scan(&team.ID, &team.EventID, &team.Name, &team.UserIDs, &metadata)
+	if err != nil {
+		return EventTeam{}, err
+	}
+	team.Metadata = json.RawMessage(metadata)
+	return team, nil
+}
+
+func (s *userStore) upsertEventUser(ctx context.Context, eventID int64, userID int64, contestant bool, metadata json.RawMessage) (EventUser, error) {
+	var eventUser EventUser
+	var savedMetadata []byte
+	err := s.pool.QueryRow(
+		ctx,
+		`INSERT INTO event_user (event_id, user_id, contestant, metadata)
+		 VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (event_id, user_id)
+		 DO UPDATE SET contestant = EXCLUDED.contestant, metadata = EXCLUDED.metadata
+		 RETURNING event_id, user_id, contestant, metadata`,
+		eventID,
+		userID,
+		contestant,
+		metadata,
+	).Scan(&eventUser.EventID, &eventUser.UserID, &eventUser.Contestant, &savedMetadata)
+	if err != nil {
+		return EventUser{}, err
+	}
+	eventUser.Metadata = json.RawMessage(savedMetadata)
+	return eventUser, nil
+}
+
+func (s *userStore) deleteEventContestant(ctx context.Context, eventID int64, userIDs []int32, teamID *int64) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if len(userIDs) > 0 {
+		if _, err := tx.Exec(ctx, `DELETE FROM event_user WHERE event_id = $1 AND user_id = ANY($2::integer[])`, eventID, userIDs); err != nil {
+			return err
+		}
+	}
+	if teamID != nil {
+		if _, err := tx.Exec(ctx, `DELETE FROM event_teams WHERE event_id = $1 AND id = $2`, eventID, *teamID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
 func (s *userStore) getHomepageHTML(ctx context.Context) (string, error) {
 	var html string
 	err := s.pool.QueryRow(ctx, `SELECT html FROM homepage LIMIT 1`).Scan(&html)
@@ -636,7 +874,7 @@ func (s *userStore) updateHomepageHTML(ctx context.Context, html string) (string
 func (s *userStore) listHomepageImages(ctx context.Context) ([]Image, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, image_url, date, party_id, event_id, user_ids, homepage, notes, uploaded_at
+		`SELECT id, image_url, date, party_id, event_id, team_id, user_ids, homepage, notes, uploaded_at
 		 FROM images
 		 WHERE homepage = true
 		 ORDER BY uploaded_at DESC`,
@@ -649,7 +887,7 @@ func (s *userStore) listHomepageImages(ctx context.Context) ([]Image, error) {
 	images := make([]Image, 0)
 	for rows.Next() {
 		var image Image
-		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt); err != nil {
+		if err := rows.Scan(&image.ID, &image.ImageURL, &image.Date, &image.PartyID, &image.EventID, &image.TeamID, &image.UserIDs, &image.Homepage, &image.Notes, &image.UploadedAt); err != nil {
 			return nil, err
 		}
 		images = append(images, image)

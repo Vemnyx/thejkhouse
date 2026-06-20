@@ -47,6 +47,7 @@ export type ImageRecord = {
   date: string;
   partyId: number | null;
   eventId: number | null;
+  teamId: number | null;
   userIds: number[];
   homepage: boolean;
   notes: string;
@@ -79,6 +80,39 @@ export type EventRecord = {
   metadata: Record<string, unknown>;
 };
 
+export type EventUserRecord = {
+  eventId: number;
+  userId: number;
+  contestant: boolean;
+  metadata: Record<string, unknown>;
+};
+
+export type EventTeamRecord = {
+  id: number;
+  eventId: number;
+  name: string;
+  userIds: number[];
+  metadata: Record<string, unknown>;
+};
+
+export type EventDetail = {
+  event: EventRecord;
+  users: EventUserRecord[];
+  teams: EventTeamRecord[];
+};
+
+export type CreateContestantPayload = {
+  userIds: number[];
+  teamName?: string;
+  costume?: string;
+  team: boolean;
+};
+
+export type CreateContestantResponse = {
+  detail: EventDetail;
+  team?: EventTeamRecord;
+};
+
 export type CreatePartyPayload = {
   label: string;
   date: string;
@@ -96,6 +130,8 @@ export type CreateEventPayload = {
 
 export type UploadImageOptions = {
   partyId?: number | null;
+  eventId?: number | null;
+  teamId?: number | null;
   homepage?: boolean;
   notes?: string;
   userIds?: number[];
@@ -250,6 +286,38 @@ export function createEvent(token: string, payload: CreateEventPayload) {
   });
 }
 
+export function getEventDetail(token: string, id: number) {
+  return apiFetch<EventDetail>(`/events/${id}`, token);
+}
+
+export function updateEventMetadata(token: string, id: number, metadata: Record<string, unknown>) {
+  return apiFetch<EventRecord>(`/events/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ metadata }),
+  });
+}
+
+export function startEvent(token: string, id: number) {
+  return apiFetch<EventRecord>(`/events/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ startNow: true }),
+  });
+}
+
+export function createEventContestant(token: string, id: number, payload: CreateContestantPayload) {
+  return apiFetch<CreateContestantResponse>(`/events/${id}/contestants`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteEventContestant(token: string, id: number, payload: { userIds: number[]; teamId?: number | null }) {
+  return apiFetch<EventDetail>(`/events/${id}/contestants`, token, {
+    method: "DELETE",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getHomepage(token: string) {
   return apiFetch<HomepageContent>("/homepage", token);
 }
@@ -301,6 +369,12 @@ export function uploadImage(token: string, file: File, date: string, options: Up
   if (options.partyId) {
     formData.append("partyId", String(options.partyId));
   }
+  if (options.eventId) {
+    formData.append("eventId", String(options.eventId));
+  }
+  if (options.teamId) {
+    formData.append("teamId", String(options.teamId));
+  }
   if (options.homepage) {
     formData.append("homepage", "true");
   }
@@ -327,6 +401,13 @@ export function updateImageHomepage(token: string, id: number, homepage: boolean
   return apiFetch<ImageRecord>(`/images/${id}`, token, {
     method: "PATCH",
     body: JSON.stringify({ homepage }),
+  });
+}
+
+export function updateImageTags(token: string, id: number, userIds: number[]) {
+  return apiFetch<ImageRecord>(`/images/${id}`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ userIds }),
   });
 }
 

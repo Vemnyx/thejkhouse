@@ -28,6 +28,7 @@ type Image struct {
 	Date       time.Time `json:"date"`
 	PartyID    *int64    `json:"partyId"`
 	EventID    *int64    `json:"eventId"`
+	TeamID     *int64    `json:"teamId"`
 	UserIDs    []int32   `json:"userIds"`
 	Homepage   bool      `json:"homepage"`
 	Notes      string    `json:"notes"`
@@ -62,6 +63,27 @@ type Event struct {
 	Type        EventType       `json:"type"`
 	Description string          `json:"description"`
 	Metadata    json.RawMessage `json:"metadata"`
+}
+
+type EventUser struct {
+	EventID    int64           `json:"eventId"`
+	UserID     int64           `json:"userId"`
+	Contestant bool            `json:"contestant"`
+	Metadata   json.RawMessage `json:"metadata"`
+}
+
+type EventTeam struct {
+	ID       int64           `json:"id"`
+	EventID  int64           `json:"eventId"`
+	Name     string          `json:"name"`
+	UserIDs  []int32         `json:"userIds"`
+	Metadata json.RawMessage `json:"metadata"`
+}
+
+type EventDetail struct {
+	Event Event       `json:"event"`
+	Users []EventUser `json:"users"`
+	Teams []EventTeam `json:"teams"`
 }
 
 type Homepage struct {

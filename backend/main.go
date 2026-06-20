@@ -92,6 +92,7 @@ func main() {
 	mux.HandleFunc("/auth/session", server.handleAuthSession)
 	mux.HandleFunc("/emails", server.handleEmails)
 	mux.HandleFunc("/events", server.handleEvents)
+	mux.HandleFunc("/events/", server.handleEventByID)
 	mux.HandleFunc("/homepage", server.handleHomepage)
 	mux.HandleFunc("/homepage/images", server.handleHomepageImages)
 	mux.HandleFunc("/images", server.handleImages)

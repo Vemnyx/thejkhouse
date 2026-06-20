@@ -89,7 +89,8 @@ func (s *apiServer) handleDeleteImage(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateImageRequest struct {
-	Homepage bool `json:"homepage"`
+	Homepage *bool    `json:"homepage"`
+	UserIDs  *[]int32 `json:"userIds"`
 }
 
 func (s *apiServer) handleUpdateImage(w http.ResponseWriter, r *http.Request) {
@@ -119,13 +120,26 @@ func (s *apiServer) handleUpdateImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	image, err := s.store.updateImageHomepage(r.Context(), id, req.Homepage)
+	if req.Homepage == nil && req.UserIDs == nil {
+		writeError(w, http.StatusBadRequest, "image update is required")
+		return
+	}
+	if req.UserIDs != nil {
+		userIDs, err := normalizeImageUserIDs(*req.UserIDs)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		req.UserIDs = &userIDs
+	}
+
+	image, err := s.store.updateImage(r.Context(), id, req.Homepage, req.UserIDs)
 	if err != nil {
 		if isNotFound(err) {
 			writeError(w, http.StatusNotFound, "image not found")
 			return
 		}
-		log.Error("image homepage update", "error", err, "image_id", id)
+		log.Error("image update", "error", err, "image_id", id)
 		writeError(w, http.StatusInternalServerError, "failed to update image")
 		return
 	}
@@ -199,6 +213,16 @@ func (s *apiServer) handleCreateImage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	eventID, err := parseOptionalID(r.FormValue("eventId"), "event id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	teamID, err := parseOptionalID(r.FormValue("teamId"), "team id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	homepage := user.Role == RoleHost && parseFormBool(r.FormValue("homepage"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
 	userIDs, err := parseImageUserIDs(r.MultipartForm.Value["userIds"])
@@ -228,7 +252,7 @@ func (s *apiServer) handleCreateImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	image, err := s.store.createImage(r.Context(), imageURL, imageDate, partyID, homepage, notes, userIDs)
+	image, err := s.store.createImage(r.Context(), imageURL, imageDate, partyID, eventID, teamID, homepage, notes, userIDs)
 	if err != nil {
 		log.Error("image create row", "error", err, "image_url", imageURL)
 		writeError(w, http.StatusInternalServerError, "failed to save image")
@@ -258,6 +282,22 @@ func parseImageUserIDs(values []string) ([]int32, error) {
 			seen[userID] = struct{}{}
 			userIDs = append(userIDs, userID)
 		}
+	}
+	return userIDs, nil
+}
+
+func normalizeImageUserIDs(values []int32) ([]int32, error) {
+	userIDs := make([]int32, 0, len(values))
+	seen := make(map[int32]struct{}, len(values))
+	for _, userID := range values {
+		if userID < 1 {
+			return nil, errors.New("tagged user ids must be positive integers")
+		}
+		if _, ok := seen[userID]; ok {
+			continue
+		}
+		seen[userID] = struct{}{}
+		userIDs = append(userIDs, userID)
 	}
 	return userIDs, nil
 }

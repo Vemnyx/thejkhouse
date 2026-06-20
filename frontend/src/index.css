@@ -1110,6 +1110,29 @@ body {
   gap: 0.75rem;
 }
 
+.event-setup-panel,
+.event-setup-step {
+  display: grid;
+  gap: 1rem;
+}
+
+.event-category-list,
+.contestant-photo-actions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.contestant-photo-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.contestant-photo-row .selected-file {
+  grid-column: 1 / -1;
+}
+
 .party-date-trigger {
   width: fit-content;
   justify-content: center;
@@ -1507,7 +1530,8 @@ body {
 }
 
 .image-delete-button,
-.image-homepage-button {
+.image-homepage-button,
+.image-tags-button {
   position: absolute;
   right: 0.4rem;
   display: grid;
@@ -1533,8 +1557,14 @@ body {
   font-size: 1rem;
 }
 
+.image-tags-button {
+  top: 4.7rem;
+  font-size: 0.95rem;
+}
+
 .image-delete-button:hover,
 .image-homepage-button:hover,
+.image-tags-button:hover,
 .image-homepage-button.active {
   color: var(--rose-pale);
   background: rgba(42, 8, 16, 0.78);
@@ -1545,7 +1575,8 @@ body {
 }
 
 .image-delete-button:disabled,
-.image-homepage-button:disabled {
+.image-homepage-button:disabled,
+.image-tags-button:disabled {
   cursor: wait;
   opacity: 0.65;
 }

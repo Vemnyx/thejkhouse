@@ -2,10 +2,11 @@ import { type DragEvent, type FormEvent, type PointerEvent, useEffect, useMemo, 
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, EventRecord, EventType, ImageRecord, PartyRecord, createEvent, createParty, deleteImage, deleteParty, deleteUser, eventTypeLabels, generateHTMLDraft, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, updateHomepage, updateImageHomepage, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, PartyRecord, createEvent, createEventContestant, createParty, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, startEvent, updateEventMetadata, updateHomepage, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
+type EventView = "list" | "setup";
 type ImageFilter = "all" | "homepage";
 type AIDraftType = "homepage" | "party";
 type DeleteTarget =
@@ -138,6 +139,8 @@ export default function HostPage() {
   const navigate = useNavigate();
   const { appUser, firebaseUser, logout } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const contestantPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const contestantPhotoTargetRef = useRef<number | "couple" | null>(null);
   const homepageAIFileInputRef = useRef<HTMLInputElement | null>(null);
   const partyAIFileInputRef = useRef<HTMLInputElement | null>(null);
   const cropStageRef = useRef<HTMLDivElement | null>(null);
@@ -148,6 +151,9 @@ export default function HostPage() {
   const [parties, setParties] = useState<PartyRecord[]>([]);
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [partyView, setPartyView] = useState<PartyView>("list");
+  const [eventView, setEventView] = useState<EventView>("list");
+  const [selectedEventDetail, setSelectedEventDetail] = useState<EventDetail | null>(null);
+  const [loadingEventDetail, setLoadingEventDetail] = useState(false);
   const [editingParty, setEditingParty] = useState<PartyRecord | null>(null);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [file, setFile] = useState<File | null>(null);
@@ -155,6 +161,8 @@ export default function HostPage() {
   const [partyId, setPartyId] = useState("");
   const [homepage, setHomepage] = useState(false);
   const [notes, setNotes] = useState("");
+  const [uploadUserId, setUploadUserId] = useState("");
+  const [uploadUserIds, setUploadUserIds] = useState<number[]>([]);
   const [cropBox, setCropBox] = useState<CropBox | null>(null);
   const [emailTo, setEmailTo] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
@@ -182,6 +190,19 @@ export default function HostPage() {
   const [eventStartDate, setEventStartDate] = useState("");
   const [eventEndDate, setEventEndDate] = useState("");
   const [eventSummary, setEventSummary] = useState("");
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [categoryDraft, setCategoryDraft] = useState("");
+  const [eventCategories, setEventCategories] = useState<string[]>([]);
+  const [contestantModalOpen, setContestantModalOpen] = useState(false);
+  const [contestantCouple, setContestantCouple] = useState(false);
+  const [contestantUserId, setContestantUserId] = useState("");
+  const [contestantUserIds, setContestantUserIds] = useState<number[]>([]);
+  const [contestantName, setContestantName] = useState("");
+  const [contestantPhotos, setContestantPhotos] = useState<Record<number, File>>({});
+  const [couplePhoto, setCouplePhoto] = useState<File | null>(null);
+  const [contestantPhotoTarget, setContestantPhotoTarget] = useState<number | "couple" | null>(null);
+  const [savingContestant, setSavingContestant] = useState(false);
+  const [startingEvent, setStartingEvent] = useState(false);
   const [error, setError] = useState("");
   const [loadingImages, setLoadingImages] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -199,11 +220,15 @@ export default function HostPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [updatingHomepageId, setUpdatingHomepageId] = useState<number | null>(null);
+  const [updatingImageTags, setUpdatingImageTags] = useState(false);
   const [deletingPartyId, setDeletingPartyId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [previewImage, setPreviewImage] = useState<ImageRecord | null>(null);
   const [previewParty, setPreviewParty] = useState<PartyRecord | null>(null);
+  const [tagEditImage, setTagEditImage] = useState<ImageRecord | null>(null);
+  const [tagEditUserId, setTagEditUserId] = useState("");
+  const [tagEditUserIds, setTagEditUserIds] = useState<number[]>([]);
 
   const filePreviewUrl = useMemo(() => {
     if (!file) {
@@ -294,6 +319,10 @@ export default function HostPage() {
     setPartySuccess("");
     if (tab !== "parties") {
       setPartyView("list");
+    }
+    if (tab !== "events") {
+      setEventView("list");
+      setSelectedEventDetail(null);
     }
   };
 
@@ -389,6 +418,210 @@ export default function HostPage() {
     }
   };
 
+  const openEventSetup = async (event: EventRecord) => {
+    if (!firebaseUser) {
+      return;
+    }
+    setError("");
+    setLoadingEventDetail(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const detail = await getEventDetail(token, event.id);
+      setSelectedEventDetail(detail);
+      setEventCategories(eventMetadataCategories(detail.event.metadata));
+      setEventView("setup");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to load event";
+      setError(message);
+    } finally {
+      setLoadingEventDetail(false);
+    }
+  };
+
+  const addCategory = (event: FormEvent) => {
+    event.preventDefault();
+    const category = categoryDraft.trim();
+    if (!category || eventCategories.includes(category)) {
+      return;
+    }
+    setEventCategories((current) => [...current, category]);
+    setCategoryDraft("");
+    setCategoryModalOpen(false);
+  };
+
+  const saveEventCategories = async () => {
+    if (!firebaseUser || !selectedEvent) {
+      return;
+    }
+    setError("");
+    setSavingEvent(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const metadata = { ...selectedEvent.metadata, categories: eventCategories };
+      const updated = await updateEventMetadata(token, selectedEvent.id, metadata);
+      setEvents((current) => current.map((event) => (event.id === updated.id ? updated : event)));
+      setSelectedEventDetail((current) => current ? { ...current, event: updated } : current);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to save event categories";
+      setError(message);
+    } finally {
+      setSavingEvent(false);
+    }
+  };
+
+  const resetContestantForm = () => {
+    setContestantCouple(false);
+    setContestantUserId("");
+    setContestantUserIds([]);
+    setContestantName("");
+    setContestantPhotos({});
+    setCouplePhoto(null);
+    setContestantPhotoTarget(null);
+  };
+
+  const openContestantModal = () => {
+    resetContestantForm();
+    setContestantModalOpen(true);
+    setError("");
+  };
+
+  const addContestantUser = (value: string) => {
+    const userId = Number(value);
+    setContestantUserId("");
+    if (!userId) {
+      return;
+    }
+    if (contestantCouple) {
+      if (!contestantUserIds.includes(userId)) {
+        setContestantUserIds((current) => [...current, userId]);
+      }
+      return;
+    }
+    setContestantUserIds([userId]);
+  };
+
+  const removeContestantUser = (userId: number) => {
+    setContestantUserIds((current) => current.filter((id) => id !== userId));
+    setContestantPhotos((current) => {
+      const next = { ...current };
+      delete next[userId];
+      return next;
+    });
+  };
+
+  const handleContestantPhotoFile = (file: File | null) => {
+    const target = contestantPhotoTarget ?? contestantPhotoTargetRef.current;
+    if (!file || !target) {
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setError("choose an image file");
+      return;
+    }
+    if (target === "couple") {
+      setCouplePhoto(file);
+    } else {
+      setContestantPhotos((current) => ({ ...current, [target]: file }));
+    }
+    contestantPhotoTargetRef.current = null;
+    setContestantPhotoTarget(null);
+  };
+
+  const submitContestant = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!firebaseUser || !selectedEvent) {
+      return;
+    }
+    if (contestantUserIds.length === 0) {
+      setError("select at least one user");
+      return;
+    }
+    if (!contestantName.trim()) {
+      setError(contestantCouple ? "couple costume is required" : "costume name is required");
+      return;
+    }
+
+    setError("");
+    setSavingContestant(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const response = await createEventContestant(token, selectedEvent.id, {
+        userIds: contestantUserIds,
+        teamName: contestantCouple ? contestantName.trim() : undefined,
+        costume: contestantCouple ? undefined : contestantName.trim(),
+        team: contestantCouple,
+      });
+      const uploadedImages: ImageRecord[] = [];
+      const uploadDate = toDateInputValue(new Date());
+      for (const [userIdText, file] of Object.entries(contestantPhotos)) {
+        const userId = Number(userIdText);
+        const uploaded = await uploadImage(token, file, uploadDate, {
+          eventId: selectedEvent.id,
+          teamId: response.team?.id ?? null,
+          userIds: [userId],
+        });
+        uploadedImages.push(uploaded);
+      }
+      if (contestantCouple && couplePhoto) {
+        const uploaded = await uploadImage(token, couplePhoto, uploadDate, {
+          eventId: selectedEvent.id,
+          teamId: response.team?.id ?? null,
+          userIds: contestantUserIds,
+        });
+        uploadedImages.push(uploaded);
+      }
+      setImages((current) => [...uploadedImages, ...current]);
+      setSelectedEventDetail(response.detail);
+      resetContestantForm();
+      setContestantModalOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to save contestant";
+      setError(message);
+    } finally {
+      setSavingContestant(false);
+    }
+  };
+
+  const handleStartSelectedEvent = async () => {
+    if (!firebaseUser || !selectedEvent) {
+      return;
+    }
+    setError("");
+    setStartingEvent(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const updated = await startEvent(token, selectedEvent.id);
+      setEvents((current) => current.map((event) => (event.id === updated.id ? updated : event)));
+      setSelectedEventDetail((current) => current ? { ...current, event: updated } : current);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to start event";
+      setError(message);
+    } finally {
+      setStartingEvent(false);
+    }
+  };
+
+  const removeContestant = async (eventUser?: EventUserRecord, team?: EventTeamRecord) => {
+    if (!firebaseUser || !selectedEvent) {
+      return;
+    }
+    if (!eventUser && !team) {
+      return;
+    }
+    setError("");
+    try {
+      const token = await firebaseUser.getIdToken();
+      const detail = await deleteEventContestant(token, selectedEvent.id, {
+        userIds: team ? team.userIds : eventUser ? [eventUser.userId] : [],
+        teamId: team?.id ?? null,
+      });
+      setSelectedEventDetail(detail);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to remove contestant";
+      setError(message);
+    }
+  };
+
   const handleUpload = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
@@ -400,19 +633,21 @@ export default function HostPage() {
 
     setSubmitting(true);
     try {
-      const croppedFile = await createCroppedUploadFile();
       const token = await firebaseUser.getIdToken();
       const uploadDate = selectedUploadParty ? toDateInputValue(new Date(selectedUploadParty.date)) : date;
-      const uploaded = await uploadImage(token, croppedFile, uploadDate, {
+      const uploaded = await uploadImage(token, file, uploadDate, {
         partyId: partyId ? Number(partyId) : null,
         homepage,
         notes: notes.trim(),
+        userIds: uploadUserIds,
       });
       setImages((current) => [uploaded, ...current]);
       setFile(null);
       setPartyId("");
       setHomepage(false);
       setNotes("");
+      setUploadUserId("");
+      setUploadUserIds([]);
       setCropBox(null);
       setUploadModalOpen(false);
     } catch (err) {
@@ -460,6 +695,58 @@ export default function HostPage() {
       setError(message);
     } finally {
       setUpdatingHomepageId(null);
+    }
+  };
+
+  const openImageTagModal = (image: ImageRecord) => {
+    setTagEditImage(image);
+    setTagEditUserIds(image.userIds ?? []);
+    setTagEditUserId("");
+    setError("");
+  };
+
+  const closeImageTagModal = () => {
+    if (updatingImageTags) {
+      return;
+    }
+    setTagEditImage(null);
+    setTagEditUserId("");
+    setTagEditUserIds([]);
+  };
+
+  const addImageTagUser = (value: string) => {
+    setTagEditUserId("");
+    const userId = Number(value);
+    if (!userId || tagEditUserIds.includes(userId)) {
+      return;
+    }
+    setTagEditUserIds((current) => [...current, userId]);
+  };
+
+  const removeImageTagUser = (userId: number) => {
+    setTagEditUserIds((current) => current.filter((id) => id !== userId));
+  };
+
+  const saveImageTags = async () => {
+    if (!firebaseUser || !tagEditImage) {
+      return;
+    }
+
+    setError("");
+    setUpdatingImageTags(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const updated = await updateImageTags(token, tagEditImage.id, tagEditUserIds);
+      setImages((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setPreviewImage((current) => (current?.id === updated.id ? updated : current));
+      setTagEditImage(null);
+      setTagEditUserId("");
+      setTagEditUserIds([]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to update tagged users";
+      setError(message);
+    } finally {
+      setUpdatingImageTags(false);
     }
   };
 
@@ -537,6 +824,13 @@ export default function HostPage() {
     ? images.filter((image) => image.homepage)
     : images;
   const selectedUploadParty = partyId ? parties.find((party) => party.id === Number(partyId)) : null;
+  const taggedUploadUsers = uploadUserIds
+    .map((userId) => users.find((user) => user.id === userId))
+    .filter((user): user is AppUser => Boolean(user));
+  const selectedEvent = selectedEventDetail?.event ?? null;
+  const selectedEventCategories = selectedEvent ? eventMetadataCategories(selectedEvent.metadata) : [];
+  const selectedEventContestantUsers = selectedEventDetail?.users.filter((eventUser) => eventUser.contestant) ?? [];
+  const selectedEventImages = selectedEvent ? images.filter((image) => image.eventId === selectedEvent.id) : [];
 
   const handleSendEmail = async (event: FormEvent) => {
     event.preventDefault();
@@ -788,6 +1082,8 @@ export default function HostPage() {
     setPartyId("");
     setHomepage(false);
     setNotes("");
+    setUploadUserId("");
+    setUploadUserIds([]);
     setCropBox(null);
     setDraggingImage(false);
     setUploadModalOpen(true);
@@ -820,6 +1116,8 @@ export default function HostPage() {
     setPartyId("");
     setHomepage(false);
     setNotes("");
+    setUploadUserId("");
+    setUploadUserIds([]);
     setCropBox(null);
     setDraggingImage(false);
   };
@@ -840,6 +1138,32 @@ export default function HostPage() {
     setFile(droppedFile);
     setCropBox(null);
     setError("");
+  };
+
+  const handleUploadFileChange = (file: File | null) => {
+    setError("");
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setError("choose an image file");
+      return;
+    }
+    setFile(file);
+    setCropBox(null);
+  };
+
+  const addUploadUser = (value: string) => {
+    setUploadUserId("");
+    const userId = Number(value);
+    if (!userId || uploadUserIds.includes(userId)) {
+      return;
+    }
+    setUploadUserIds((current) => [...current, userId]);
+  };
+
+  const removeUploadUser = (userId: number) => {
+    setUploadUserIds((current) => current.filter((id) => id !== userId));
   };
 
   const resetCropBox = () => {
@@ -1073,7 +1397,7 @@ export default function HostPage() {
               </label>
               <div className="host-panel-actions">
                 <button className="auth-submit" type="button" onClick={openUploadModal}>
-                  Add New Image
+                  Add Photo
                 </button>
               </div>
             </div>
@@ -1119,10 +1443,20 @@ export default function HostPage() {
                       >
                         {updatingHomepageId === image.id ? "..." : image.homepage ? "★" : "☆"}
                       </button>
+                      <button
+                        className="image-tags-button"
+                        type="button"
+                        aria-label="Edit tagged users"
+                        title="Edit tagged users"
+                        onClick={() => openImageTagModal(image)}
+                      >
+                        @
+                      </button>
                     </div>
                     <div className="image-grid-meta">
                       <span>{formatDate(image.date)}</span>
                       <span>{image.partyId ? partyLabel(parties, image.partyId) : image.homepage ? "Homepage" : "No party"}</span>
+                      {taggedUserLabels(users, image.userIds).length > 0 ? <span>Tagged: {taggedUserLabels(users, image.userIds).join(", ")}</span> : null}
                       {image.notes ? <span>{image.notes}</span> : null}
                     </div>
                   </article>
@@ -1266,45 +1600,153 @@ export default function HostPage() {
             </section>
           ) : activeTab === "events" ? (
             <section className="host-panel" role="tabpanel">
-              <div className="host-panel-header">
-                <button className="auth-submit" type="button" onClick={openEventModal}>
-                  Add New Event
-                </button>
-              </div>
+              {eventView === "list" ? (
+                <>
+                  <div className="host-panel-header">
+                    <button className="auth-submit" type="button" onClick={openEventModal}>
+                      Add New Event
+                    </button>
+                  </div>
 
-              {error ? <p className="auth-error">{error}</p> : null}
+                  {error ? <p className="auth-error">{error}</p> : null}
 
-              <div className="host-table-wrap">
-                <table className="host-table">
-                  <thead>
-                    <tr>
-                      <th>Type</th>
-                      <th>Label</th>
-                      <th>Party</th>
-                      <th>Start</th>
-                      <th>End</th>
-                      <th>Summary</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {events.map((event) => (
-                      <tr key={event.id}>
-                        <td>{eventTypeLabels[event.type]}</td>
-                        <td>{event.label}</td>
-                        <td>{event.partyId ? partyLabel(parties, event.partyId) : "No party"}</td>
-                        <td>{event.startDate ? formatDate(event.startDate) : "Not set"}</td>
-                        <td>{event.endDate ? formatDate(event.endDate) : "Not set"}</td>
-                        <td>{event.description || "No summary"}</td>
-                      </tr>
-                    ))}
-                    {events.length === 0 ? (
-                      <tr>
-                        <td colSpan={6}>No events yet.</td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
+                  <div className="host-table-wrap">
+                    <table className="host-table">
+                      <thead>
+                        <tr>
+                          <th>Type</th>
+                          <th>Label</th>
+                          <th>Party</th>
+                          <th>Start</th>
+                          <th>End</th>
+                          <th>Summary</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {events.map((event) => (
+                          <tr className="clickable-row" key={event.id} onClick={() => void openEventSetup(event)}>
+                            <td>{eventTypeLabels[event.type]}</td>
+                            <td>{event.label}</td>
+                            <td>{event.partyId ? partyLabel(parties, event.partyId) : "No party"}</td>
+                            <td>{event.startDate ? formatDate(event.startDate) : "Not set"}</td>
+                            <td>{event.endDate ? formatDate(event.endDate) : "Not set"}</td>
+                            <td>{event.description || "No summary"}</td>
+                          </tr>
+                        ))}
+                        {events.length === 0 ? (
+                          <tr>
+                            <td colSpan={6}>No events yet.</td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
+                  </div>
+                  {loadingEventDetail ? <p className="loading-text">Loading event...</p> : null}
+                </>
+              ) : selectedEvent ? (
+                <div className="event-setup-panel">
+                  <div className="host-panel-header">
+                    <button className="auth-secondary" type="button" onClick={() => {
+                      setEventView("list");
+                      setSelectedEventDetail(null);
+                      setEventCategories([]);
+                      setError("");
+                    }}>
+                      Back to Events
+                    </button>
+                    <div>
+                      <h2 className="host-section-title">{selectedEvent.label}</h2>
+                      <p className="host-section-copy">{eventTypeLabels[selectedEvent.type]}</p>
+                    </div>
+                  </div>
+
+                  {error ? <p className="auth-error">{error}</p> : null}
+
+                  {selectedEventCategories.length === 0 ? (
+                    <section className="event-setup-step">
+                      <h3 className="host-section-title">Categories</h3>
+                      <button className="auth-submit" type="button" onClick={() => setCategoryModalOpen(true)}>
+                        Add Category
+                      </button>
+                      <div className="event-category-list">
+                        {eventCategories.map((category) => (
+                          <span className="tagged-user-bubble" key={category}>
+                            {category}
+                            <button type="button" onClick={() => setEventCategories((current) => current.filter((item) => item !== category))} aria-label={`Remove ${category}`}>
+                              x
+                            </button>
+                          </span>
+                        ))}
+                        {eventCategories.length === 0 ? <p className="selected-file">No categories added yet.</p> : null}
+                      </div>
+                      <button className="auth-submit" type="button" onClick={() => void saveEventCategories()} disabled={savingEvent || eventCategories.length === 0}>
+                        {savingEvent ? "Saving..." : "Next"}
+                      </button>
+                    </section>
+                  ) : (
+                    <section className="event-setup-step">
+                      <div className="host-panel-header">
+                        <button className="auth-submit" type="button" onClick={openContestantModal}>
+                          Add Contestant
+                        </button>
+                        <button className="auth-submit" type="button" onClick={() => void handleStartSelectedEvent()} disabled={startingEvent || Boolean(selectedEvent.startDate)}>
+                          {selectedEvent.startDate ? "Event Started" : startingEvent ? "Starting..." : "Start Event"}
+                        </button>
+                      </div>
+                      <div className="event-category-list">
+                        {selectedEventCategories.map((category) => (
+                          <span className="tagged-user-bubble" key={category}>{category}</span>
+                        ))}
+                      </div>
+                      <div className="host-table-wrap">
+                        <table className="host-table">
+                          <thead>
+                            <tr>
+                              <th>Contestant</th>
+                              <th>Costume</th>
+                              <th>Photos</th>
+                              <th aria-label="Actions" />
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedEventDetail?.teams.map((team) => (
+                              <tr key={`team-${team.id}`}>
+                                <td>{team.userIds.map((userId) => userLabel(users, userId)).join(" + ")}</td>
+                                <td>{team.name}</td>
+                                <td>{selectedEventImages.filter((image) => image.teamId === team.id).length}</td>
+                                <td>
+                                  <button className="auth-secondary" type="button" onClick={() => void removeContestant(undefined, team)}>
+                                    Remove
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                            {selectedEventContestantUsers
+                              .filter((eventUser) => !selectedEventDetail?.teams.some((team) => team.userIds.includes(eventUser.userId)))
+                              .map((eventUser) => (
+                                <tr key={`user-${eventUser.userId}`}>
+                                  <td>{userLabel(users, eventUser.userId)}</td>
+                                  <td>{eventUserCostume(eventUser)}</td>
+                                  <td>{selectedEventImages.filter((image) => image.userIds.includes(eventUser.userId)).length}</td>
+                                  <td>
+                                    <button className="auth-secondary" type="button" onClick={() => void removeContestant(eventUser)}>
+                                      Remove
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            {selectedEventContestantUsers.length === 0 && selectedEventDetail?.teams.length === 0 ? (
+                              <tr>
+                                <td colSpan={4}>No contestants yet.</td>
+                              </tr>
+                            ) : null}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  )}
+                </div>
+              ) : null}
             </section>
           ) : activeTab === "homepage" ? (
             <section className="host-panel" role="tabpanel">
@@ -1670,30 +2112,161 @@ export default function HostPage() {
           </div>
         ) : null}
 
+        {categoryModalOpen ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={() => setCategoryModalOpen(false)}>
+            <section className="confirmation-modal gothic-card" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+              <div className="modal-header">
+                <h2 className="host-section-title">Add Category</h2>
+                <button className="modal-close" type="button" onClick={() => setCategoryModalOpen(false)} aria-label="Close category modal">
+                  x
+                </button>
+              </div>
+              <form className="host-email-form" onSubmit={addCategory}>
+                <label className="auth-field">
+                  <span>Category</span>
+                  <input value={categoryDraft} onChange={(event) => setCategoryDraft(event.target.value)} autoFocus required />
+                </label>
+                <button className="auth-submit" type="submit">Add Category</button>
+              </form>
+            </section>
+          </div>
+        ) : null}
+
+        {contestantModalOpen ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={() => setContestantModalOpen(false)}>
+            <section className="upload-modal gothic-card" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+              <div className="modal-header">
+                <h2 className="host-section-title">Add Contestant</h2>
+                <button className="modal-close" type="button" onClick={() => setContestantModalOpen(false)} aria-label="Close contestant modal">
+                  x
+                </button>
+              </div>
+              <form className="host-email-form" onSubmit={submitContestant}>
+                <label className="auth-password-toggle">
+                  <input
+                    type="checkbox"
+                    checked={contestantCouple}
+                    onChange={(event) => {
+                      setContestantCouple(event.target.checked);
+                      setContestantUserId("");
+                      setContestantUserIds([]);
+                      setContestantPhotos({});
+                      setCouplePhoto(null);
+                    }}
+                  />
+                  <span>Couple costume</span>
+                </label>
+
+                <label className="auth-field">
+                  <span>{contestantCouple ? "Tagged users" : "User"}</span>
+                  <select value={contestantUserId} onChange={(event) => addContestantUser(event.target.value)}>
+                    <option value="">Select a user</option>
+                    {users
+                      .filter((user) => !contestantUserIds.includes(user.id))
+                      .map((user) => (
+                        <option value={user.id} key={user.id}>
+                          {userDisplayName(user)}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+
+                {contestantUserIds.length > 0 ? (
+                  <div className="tagged-user-bubbles">
+                    {contestantUserIds.map((userId) => (
+                      <span className="tagged-user-bubble" key={userId}>
+                        {userLabel(users, userId)}
+                        <button type="button" onClick={() => removeContestantUser(userId)} aria-label={`Remove ${userLabel(users, userId)}`}>
+                          x
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                <label className="auth-field">
+                  <span>{contestantCouple ? "Couple Costume" : "Costume Name"}</span>
+                  <input value={contestantName} onChange={(event) => setContestantName(event.target.value)} required />
+                </label>
+
+                <div className="contestant-photo-actions">
+                  {contestantUserIds.map((userId) => (
+                    <div className="contestant-photo-row" key={userId}>
+                      <span>{userLabel(users, userId)}</span>
+                      <button className="auth-secondary" type="button" onClick={() => {
+                        contestantPhotoTargetRef.current = userId;
+                        setContestantPhotoTarget(userId);
+                        contestantPhotoInputRef.current?.click();
+                      }}>
+                        Add Photo
+                      </button>
+                      {contestantPhotos[userId] ? <span className="selected-file">{contestantPhotos[userId].name}</span> : null}
+                    </div>
+                  ))}
+                  {contestantCouple ? (
+                    <div className="contestant-photo-row">
+                      <span>Couple</span>
+                      <button className="auth-secondary" type="button" onClick={() => {
+                        contestantPhotoTargetRef.current = "couple";
+                        setContestantPhotoTarget("couple");
+                        contestantPhotoInputRef.current?.click();
+                      }}>
+                        Add Couple Photo
+                      </button>
+                      {couplePhoto ? <span className="selected-file">{couplePhoto.name}</span> : null}
+                    </div>
+                  ) : null}
+                </div>
+
+                <input
+                  ref={contestantPhotoInputRef}
+                  className="visually-hidden"
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  onChange={(event) => {
+                    handleContestantPhotoFile(event.target.files?.[0] ?? null);
+                    event.target.value = "";
+                  }}
+                />
+
+                {error ? <p className="auth-error">{error}</p> : null}
+                <button className="auth-submit" type="submit" disabled={savingContestant}>
+                  {savingContestant ? "Saving..." : "Save Contestant"}
+                </button>
+              </form>
+            </section>
+          </div>
+        ) : null}
+
         {uploadModalOpen ? (
           <div className="modal-backdrop" role="presentation" onMouseDown={closeUploadModal}>
-            <section
-              className="upload-modal gothic-card"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="upload-modal-title"
-              onMouseDown={(event) => event.stopPropagation()}
-            >
-              <div className="card-frame" aria-hidden="true">
-                <span className="corner corner-tl" />
-                <span className="corner corner-tr" />
-                <span className="corner corner-bl" />
-                <span className="corner corner-br" />
-              </div>
-
+            <section className="upload-modal gothic-card" onMouseDown={(event) => event.stopPropagation()}>
               <div className="modal-header">
-                <h2 className="host-section-title" id="upload-modal-title">Upload image</h2>
-                <button className="modal-close" type="button" onClick={closeUploadModal} aria-label="Close upload dialog">
+                <h2 className="host-section-title">Add a Photo!</h2>
+                <button className="modal-close" type="button" onClick={closeUploadModal} aria-label="Close upload modal">
                   x
                 </button>
               </div>
 
               <form className="host-email-form" onSubmit={handleUpload}>
+                <label className="auth-field">
+                  <span>Party</span>
+                  <select value={partyId} onChange={(event) => setPartyId(event.target.value)}>
+                    <option value="">Select a party</option>
+                    {parties.map((party) => (
+                      <option key={party.id} value={party.id}>
+                        {party.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {selectedUploadParty ? (
+                  <p className="selected-file">Using party date: {formatDate(selectedUploadParty.date)}</p>
+                ) : (
+                  <ImageDateSelect value={date} onChange={setDate} />
+                )}
+
                 {!file ? (
                   <div
                     className={draggingImage ? "drop-zone dragging" : "drop-zone"}
@@ -1704,87 +2277,37 @@ export default function HostPage() {
                     onDragLeave={() => setDraggingImage(false)}
                     onDrop={handleImageDrop}
                   >
-                    <p>Drag and drop an image here</p>
-                    <span>or</span>
+                    <p>Drop an image here or choose one from your device.</p>
                     <button
-                      className="auth-secondary"
+                      className="auth-submit"
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={submitting}
                     >
-                      Choose from folder
+                      Choose Image
                     </button>
-                    <input
-                      ref={fileInputRef}
-                      className="visually-hidden"
-                      type="file"
-                      accept="image/png,image/jpeg,image/gif,image/webp"
-                      disabled={submitting}
-                      onChange={(event) => {
-                        setFile(event.target.files?.[0] ?? null);
-                        setCropBox(null);
-                        setError("");
-                      }}
-                    />
                   </div>
                 ) : (
-                  <>
-                    <p className="selected-file">Drag the square to choose the saved crop.</p>
-                    <div className="crop-stage" ref={cropStageRef}>
-                      <img src={filePreviewUrl} alt="Upload crop preview" onLoad={resetCropBox} />
-                      {cropBox ? (
-                        <div
-                          className="crop-box"
-                          style={{
-                            width: cropBox.size,
-                            height: cropBox.size,
-                            transform: `translate(${cropBox.x}px, ${cropBox.y}px)`,
-                          }}
-                          onPointerDown={handleCropPointerDown}
-                          onPointerMove={handleCropPointerMove}
-                          onPointerUp={handleCropPointerUp}
-                          onPointerCancel={handleCropPointerUp}
-                        />
-                      ) : null}
-                      {submitting ? (
-                        <div className="upload-loading" aria-label="Uploading image">
-                          <span className="confirmation-spinner" />
-                        </div>
-                      ) : null}
-                    </div>
-                    <button
-                      className="auth-secondary"
-                      type="button"
-                      onClick={() => {
-                        setFile(null);
-                        setCropBox(null);
-                      }}
-                      disabled={submitting}
-                    >
-                      Choose Different Image
-                    </button>
-                  </>
+                  <div className="upload-preview">
+                    <img src={filePreviewUrl} alt="Selected upload preview" />
+                  </div>
                 )}
-
-                {parties.length > 0 ? (
-                  <label className="auth-field">
-                    <span>Party</span>
-                    <select value={partyId} onChange={(event) => setPartyId(event.target.value)}>
-                      <option value="">No party</option>
-                      {parties.map((party) => (
-                        <option key={party.id} value={party.id}>
-                          {party.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                <input
+                  ref={fileInputRef}
+                  className="visually-hidden"
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  disabled={submitting}
+                  onChange={(event) => {
+                    handleUploadFileChange(event.target.files?.[0] ?? null);
+                    event.target.value = "";
+                  }}
+                />
+                {file ? (
+                  <button className="auth-submit" type="button" onClick={() => fileInputRef.current?.click()} disabled={submitting}>
+                    Choose Different Image
+                  </button>
                 ) : null}
-
-                {selectedUploadParty ? (
-                  <p className="selected-file">Using party date: {formatDate(selectedUploadParty.date)}</p>
-                ) : (
-                  <ImageDateSelect value={date} onChange={setDate} />
-                )}
 
                 <label className="auth-password-toggle">
                   <input
@@ -1805,9 +2328,35 @@ export default function HostPage() {
                   />
                 </label>
 
+                <label className="auth-field">
+                  <span>Tag users</span>
+                  <select value={uploadUserId} onChange={(event) => addUploadUser(event.target.value)}>
+                    <option value="">Select a user</option>
+                    {users
+                      .filter((user) => !uploadUserIds.includes(user.id))
+                      .map((user) => (
+                        <option value={user.id} key={user.id}>
+                          {userDisplayName(user)}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                {taggedUploadUsers.length > 0 ? (
+                  <div className="tagged-user-bubbles" aria-label="Tagged users">
+                    {taggedUploadUsers.map((user) => (
+                      <span className="tagged-user-bubble" key={user.id}>
+                        {userDisplayName(user)}
+                        <button type="button" onClick={() => removeUploadUser(user.id)} aria-label={`Remove ${userDisplayName(user)}`}>
+                          x
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
                 {error ? <p className="auth-error">{error}</p> : null}
 
-                <button className="auth-submit" type="submit" disabled={submitting || !file || !cropBox}>
+                <button className="auth-submit" type="submit" disabled={submitting || !file}>
                   {submitting ? "Uploading..." : "Upload Image"}
                 </button>
               </form>
@@ -1827,9 +2376,69 @@ export default function HostPage() {
               <figcaption>
                 <span>{formatDate(previewImage.date)}</span>
                 <span>{previewImage.partyId ? partyLabel(parties, previewImage.partyId) : previewImage.homepage ? "Homepage" : "No party"}</span>
+                {taggedUserLabels(users, previewImage.userIds).map((label) => (
+                  <span key={label}>{label}</span>
+                ))}
                 {previewImage.notes ? <span>{previewImage.notes}</span> : null}
               </figcaption>
             </figure>
+          </div>
+        ) : null}
+        {tagEditImage ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={closeImageTagModal}>
+            <section
+              className="upload-modal gothic-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="image-tags-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="card-frame" aria-hidden="true">
+                <span className="corner corner-tl" />
+                <span className="corner corner-tr" />
+                <span className="corner corner-bl" />
+                <span className="corner corner-br" />
+              </div>
+              <div className="modal-header">
+                <h2 className="host-section-title" id="image-tags-modal-title">Tagged Users</h2>
+                <button className="modal-close" type="button" onClick={closeImageTagModal} aria-label="Close tagged users dialog">
+                  x
+                </button>
+              </div>
+              <div className="host-email-form">
+                <label className="auth-field">
+                  <span>Add user</span>
+                  <select value={tagEditUserId} onChange={(event) => addImageTagUser(event.target.value)}>
+                    <option value="">Select a user</option>
+                    {users
+                      .filter((user) => !tagEditUserIds.includes(user.id))
+                      .map((user) => (
+                        <option value={user.id} key={user.id}>
+                          {userDisplayName(user)}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                {tagEditUserIds.length > 0 ? (
+                  <div className="tagged-user-bubbles" aria-label="Tagged users">
+                    {tagEditUserIds.map((userId) => (
+                      <span className="tagged-user-bubble" key={userId}>
+                        {userLabel(users, userId)}
+                        <button type="button" onClick={() => removeImageTagUser(userId)} aria-label={`Remove ${userLabel(users, userId)}`}>
+                          x
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="selected-file">No tagged users yet.</p>
+                )}
+                {error ? <p className="auth-error">{error}</p> : null}
+                <button className="auth-submit" type="button" onClick={() => void saveImageTags()} disabled={updatingImageTags}>
+                  {updatingImageTags ? "Saving..." : "Save Tags"}
+                </button>
+              </div>
+            </section>
           </div>
         ) : null}
         {previewParty ? (
@@ -1949,6 +2558,32 @@ function sortPartiesByDate(parties: PartyRecord[]) {
 
 function partyLabel(parties: PartyRecord[], partyId: number) {
   return parties.find((party) => party.id === partyId)?.label ?? `Party #${partyId}`;
+}
+
+function userDisplayName(user: AppUser) {
+  return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
+}
+
+function userLabel(users: AppUser[], userId: number) {
+  const user = users.find((item) => item.id === userId);
+  return user ? userDisplayName(user) : `User #${userId}`;
+}
+
+function taggedUserLabels(users: AppUser[], userIds: number[]) {
+  return userIds.map((userId) => userLabel(users, userId));
+}
+
+function eventMetadataCategories(metadata: Record<string, unknown>) {
+  const value = metadata.categories;
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function eventUserCostume(eventUser: EventUserRecord) {
+  const costume = eventUser.metadata.costume;
+  return typeof costume === "string" && costume.trim() ? costume : "No costume name";
 }
 
 function loadImage(src: string) {
