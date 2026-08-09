@@ -103,6 +103,7 @@ func main() {
 	mux.HandleFunc("/users/", server.handleUserByID)
 	mux.HandleFunc("/users/register", server.handleRegister)
 	mux.HandleFunc("/users/me", server.handleMe)
+	mux.HandleFunc("/users/me/avatar", server.handleMeAvatar)
 
 	addr := listenAddr()
 	srv := &http.Server{

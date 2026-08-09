@@ -11,6 +11,7 @@ type User struct {
 	FirstName   string     `json:"firstName"`
 	LastName    string     `json:"lastName"`
 	Birthday    *time.Time `json:"birthday"`
+	AvatarURL   *string    `json:"avatarUrl"`
 	Role        Role       `json:"role"`
 	FirebaseUID string     `json:"-"`
 	CreatedAt   time.Time  `json:"createdAt"`

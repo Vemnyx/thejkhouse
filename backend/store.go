@@ -29,7 +29,7 @@ func (s *userStore) createUser(ctx context.Context, firebaseUID, email, firstNam
 		ctx,
 		`INSERT INTO users (firebase_uid, email, first_name, last_name, birthday, role)
 		 VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING id, firebase_uid, email, first_name, last_name, birthday, role, created_at`,
+		 RETURNING id, firebase_uid, email, first_name, last_name, birthday, avatar_url, role, created_at`,
 		firebaseUID,
 		email,
 		firstName,
@@ -43,6 +43,7 @@ func (s *userStore) createUser(ctx context.Context, firebaseUID, email, firstNam
 		&user.FirstName,
 		&user.LastName,
 		&user.Birthday,
+		&user.AvatarURL,
 		&user.Role,
 		&user.CreatedAt,
 	)
@@ -69,7 +70,7 @@ func (s *userStore) confirmUserByEmail(ctx context.Context, firebaseUID, email, 
 		   last_name = EXCLUDED.last_name,
 		   birthday = EXCLUDED.birthday,
 		   role = EXCLUDED.role
-		 RETURNING id, firebase_uid, email, first_name, last_name, birthday, role, created_at`,
+		 RETURNING id, firebase_uid, email, first_name, last_name, birthday, avatar_url, role, created_at`,
 		firebaseUID,
 		email,
 		firstName,
@@ -83,6 +84,7 @@ func (s *userStore) confirmUserByEmail(ctx context.Context, firebaseUID, email, 
 		&user.FirstName,
 		&user.LastName,
 		&user.Birthday,
+		&user.AvatarURL,
 		&user.Role,
 		&user.CreatedAt,
 	)
@@ -97,7 +99,7 @@ func (s *userStore) getUserByFirebaseUID(ctx context.Context, firebaseUID string
 	var user User
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, firebase_uid, email, first_name, last_name, birthday, role, created_at
+		`SELECT id, firebase_uid, email, first_name, last_name, birthday, avatar_url, role, created_at
 		 FROM users WHERE firebase_uid = $1`,
 		firebaseUID,
 	).Scan(
@@ -107,6 +109,7 @@ func (s *userStore) getUserByFirebaseUID(ctx context.Context, firebaseUID string
 		&user.FirstName,
 		&user.LastName,
 		&user.Birthday,
+		&user.AvatarURL,
 		&user.Role,
 		&user.CreatedAt,
 	)
@@ -121,7 +124,7 @@ func (s *userStore) getUserByID(ctx context.Context, id int64) (*User, error) {
 	var user User
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, firebase_uid, email, first_name, last_name, birthday, role, created_at
+		`SELECT id, firebase_uid, email, first_name, last_name, birthday, avatar_url, role, created_at
 		 FROM users WHERE id = $1`,
 		id,
 	).Scan(
@@ -131,6 +134,7 @@ func (s *userStore) getUserByID(ctx context.Context, id int64) (*User, error) {
 		&user.FirstName,
 		&user.LastName,
 		&user.Birthday,
+		&user.AvatarURL,
 		&user.Role,
 		&user.CreatedAt,
 	)
@@ -144,7 +148,7 @@ func (s *userStore) getUserByID(ctx context.Context, id int64) (*User, error) {
 func (s *userStore) listUsers(ctx context.Context) ([]User, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, firebase_uid, email, first_name, last_name, birthday, role, created_at
+		`SELECT id, firebase_uid, email, first_name, last_name, birthday, avatar_url, role, created_at
 		 FROM users
 		 ORDER BY created_at DESC`,
 	)
@@ -163,6 +167,7 @@ func (s *userStore) listUsers(ctx context.Context) ([]User, error) {
 			&user.FirstName,
 			&user.LastName,
 			&user.Birthday,
+			&user.AvatarURL,
 			&user.Role,
 			&user.CreatedAt,
 		); err != nil {
@@ -184,7 +189,7 @@ func (s *userStore) updateUserProfile(ctx context.Context, firebaseUID, firstNam
 		`UPDATE users
 		 SET first_name = $2, last_name = $3, birthday = $4
 		 WHERE firebase_uid = $1
-		 RETURNING id, firebase_uid, email, first_name, last_name, birthday, role, created_at`,
+		 RETURNING id, firebase_uid, email, first_name, last_name, birthday, avatar_url, role, created_at`,
 		firebaseUID,
 		firstName,
 		lastName,
@@ -196,6 +201,35 @@ func (s *userStore) updateUserProfile(ctx context.Context, firebaseUID, firstNam
 		&user.FirstName,
 		&user.LastName,
 		&user.Birthday,
+		&user.AvatarURL,
+		&user.Role,
+		&user.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (s *userStore) updateUserAvatar(ctx context.Context, firebaseUID, avatarURL string) (*User, error) {
+	var user User
+	err := s.pool.QueryRow(
+		ctx,
+		`UPDATE users
+		 SET avatar_url = $2
+		 WHERE firebase_uid = $1
+		 RETURNING id, firebase_uid, email, first_name, last_name, birthday, avatar_url, role, created_at`,
+		firebaseUID,
+		avatarURL,
+	).Scan(
+		&user.ID,
+		&user.FirebaseUID,
+		&user.Email,
+		&user.FirstName,
+		&user.LastName,
+		&user.Birthday,
+		&user.AvatarURL,
 		&user.Role,
 		&user.CreatedAt,
 	)

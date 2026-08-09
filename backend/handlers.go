@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Vemnyx/thejkhouse/backend/log"
 )
@@ -137,6 +141,86 @@ func (s *apiServer) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, user)
+}
+
+func (s *apiServer) handleMeAvatar(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+
+	user, err := s.loadUserFromRequest(r)
+	if err != nil {
+		if authErr, ok := err.(*authRequestError); ok {
+			writeError(w, authErr.status, authErr.message)
+			return
+		}
+		log.Error("avatar auth", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to authorize avatar upload")
+		return
+	}
+	if s.images == nil {
+		writeError(w, http.StatusServiceUnavailable, "image uploads are not configured")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxImageUploadSize)
+	if err := r.ParseMultipartForm(maxImageUploadSize); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid multipart form")
+		return
+	}
+
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "image file is required")
+		return
+	}
+	defer func() { _ = file.Close() }()
+
+	sample := make([]byte, 512)
+	n, readErr := file.Read(sample)
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
+		log.Error("avatar read sample", "error", readErr)
+		writeError(w, http.StatusBadRequest, "failed to read image")
+		return
+	}
+	contentType, ok := detectImageContentType(sample[:n])
+	if !ok {
+		writeError(w, http.StatusBadRequest, "image must be jpeg, png, gif, or webp")
+		return
+	}
+
+	imageURL, err := s.images.upload(r.Context(), io.MultiReader(bytes.NewReader(sample[:n]), file), header.Filename, contentType, time.Now().UTC())
+	if err != nil {
+		log.Error("avatar upload", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to upload avatar")
+		return
+	}
+
+	previousAvatarURL := ""
+	if user.AvatarURL != nil {
+		previousAvatarURL = strings.TrimSpace(*user.AvatarURL)
+	}
+
+	updated, err := s.store.updateUserAvatar(r.Context(), user.FirebaseUID, imageURL)
+	if err != nil {
+		_ = s.images.delete(r.Context(), imageURL)
+		if isNotFound(err) {
+			writeError(w, http.StatusNotFound, "user not found")
+			return
+		}
+		log.Error("avatar update", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to update avatar")
+		return
+	}
+
+	if previousAvatarURL != "" && previousAvatarURL != imageURL {
+		if err := s.images.delete(r.Context(), previousAvatarURL); err != nil {
+			log.Error("avatar cleanup", "error", err, "url", previousAvatarURL)
+		}
+	}
+
+	writeJSON(w, updated)
 }
 
 func writeJSON(w http.ResponseWriter, payload any) {

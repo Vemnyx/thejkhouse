@@ -47,8 +47,9 @@ function tabFromPath(pathname: string): MainTab {
 export default function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { appUser, firebaseUser, logout, updateProfile } = useAuth();
+  const { appUser, firebaseUser, logout, updateProfile, updateAvatar } = useAuth();
   const photoFileInputRef = useRef<HTMLInputElement | null>(null);
+  const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeView, setActiveView] = useState<MainView>(() => tabFromPath(location.pathname));
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -56,6 +57,7 @@ export default function HomePage() {
   const [lastName, setLastName] = useState(appUser?.lastName ?? "");
   const [birthday, setBirthday] = useState(appUser?.birthday?.slice(0, 10) ?? "");
   const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [homepage, setHomepage] = useState<HomepageContent>({ html: "", images: [] });
@@ -352,6 +354,32 @@ export default function HomePage() {
     }
   };
 
+  const handleAvatarFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+    setMessage("");
+    setError("");
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const hadAvatar = Boolean(appUser?.avatarUrl);
+      await updateAvatar(file);
+      setMessage(hadAvatar ? "Profile picture updated." : "Profile picture added.");
+    } catch (err) {
+      const nextError = err instanceof Error ? err.message : "failed to upload profile picture";
+      setError(nextError);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   return (
     <main className="page app-shell-page">
       <div className="page-vignette" aria-hidden="true" />
@@ -420,6 +448,31 @@ export default function HomePage() {
         <section className="main-content">
           {activeView === "settings" ? (
             <div className="settings-panel">
+              <div className="settings-avatar-block">
+                <button
+                  className={appUser?.avatarUrl ? "settings-avatar has-image" : "settings-avatar"}
+                  type="button"
+                  disabled={avatarUploading}
+                  onClick={() => avatarFileInputRef.current?.click()}
+                  aria-label={appUser?.avatarUrl ? "Edit profile picture" : "Add profile picture"}
+                >
+                  {appUser?.avatarUrl ? (
+                    <img src={appUser.avatarUrl} alt="" className="settings-avatar-image" />
+                  ) : (
+                    <span className="settings-avatar-placeholder" aria-hidden="true" />
+                  )}
+                  <span className={appUser?.avatarUrl ? "settings-avatar-action edit" : "settings-avatar-action add"}>
+                    {avatarUploading ? "Uploading..." : appUser?.avatarUrl ? "Edit Profile Picture" : "Add Profile Picture"}
+                  </span>
+                </button>
+                <input
+                  ref={avatarFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(event) => void handleAvatarFileChange(event)}
+                />
+              </div>
               <form className="auth-form" onSubmit={handleSaveProfile}>
                 <div className="auth-row">
                   <label className="auth-field">
@@ -442,7 +495,7 @@ export default function HomePage() {
                 <BirthdaySelect value={birthday} onChange={setBirthday} />
                 {message ? <p className="host-success">{message}</p> : null}
                 {error ? <p className="auth-error">{error}</p> : null}
-                <button className="auth-submit" type="submit" disabled={saving}>
+                <button className="auth-submit" type="submit" disabled={saving || avatarUploading}>
                   {saving ? "Saving..." : "Save Settings"}
                 </button>
               </form>

@@ -6,6 +6,7 @@ export type AppUser = {
   firstName: string;
   lastName: string;
   birthday: string | null;
+  avatarUrl: string | null;
   role: UserRole;
   createdAt: string;
 };
@@ -283,6 +284,15 @@ export function updateProfile(token: string, payload: UpdateProfilePayload) {
   return apiFetch<AppUser>("/users/me", token, {
     method: "PATCH",
     body: JSON.stringify(payload),
+  });
+}
+
+export function uploadAvatar(token: string, file: File) {
+  const formData = new FormData();
+  formData.append("image", file);
+  return apiFetch<AppUser>("/users/me/avatar", token, {
+    method: "POST",
+    body: formData,
   });
 }
 
