@@ -112,6 +112,13 @@ export type EventVoteRecord = {
   metadata: Record<string, unknown>;
 };
 
+export type EventAttendeeRecord = {
+  eventId: number;
+  userId: number;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
 export type BracketParticipant = {
   key: string;
   type: "individual" | "team";
@@ -137,6 +144,7 @@ export type EventDetail = {
   event: EventRecord;
   users: EventUserRecord[];
   teams: EventTeamRecord[];
+  attendees: EventAttendeeRecord[];
   rounds: EventRoundRecord[];
 };
 
@@ -403,6 +411,24 @@ export function submitEventVote(token: string, id: number, metadata: Record<stri
 
 export function listEventVotes(token: string, id: number) {
   return apiFetch<EventVoteRecord[] | null>(`/events/${id}/votes`, token).then((votes) => votes ?? []);
+}
+
+export function listEventAttendees(token: string, id: number) {
+  return apiFetch<EventAttendeeRecord[] | null>(`/events/${id}/attendees`, token).then((attendees) => attendees ?? []);
+}
+
+export function addEventAttendee(token: string, id: number, payload: { userId?: number; metadata?: Record<string, unknown> } = {}) {
+  return apiFetch<EventAttendeeRecord>(`/events/${id}/attendees`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function removeEventAttendee(token: string, id: number, userId?: number) {
+  return apiFetch<Record<string, never>>(`/events/${id}/attendees`, token, {
+    method: "DELETE",
+    body: JSON.stringify(userId ? { userId } : {}),
+  });
 }
 
 export function getHomepage(token: string) {

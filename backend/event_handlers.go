@@ -40,6 +40,11 @@ type upsertContestantResponse struct {
 	Team   *EventTeam  `json:"team,omitempty"`
 }
 
+type eventAttendeeRequest struct {
+	UserID   *int64          `json:"userId"`
+	Metadata json.RawMessage `json:"metadata"`
+}
+
 type deleteContestantRequest struct {
 	UserIDs []int32 `json:"userIds"`
 	TeamID  *int64  `json:"teamId"`
@@ -186,6 +191,10 @@ func (s *apiServer) handleEventByID(w http.ResponseWriter, r *http.Request) {
 		s.handleEventVotes(w, r, id, user)
 		return
 	}
+	if suffix == "/attendees" {
+		s.handleEventAttendees(w, r, id, user)
+		return
+	}
 	if suffix == "/bracket/start" {
 		s.handleBracketStart(w, r, id, user)
 		return
@@ -316,6 +325,104 @@ func (s *apiServer) handleEventVotes(w http.ResponseWriter, r *http.Request, eve
 	}
 
 	writeJSON(w, vote)
+}
+
+func (s *apiServer) handleEventAttendees(w http.ResponseWriter, r *http.Request, eventID int64, user *User) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		methodNotAllowed(w)
+		return
+	}
+
+	if _, err := s.store.getEventByID(r.Context(), eventID); err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusNotFound, "event not found")
+			return
+		}
+		log.Error("event attendees event load", "error", err, "event_id", eventID)
+		writeError(w, http.StatusInternalServerError, "failed to load event")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		attendees, err := s.store.listEventAttendees(r.Context(), eventID)
+		if err != nil {
+			log.Error("event attendees list", "error", err, "event_id", eventID)
+			writeError(w, http.StatusInternalServerError, "failed to load attendees")
+			return
+		}
+		writeJSON(w, attendees)
+	case http.MethodPost:
+		var req eventAttendeeRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid attendee request")
+			return
+		}
+		targetUserID := user.ID
+		if req.UserID != nil {
+			if *req.UserID < 1 {
+				writeError(w, http.StatusBadRequest, "userId is invalid")
+				return
+			}
+			if user.Role != RoleHost && *req.UserID != user.ID {
+				writeError(w, http.StatusForbidden, "you can only add yourself as an attendee")
+				return
+			}
+			targetUserID = *req.UserID
+		}
+		if _, err := s.store.getUserByID(r.Context(), targetUserID); err != nil {
+			if isNotFound(err) {
+				writeError(w, http.StatusBadRequest, "user not found")
+				return
+			}
+			log.Error("event attendee user load", "error", err, "user_id", targetUserID)
+			writeError(w, http.StatusInternalServerError, "failed to load user")
+			return
+		}
+		metadata := req.Metadata
+		if len(metadata) == 0 {
+			metadata = json.RawMessage([]byte("{}"))
+		}
+		if !json.Valid(metadata) {
+			writeError(w, http.StatusBadRequest, "metadata must be valid json")
+			return
+		}
+		attendee, err := s.store.upsertEventAttendee(r.Context(), eventID, targetUserID, metadata)
+		if err != nil {
+			log.Error("event attendee upsert", "error", err, "event_id", eventID, "user_id", targetUserID)
+			writeError(w, http.StatusInternalServerError, "failed to save attendee")
+			return
+		}
+		writeJSONStatus(w, http.StatusCreated, attendee)
+	case http.MethodDelete:
+		var req eventAttendeeRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid attendee delete")
+			return
+		}
+		targetUserID := user.ID
+		if req.UserID != nil {
+			if *req.UserID < 1 {
+				writeError(w, http.StatusBadRequest, "userId is invalid")
+				return
+			}
+			if user.Role != RoleHost && *req.UserID != user.ID {
+				writeError(w, http.StatusForbidden, "you can only remove yourself as an attendee")
+				return
+			}
+			targetUserID = *req.UserID
+		}
+		if err := s.store.deleteEventAttendee(r.Context(), eventID, targetUserID); err != nil {
+			if isNotFound(err) {
+				writeError(w, http.StatusNotFound, "attendee not found")
+				return
+			}
+			log.Error("event attendee delete", "error", err, "event_id", eventID, "user_id", targetUserID)
+			writeError(w, http.StatusInternalServerError, "failed to remove attendee")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 func (s *apiServer) handleBracketStart(w http.ResponseWriter, r *http.Request, eventID int64, user *User) {

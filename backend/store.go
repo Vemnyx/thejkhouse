@@ -801,11 +801,15 @@ func (s *userStore) getEventDetail(ctx context.Context, id int64) (EventDetail, 
 	if err != nil {
 		return EventDetail{}, err
 	}
+	attendees, err := s.listEventAttendees(ctx, id)
+	if err != nil {
+		return EventDetail{}, err
+	}
 	rounds, err := s.listEventRounds(ctx, id)
 	if err != nil {
 		return EventDetail{}, err
 	}
-	return EventDetail{Event: event, Users: users, Teams: teams, Rounds: rounds}, nil
+	return EventDetail{Event: event, Users: users, Teams: teams, Attendees: attendees, Rounds: rounds}, nil
 }
 
 func (s *userStore) listEventRounds(ctx context.Context, eventID int64) ([]EventRound, error) {
@@ -1025,6 +1029,71 @@ func (s *userStore) listEventVotes(ctx context.Context, eventID int64) ([]EventV
 		return nil, err
 	}
 	return votes, nil
+}
+
+func (s *userStore) listEventAttendees(ctx context.Context, eventID int64) ([]EventAttendee, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT event_id, user_id, metadata, created_at
+		 FROM event_attendees
+		 WHERE event_id = $1
+		 ORDER BY created_at, user_id`,
+		eventID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	attendees := make([]EventAttendee, 0)
+	for rows.Next() {
+		var attendee EventAttendee
+		var metadata []byte
+		if err := rows.Scan(&attendee.EventID, &attendee.UserID, &metadata, &attendee.CreatedAt); err != nil {
+			return nil, err
+		}
+		attendee.Metadata = json.RawMessage(metadata)
+		attendees = append(attendees, attendee)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return attendees, nil
+}
+
+func (s *userStore) upsertEventAttendee(ctx context.Context, eventID int64, userID int64, metadata json.RawMessage) (EventAttendee, error) {
+	if len(metadata) == 0 || !json.Valid(metadata) {
+		metadata = json.RawMessage([]byte("{}"))
+	}
+	var attendee EventAttendee
+	var savedMetadata []byte
+	err := s.pool.QueryRow(
+		ctx,
+		`INSERT INTO event_attendees (event_id, user_id, metadata)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (event_id, user_id)
+		 DO UPDATE SET metadata = EXCLUDED.metadata
+		 RETURNING event_id, user_id, metadata, created_at`,
+		eventID,
+		userID,
+		metadata,
+	).Scan(&attendee.EventID, &attendee.UserID, &savedMetadata, &attendee.CreatedAt)
+	if err != nil {
+		return EventAttendee{}, err
+	}
+	attendee.Metadata = json.RawMessage(savedMetadata)
+	return attendee, nil
+}
+
+func (s *userStore) deleteEventAttendee(ctx context.Context, eventID int64, userID int64) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM event_attendees WHERE event_id = $1 AND user_id = $2`, eventID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }
 
 func (s *userStore) replaceEventRounds(ctx context.Context, eventID int64, rounds []bracketRoundSeed, startedAt time.Time) error {
