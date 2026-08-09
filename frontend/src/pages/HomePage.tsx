@@ -390,7 +390,8 @@ export default function HomePage() {
     if (!bounds) {
       return;
     }
-    const size = Math.min(bounds.width, bounds.height);
+    const inset = 6;
+    const size = Math.max(Math.min(bounds.width, bounds.height) - inset * 2, 48);
     setAvatarCropBox({
       size,
       x: (bounds.width - size) / 2,
