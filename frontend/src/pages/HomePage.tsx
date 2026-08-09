@@ -1,4 +1,4 @@
-import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import BirthdaySelect, { ImageDateSelect } from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
@@ -8,6 +8,9 @@ import { AppUser, EventRecord, HomepageContent, ImageRecord, PartyRecord, eventR
 type MainTab = "home" | "parties" | "photos" | "events";
 type MainView = MainTab | "settings";
 type EventDashboardTab = "active" | "upcoming" | "past";
+type CropBox = { x: number; y: number; size: number };
+
+const avatarCropOutputSize = 800;
 
 const tabs: Array<{ id: MainTab; label: string }> = [
   { id: "home", label: "Home" },
@@ -50,6 +53,8 @@ export default function HomePage() {
   const { appUser, firebaseUser, logout, updateProfile, updateAvatar } = useAuth();
   const photoFileInputRef = useRef<HTMLInputElement | null>(null);
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
+  const avatarCropStageRef = useRef<HTMLDivElement | null>(null);
+  const avatarCropDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const [activeView, setActiveView] = useState<MainView>(() => tabFromPath(location.pathname));
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -58,6 +63,9 @@ export default function HomePage() {
   const [birthday, setBirthday] = useState(appUser?.birthday?.slice(0, 10) ?? "");
   const [saving, setSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarCropOpen, setAvatarCropOpen] = useState(false);
+  const [avatarCropFile, setAvatarCropFile] = useState<File | null>(null);
+  const [avatarCropBox, setAvatarCropBox] = useState<CropBox | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [homepage, setHomepage] = useState<HomepageContent>({ html: "", images: [] });
@@ -107,6 +115,12 @@ export default function HomePage() {
   const selectedUploadParty = photoUploadPartyId
     ? parties.find((party) => party.id === Number(photoUploadPartyId)) ?? null
     : null;
+  const avatarCropPreviewUrl = useMemo(() => {
+    if (!avatarCropFile) {
+      return "";
+    }
+    return URL.createObjectURL(avatarCropFile);
+  }, [avatarCropFile]);
   const taggedUploadUsers = photoUploadUserIds
     .map((userId) => users.find((user) => user.id === userId))
     .filter((user): user is AppUser => Boolean(user));
@@ -216,6 +230,13 @@ export default function HomePage() {
     setPhotoUploadPreviewURL(objectURL);
     return () => URL.revokeObjectURL(objectURL);
   }, [photoUploadFile]);
+
+  useEffect(() => {
+    if (!avatarCropPreviewUrl) {
+      return undefined;
+    }
+    return () => URL.revokeObjectURL(avatarCropPreviewUrl);
+  }, [avatarCropPreviewUrl]);
 
   const selectView = (view: MainView) => {
     setActiveView(view);
@@ -354,7 +375,122 @@ export default function HomePage() {
     }
   };
 
-  const handleAvatarFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+  const closeAvatarCrop = () => {
+    if (avatarUploading) {
+      return;
+    }
+    setAvatarCropOpen(false);
+    setAvatarCropFile(null);
+    setAvatarCropBox(null);
+    avatarCropDragRef.current = null;
+  };
+
+  const resetAvatarCropBox = () => {
+    const bounds = avatarCropStageRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return;
+    }
+    const size = Math.min(bounds.width, bounds.height) * 0.82;
+    setAvatarCropBox({
+      size,
+      x: (bounds.width - size) / 2,
+      y: (bounds.height - size) / 2,
+    });
+  };
+
+  const constrainAvatarCropBox = (nextX: number, nextY: number, size: number) => {
+    const bounds = avatarCropStageRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return { x: nextX, y: nextY, size };
+    }
+    return {
+      size,
+      x: Math.min(Math.max(nextX, 0), Math.max(bounds.width - size, 0)),
+      y: Math.min(Math.max(nextY, 0), Math.max(bounds.height - size, 0)),
+    };
+  };
+
+  const handleAvatarCropPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (!avatarCropBox) {
+      return;
+    }
+    const bounds = avatarCropStageRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return;
+    }
+    event.currentTarget.setPointerCapture(event.pointerId);
+    avatarCropDragRef.current = {
+      offsetX: event.clientX - bounds.left - avatarCropBox.x,
+      offsetY: event.clientY - bounds.top - avatarCropBox.y,
+    };
+  };
+
+  const handleAvatarCropPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!avatarCropBox || !avatarCropDragRef.current) {
+      return;
+    }
+    const bounds = avatarCropStageRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return;
+    }
+    setAvatarCropBox(constrainAvatarCropBox(
+      event.clientX - bounds.left - avatarCropDragRef.current.offsetX,
+      event.clientY - bounds.top - avatarCropDragRef.current.offsetY,
+      avatarCropBox.size,
+    ));
+  };
+
+  const handleAvatarCropPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    avatarCropDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const createCircularAvatarFile = async () => {
+    if (!avatarCropFile || !avatarCropPreviewUrl || !avatarCropBox || !avatarCropStageRef.current) {
+      throw new Error("choose an image to crop");
+    }
+
+    const bounds = avatarCropStageRef.current.getBoundingClientRect();
+    const image = await loadImage(avatarCropPreviewUrl);
+    const scaleX = image.naturalWidth / bounds.width;
+    const scaleY = image.naturalHeight / bounds.height;
+    const canvas = document.createElement("canvas");
+    canvas.width = avatarCropOutputSize;
+    canvas.height = avatarCropOutputSize;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("failed to crop image");
+    }
+
+    ctx.clearRect(0, 0, avatarCropOutputSize, avatarCropOutputSize);
+    ctx.drawImage(
+      image,
+      avatarCropBox.x * scaleX,
+      avatarCropBox.y * scaleY,
+      avatarCropBox.size * scaleX,
+      avatarCropBox.size * scaleY,
+      0,
+      0,
+      avatarCropOutputSize,
+      avatarCropOutputSize,
+    );
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.beginPath();
+    ctx.arc(avatarCropOutputSize / 2, avatarCropOutputSize / 2, avatarCropOutputSize / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.fill();
+
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) {
+      throw new Error("failed to crop image");
+    }
+    return new File([blob], `avatar-${Date.now()}.png`, { type: "image/png" });
+  };
+
+  const handleAvatarFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     event.target.value = "";
     setMessage("");
@@ -366,11 +502,28 @@ export default function HomePage() {
       setError("Please choose an image file.");
       return;
     }
+    setAvatarCropFile(file);
+    setAvatarCropBox(null);
+    setAvatarCropOpen(true);
+  };
+
+  const handleAvatarCropSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setMessage("");
+    setError("");
+    if (!avatarCropFile || !avatarCropBox) {
+      setError("Choose an image crop before submitting.");
+      return;
+    }
 
     setAvatarUploading(true);
     try {
       const hadAvatar = Boolean(appUser?.avatarUrl);
-      await updateAvatar(file);
+      const cropped = await createCircularAvatarFile();
+      await updateAvatar(cropped);
+      setAvatarCropOpen(false);
+      setAvatarCropFile(null);
+      setAvatarCropBox(null);
       setMessage(hadAvatar ? "Profile picture updated." : "Profile picture added.");
     } catch (err) {
       const nextError = err instanceof Error ? err.message : "failed to upload profile picture";
@@ -454,7 +607,7 @@ export default function HomePage() {
                   type="button"
                   disabled={avatarUploading}
                   onClick={() => avatarFileInputRef.current?.click()}
-                  aria-label={appUser?.avatarUrl ? "Edit profile picture" : "Add profile picture"}
+                  aria-label={appUser?.avatarUrl ? "Edit picture" : "Add picture"}
                 >
                   {appUser?.avatarUrl ? (
                     <img src={appUser.avatarUrl} alt="" className="settings-avatar-image" />
@@ -462,7 +615,7 @@ export default function HomePage() {
                     <span className="settings-avatar-placeholder" aria-hidden="true" />
                   )}
                   <span className={appUser?.avatarUrl ? "settings-avatar-action edit" : "settings-avatar-action add"}>
-                    {avatarUploading ? "Uploading..." : appUser?.avatarUrl ? "Edit Profile Picture" : "Add Profile Picture"}
+                    {avatarUploading ? "Uploading..." : appUser?.avatarUrl ? "Edit Picture" : "Add Picture"}
                   </span>
                 </button>
                 <input
@@ -470,7 +623,7 @@ export default function HomePage() {
                   type="file"
                   accept="image/*"
                   hidden
-                  onChange={(event) => void handleAvatarFileChange(event)}
+                  onChange={handleAvatarFileChange}
                 />
               </div>
               <form className="auth-form" onSubmit={handleSaveProfile}>
@@ -787,6 +940,47 @@ export default function HomePage() {
           </section>
         </div>
       ) : null}
+      {avatarCropOpen && avatarCropPreviewUrl ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeAvatarCrop}>
+          <section className="upload-modal gothic-card avatar-crop-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="host-section-title">{appUser?.avatarUrl ? "Edit Picture" : "Add Picture"}</h2>
+              <button className="modal-close" type="button" onClick={closeAvatarCrop} aria-label="Close picture crop modal" disabled={avatarUploading}>
+                x
+              </button>
+            </div>
+            <form className="host-email-form" onSubmit={(event) => void handleAvatarCropSubmit(event)}>
+              <p className="selected-file">Drag the circle to choose your crop.</p>
+              <div className="crop-stage" ref={avatarCropStageRef}>
+                <img src={avatarCropPreviewUrl} alt="Profile picture crop preview" onLoad={resetAvatarCropBox} />
+                {avatarCropBox ? (
+                  <div
+                    className="crop-box crop-circle"
+                    style={{
+                      width: avatarCropBox.size,
+                      height: avatarCropBox.size,
+                      transform: `translate(${avatarCropBox.x}px, ${avatarCropBox.y}px)`,
+                    }}
+                    onPointerDown={handleAvatarCropPointerDown}
+                    onPointerMove={handleAvatarCropPointerMove}
+                    onPointerUp={handleAvatarCropPointerUp}
+                    onPointerCancel={handleAvatarCropPointerUp}
+                  />
+                ) : null}
+                {avatarUploading ? (
+                  <div className="upload-loading" aria-label="Uploading profile picture">
+                    <span className="confirmation-spinner" />
+                  </div>
+                ) : null}
+              </div>
+              {error && activeView === "settings" ? <p className="auth-error">{error}</p> : null}
+              <button className="auth-submit" type="submit" disabled={avatarUploading || !avatarCropBox}>
+                {avatarUploading ? "Uploading..." : "Submit"}
+              </button>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -796,6 +990,15 @@ function toDateInputValue(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("failed to load image"));
+    image.src = src;
+  });
 }
 
 function formatDate(value: string) {
