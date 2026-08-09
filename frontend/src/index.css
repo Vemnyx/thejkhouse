@@ -1534,22 +1534,36 @@ body {
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 0.85rem;
+  place-content: center;
+  padding: 1rem;
   border-radius: 999px;
   color: #fff;
   font-family: var(--display-font);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.08em;
-  line-height: 1.25;
+  line-height: 1.2;
   text-transform: uppercase;
   text-align: center;
-  transition: opacity 160ms ease, background 160ms ease;
+  transition: opacity 160ms ease, background 160ms ease, text-decoration-color 160ms ease, font-weight 160ms ease;
 }
 
 .settings-avatar-action.add {
   background: rgba(20, 20, 20, 0.34);
   opacity: 1;
+  font-family: var(--decorative-font);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+  text-decoration: none;
+  text-underline-offset: 0.18em;
+}
+
+.settings-avatar:hover .settings-avatar-action.add,
+.settings-avatar:focus-visible .settings-avatar-action.add {
+  font-weight: 800;
+  text-decoration: underline;
 }
 
 .settings-avatar-action.edit {
@@ -2832,11 +2846,16 @@ body {
 }
 
 .crop-box.crop-circle::after {
-  content: "Drag";
+  content: none;
 }
 
 .avatar-crop-modal .crop-stage {
   width: min(100%, 22rem);
+}
+
+.avatar-crop-form {
+  gap: 1rem;
+  justify-items: center;
 }
 
 .crop-box::after {

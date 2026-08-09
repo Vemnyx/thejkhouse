@@ -390,7 +390,7 @@ export default function HomePage() {
     if (!bounds) {
       return;
     }
-    const size = Math.min(bounds.width, bounds.height) * 0.82;
+    const size = Math.min(bounds.width, bounds.height);
     setAvatarCropBox({
       size,
       x: (bounds.width - size) / 2,
@@ -942,17 +942,10 @@ export default function HomePage() {
       ) : null}
       {avatarCropOpen && avatarCropPreviewUrl ? (
         <div className="modal-backdrop" role="presentation" onMouseDown={closeAvatarCrop}>
-          <section className="upload-modal gothic-card avatar-crop-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="host-section-title">{appUser?.avatarUrl ? "Edit Picture" : "Add Picture"}</h2>
-              <button className="modal-close" type="button" onClick={closeAvatarCrop} aria-label="Close picture crop modal" disabled={avatarUploading}>
-                x
-              </button>
-            </div>
-            <form className="host-email-form" onSubmit={(event) => void handleAvatarCropSubmit(event)}>
-              <p className="selected-file">Drag the circle to choose your crop.</p>
+          <section className="upload-modal gothic-card avatar-crop-modal" role="dialog" aria-modal="true" aria-label="Crop profile picture" onMouseDown={(event) => event.stopPropagation()}>
+            <form className="host-email-form avatar-crop-form" onSubmit={(event) => void handleAvatarCropSubmit(event)}>
               <div className="crop-stage" ref={avatarCropStageRef}>
-                <img src={avatarCropPreviewUrl} alt="Profile picture crop preview" onLoad={resetAvatarCropBox} />
+                <img src={avatarCropPreviewUrl} alt="" onLoad={resetAvatarCropBox} />
                 {avatarCropBox ? (
                   <div
                     className="crop-box crop-circle"
@@ -973,7 +966,6 @@ export default function HomePage() {
                   </div>
                 ) : null}
               </div>
-              {error && activeView === "settings" ? <p className="auth-error">{error}</p> : null}
               <button className="auth-submit" type="submit" disabled={avatarUploading || !avatarCropBox}>
                 {avatarUploading ? "Uploading..." : "Submit"}
               </button>
