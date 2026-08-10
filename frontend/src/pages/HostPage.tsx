@@ -4,7 +4,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
 import { AppUser, BracketParticipant, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
-import { searchPartyMedia } from "../lib/googleCseSearch";
+import { searchPartyMedia, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
@@ -369,6 +369,14 @@ export default function HostPage() {
 
     return cells;
   }, [partyCalendarDate]);
+
+  useEffect(() => {
+    if (partyMediaModalOpen) {
+      return;
+    }
+
+    resetPartyMediaSearchElement();
+  }, [partyMediaModalOpen]);
 
   if (appUser?.role !== "host") {
     return <Navigate to="/" replace />;
@@ -2438,13 +2446,16 @@ export default function HostPage() {
                       onClick={() => void handleSelectPartyMedia(item)}
                       disabled={partyMediaSaving}
                     >
-                      <img src={item.thumbnail || item.link} alt={item.title || "Search result"} />
-                      <span>{item.title || "Select"}</span>
+                      <img
+                        src={partyMediaType === "gif" || item.mime === "image/gif" ? item.link : item.thumbnail || item.link}
+                        alt={item.title || "Search result"}
+                      />
                     </button>
                   ))}
                 </div>
               ) : null}
               {partyMediaSaving ? <p className="dashboard-copy">Saving selected media to storage...</p> : null}
+              <div id={PARTY_MEDIA_CSE_HOST_ID} className="party-media-cse-host" aria-hidden="true" />
             </section>
           </div>
         ) : null}

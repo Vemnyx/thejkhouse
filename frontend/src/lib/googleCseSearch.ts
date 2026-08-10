@@ -2,7 +2,7 @@ import type { MediaSearchItem, MediaSearchType } from "./api";
 
 const GOOGLE_CSE_ID = "b26f26aa1ed1341d4";
 const CSE_ELEMENT_NAME = "jkhouse-party-media";
-const CSE_HOST_ID = "jkhouse-cse-host";
+export const PARTY_MEDIA_CSE_HOST_ID = "jkhouse-cse-host";
 const SEARCH_TIMEOUT_MS = 20_000;
 
 type GoogleCseImage = {
@@ -81,6 +81,42 @@ let scriptLoadPromise: Promise<void> | null = null;
 let searchGeneration = 0;
 let pendingSearch: PendingSearch | null = null;
 let gcseConfigured = false;
+let searchElementReady = false;
+
+function getHostElement() {
+  return document.getElementById(PARTY_MEDIA_CSE_HOST_ID);
+}
+
+export function releasePartyMediaSearchState() {
+  document.body.classList.remove("gsc-overflow-hidden");
+  document.documentElement.classList.remove("gsc-overflow-hidden");
+  document.body.style.overflow = "";
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.width = "";
+  document.body.style.paddingRight = "";
+  document.documentElement.style.overflow = "";
+
+  document.querySelectorAll(".gsc-results-wrapper-overlay, .gsc-modal-background-image").forEach((element) => {
+    element.remove();
+  });
+
+  window.google?.search?.cse?.element?.getElement(CSE_ELEMENT_NAME)?.clearAllResults?.();
+}
+
+export function resetPartyMediaSearchElement() {
+  if (pendingSearch) {
+    failPendingSearch("Search cancelled");
+  }
+
+  releasePartyMediaSearchState();
+  searchElementReady = false;
+
+  const host = getHostElement();
+  if (host) {
+    host.innerHTML = "";
+  }
+}
 
 function isGifResult(result: GoogleCseResult) {
   const link = (result.url || result.image?.url || "").toLowerCase();
@@ -89,12 +125,15 @@ function isGifResult(result: GoogleCseResult) {
 }
 
 function toMediaSearchItem(result: GoogleCseResult): MediaSearchItem | null {
-  const link = (result.url || result.image?.url || "").trim();
+  const pageUrl = (result.url || "").trim();
+  const imageUrl = (result.image?.url || "").trim();
+  const isGif = isGifResult(result);
+  const link = (isGif && imageUrl) || pageUrl || imageUrl;
   if (!link) {
     return null;
   }
 
-  const thumbnail = (result.thumbnailImage?.url || result.image?.url || link).trim();
+  const thumbnail = isGif ? link : (result.thumbnailImage?.url || imageUrl || link).trim();
   const title = (result.titleNoFormatting || result.title || result.visibleUrl || "Image").trim();
   const context = (result.contextUrl || result.visibleUrl || "").trim();
   const mime = (result.fileFormat || "").trim().toLowerCase();
@@ -104,7 +143,7 @@ function toMediaSearchItem(result: GoogleCseResult): MediaSearchItem | null {
     link,
     thumbnail,
     context,
-    mime: mime.includes("gif") || /\.gif(\?|$)/i.test(link) ? "image/gif" : mime ? `image/${mime}` : "image/*",
+    mime: isGif ? "image/gif" : mime ? `image/${mime}` : "image/*",
   };
 }
 
@@ -151,29 +190,21 @@ function handleResultsReady(gname: string, results: GoogleCseResult[] | null) {
   return finishPendingSearch(results);
 }
 
-function ensureHostElement() {
-  if (document.getElementById(CSE_HOST_ID)) {
+function renderSearchElement() {
+  if (!getHostElement()) {
     return;
   }
 
-  const host = document.createElement("div");
-  host.id = CSE_HOST_ID;
-  host.setAttribute("aria-hidden", "true");
-  host.style.cssText = "position:absolute;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none";
-  document.body.appendChild(host);
-}
-
-function renderSearchElement() {
-  ensureHostElement();
   window.google?.search?.cse?.element?.render({
-    div: CSE_HOST_ID,
+    div: PARTY_MEDIA_CSE_HOST_ID,
     tag: "searchresults-only",
     gname: CSE_ELEMENT_NAME,
     attributes: {
       enableImageSearch: true,
       defaultToImageSearch: true,
       disableWebSearch: false,
-      imageSearchResultSetSize: 12,
+      imageSearchResultSetSize: 40,
+      imageSearchLayout: "classic",
       safeSearch: "active",
       autoSearchOnLoad: false,
     },
@@ -236,15 +267,20 @@ function loadGoogleCseScript() {
 }
 
 async function ensureInitialized() {
+  if (!getHostElement()) {
+    throw new Error("Media search is not available");
+  }
+
   await loadGoogleCseScript();
 
-  if (window.google?.search?.cse?.element?.getElement(CSE_ELEMENT_NAME)) {
+  if (searchElementReady && window.google?.search?.cse?.element?.getElement(CSE_ELEMENT_NAME)) {
     return;
   }
 
   await new Promise<void>((resolve, reject) => {
     const tryInit = (attempt = 0) => {
       if (window.google?.search?.cse?.element?.getElement(CSE_ELEMENT_NAME)) {
+        searchElementReady = true;
         resolve();
         return;
       }
@@ -254,6 +290,7 @@ async function ensureInitialized() {
       }
 
       if (window.google?.search?.cse?.element?.getElement(CSE_ELEMENT_NAME)) {
+        searchElementReady = true;
         resolve();
         return;
       }

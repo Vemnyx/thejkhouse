@@ -15,6 +15,23 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+func (s *apiServer) resolvePartyMediaURL(ctx context.Context, mediaURL, previousURL string) (string, error) {
+	mediaURL = strings.TrimSpace(mediaURL)
+	if mediaURL == "" {
+		return "", nil
+	}
+	if s.images == nil {
+		return "", errors.New("image storage is not configured")
+	}
+
+	previousURL = strings.TrimSpace(previousURL)
+	if mediaURL == previousURL && s.images.isHostedURL(previousURL) {
+		return previousURL, nil
+	}
+
+	return s.images.ensureHostedURL(ctx, mediaURL)
+}
+
 type createPartyRequest struct {
 	Label       string `json:"label"`
 	Date        string `json:"date"`
@@ -84,13 +101,20 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	mediaURL, err := s.resolvePartyMediaURL(r.Context(), req.MediaURL, "")
+	if err != nil {
+		log.Error("party create media", "error", err)
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
 	party, err := s.store.createParty(
 		r.Context(),
 		label,
 		date,
 		strings.TrimSpace(req.Summary),
 		strings.TrimSpace(req.PartifulURL),
-		strings.TrimSpace(req.MediaURL),
+		mediaURL,
 	)
 	if err != nil {
 		log.Error("party create", "error", err)
@@ -183,6 +207,24 @@ func (s *apiServer) handlePartyByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		existingParty, err := s.store.getPartyByID(r.Context(), id)
+		if err != nil {
+			if isNotFound(err) {
+				writeError(w, http.StatusNotFound, "party not found")
+				return
+			}
+			log.Error("party update load", "error", err, "party_id", id)
+			writeError(w, http.StatusInternalServerError, "failed to load party")
+			return
+		}
+
+		mediaURL, err := s.resolvePartyMediaURL(r.Context(), req.MediaURL, existingParty.MediaURL)
+		if err != nil {
+			log.Error("party update media", "error", err, "party_id", id)
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+
 		party, err := s.store.updateParty(
 			r.Context(),
 			id,
@@ -190,7 +232,7 @@ func (s *apiServer) handlePartyByID(w http.ResponseWriter, r *http.Request) {
 			date,
 			strings.TrimSpace(req.Summary),
 			strings.TrimSpace(req.PartifulURL),
-			strings.TrimSpace(req.MediaURL),
+			mediaURL,
 		)
 		if err != nil {
 			if isNotFound(err) {

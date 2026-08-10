@@ -64,6 +64,22 @@ func (u *imageUploader) upload(ctx context.Context, r io.Reader, originalFilenam
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", u.bucket, objectName), nil
 }
 
+func (u *imageUploader) isHostedURL(imageURL string) bool {
+	_, err := u.objectNameFromURL(strings.TrimSpace(imageURL))
+	return err == nil
+}
+
+func (u *imageUploader) ensureHostedURL(ctx context.Context, sourceURL string) (string, error) {
+	sourceURL = strings.TrimSpace(sourceURL)
+	if sourceURL == "" {
+		return "", nil
+	}
+	if u.isHostedURL(sourceURL) {
+		return sourceURL, nil
+	}
+	return u.uploadFromURL(ctx, sourceURL)
+}
+
 func (u *imageUploader) uploadFromURL(ctx context.Context, sourceURL string) (string, error) {
 	parsed, err := url.Parse(strings.TrimSpace(sourceURL))
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
