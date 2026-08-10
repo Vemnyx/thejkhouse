@@ -98,7 +98,6 @@ export default function PartyPage() {
         firstName,
         avatarUrl: linkedUser?.avatarUrl ?? null,
         colorId,
-        isPlusOne: attendee.plusOneOf != null,
       };
     });
   }, [attendees, usersById]);
@@ -124,66 +123,57 @@ export default function PartyPage() {
           <p className="auth-error">{error}</p>
         ) : party ? (
           <section className="party-detail-view" aria-label={`${party.label} party details`}>
-            <div className="party-detail-top">
+            <header className="party-detail-header">
+              <h1>{party.label}</h1>
+              <section className="party-detail-meta" aria-label="When and where">
+                <article>
+                  <span>When</span>
+                  <strong>{formatPartyDateTime(party.date)}</strong>
+                </article>
+                <article>
+                  <span>Where</span>
+                  <strong>{partyVenueAddress}</strong>
+                </article>
+                {party.partifulUrl ? (
+                  <article>
+                    <span>Partiful</span>
+                    <strong>
+                      <a href={party.partifulUrl} target="_blank" rel="noreferrer">
+                        Open invite
+                      </a>
+                    </strong>
+                  </article>
+                ) : null}
+              </section>
+            </header>
+
+            <div className={party.mediaUrl ? "party-detail-top has-media" : "party-detail-top"}>
               <div className="party-detail-main">
-                <header className="party-detail-hero">
-                  <p className="eyebrow">The JK House</p>
-                  <h1>{party.label}</h1>
-                  {party.summary ? <p className="party-detail-summary">{party.summary}</p> : null}
-                </header>
-
-                <section className="party-detail-meta" aria-label="When and where">
-                  <article>
-                    <span>When</span>
-                    <strong>{formatPartyDateTime(party.date)}</strong>
-                  </article>
-                  <article>
-                    <span>Where</span>
-                    <strong>{partyVenueAddress}</strong>
-                  </article>
-                  {party.partifulUrl ? (
-                    <article>
-                      <span>Partiful</span>
-                      <strong>
-                        <a href={party.partifulUrl} target="_blank" rel="noreferrer">
-                          Open invite
-                        </a>
-                      </strong>
-                    </article>
-                  ) : null}
-                </section>
+                {party.summary ? <p className="party-detail-summary">{party.summary}</p> : null}
               </div>
-
-              <aside className="party-detail-media-card" aria-label="Party media">
-                {party.mediaUrl ? (
+              {party.mediaUrl ? (
+                <aside className="party-detail-media" aria-label="Party media">
                   <img src={party.mediaUrl} alt="" />
-                ) : (
-                  <div className="party-detail-media-empty">
-                    <span>No media yet</span>
-                  </div>
-                )}
-              </aside>
+                </aside>
+              ) : null}
             </div>
 
-            <section className="party-attendee-section" aria-label="Attendees">
+            <section className="party-attendee-section" aria-label="Attending">
               <div className="party-attendee-header">
-                <h2>Attendees</h2>
+                <h2>Attending</h2>
               </div>
               {attendeeRows.length === 0 ? (
                 <p className="dashboard-copy">No one has RSVP&apos;d yet.</p>
               ) : (
                 <ul className="party-attendee-list">
                   {attendeeRows.map((row) => (
-                    <li className={row.isPlusOne ? "party-attendee-row plus-one" : "party-attendee-row"} key={row.attendee.id}>
+                    <li className="party-attendee-row" key={row.attendee.id}>
                       <AttendeeAvatar
                         name={row.displayName}
                         firstName={row.firstName}
                         avatarUrl={row.avatarUrl}
                         colorId={row.colorId}
                       />
-                      <div className="party-attendee-copy">
-                        <span className="party-attendee-name">{row.displayName}</span>
-                      </div>
                     </li>
                   ))}
                 </ul>
@@ -212,14 +202,15 @@ function AttendeeAvatar({
   const initial = (firstName || name).trim().charAt(0).toUpperCase() || "?";
 
   if (avatarUrl) {
-    return <img className="party-attendee-avatar" src={avatarUrl} alt="" />;
+    return <img className="party-attendee-avatar" src={avatarUrl} alt={name} title={name} />;
   }
 
   return (
     <span
       className="party-attendee-avatar party-attendee-avatar-fallback"
       style={{ backgroundColor: avatarColorFromUserId(colorId) }}
-      aria-hidden="true"
+      title={name}
+      aria-label={name}
     >
       {initial}
     </span>

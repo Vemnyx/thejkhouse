@@ -378,6 +378,52 @@ export default function HostPage() {
     resetPartyMediaSearchElement();
   }, [partyMediaModalOpen]);
 
+  useEffect(() => {
+    if (!partyMediaModalOpen) {
+      return;
+    }
+
+    const query = partyMediaQuery.trim();
+    if (!query) {
+      setPartyMediaResults([]);
+      setPartyMediaError("");
+      setPartyMediaSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPartyMediaError("");
+    const timeoutId = window.setTimeout(() => {
+      void (async () => {
+        setPartyMediaSearching(true);
+        try {
+          const items = await searchPartyMedia(query, partyMediaType);
+          if (cancelled) {
+            return;
+          }
+          setPartyMediaResults(items);
+          setPartyMediaError(items.length === 0 ? "No results found. Try another query." : "");
+        } catch (err) {
+          if (cancelled) {
+            return;
+          }
+          const message = err instanceof Error ? err.message : "failed to search media";
+          setPartyMediaError(message);
+          setPartyMediaResults([]);
+        } finally {
+          if (!cancelled) {
+            setPartyMediaSearching(false);
+          }
+        }
+      })();
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [partyMediaModalOpen, partyMediaQuery, partyMediaType]);
+
   if (appUser?.role !== "host") {
     return <Navigate to="/" replace />;
   }
@@ -1271,6 +1317,10 @@ export default function HostPage() {
       setError("party date is required");
       return;
     }
+    if (!partyMediaUrl.trim()) {
+      setError("party media is required");
+      return;
+    }
 
     setSavingParty(true);
     try {
@@ -1323,31 +1373,6 @@ export default function HostPage() {
     }
     setPartyMediaModalOpen(false);
     setPartyMediaError("");
-  };
-
-  const handlePartyMediaSearch = async (event: FormEvent) => {
-    event.preventDefault();
-    setPartyMediaError("");
-    const query = partyMediaQuery.trim();
-    if (!query) {
-      setPartyMediaError("Enter a search query.");
-      return;
-    }
-
-    setPartyMediaSearching(true);
-    try {
-      const items = await searchPartyMedia(query, partyMediaType);
-      setPartyMediaResults(items);
-      if (items.length === 0) {
-        setPartyMediaError("No results found. Try another query.");
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "failed to search media";
-      setPartyMediaError(message);
-      setPartyMediaResults([]);
-    } finally {
-      setPartyMediaSearching(false);
-    }
   };
 
   const handleSelectPartyMedia = async (item: MediaSearchItem) => {
@@ -1991,17 +2016,14 @@ export default function HostPage() {
                   <div className="auth-field party-media-field">
                     <span>Party media</span>
                     {partyMediaUrl ? (
-                      <div className="party-media-preview-block">
+                      <button
+                        className="party-media-preview-button"
+                        type="button"
+                        onClick={openPartyMediaModal}
+                        aria-label="Replace party media"
+                      >
                         <img src={partyMediaUrl} alt="Selected party media" className="party-media-preview" />
-                        <div className="party-media-preview-actions">
-                          <button className="auth-secondary" type="button" onClick={openPartyMediaModal}>
-                            Change Media
-                          </button>
-                          <button className="auth-secondary" type="button" onClick={() => setPartyMediaUrl("")}>
-                            Remove
-                          </button>
-                        </div>
-                      </div>
+                      </button>
                     ) : (
                       <button className="auth-secondary" type="button" onClick={openPartyMediaModal}>
                         Select Image or GIF
@@ -2012,7 +2034,7 @@ export default function HostPage() {
 
                   {error ? <p className="auth-error">{error}</p> : null}
 
-                  <button className="auth-submit" type="submit" disabled={savingParty}>
+                  <button className="auth-submit" type="submit" disabled={savingParty || !partyMediaUrl.trim()}>
                     {savingParty ? "Saving..." : partyView === "edit" ? "Update Party" : "Create Party"}
                   </button>
                 </form>
@@ -2414,27 +2436,19 @@ export default function HostPage() {
                 </button>
               </div>
 
-              <form className="host-email-form" onSubmit={(event) => void handlePartyMediaSearch(event)}>
+              <div className="party-media-search">
                 <label className="auth-field">
                   <input
                     value={partyMediaQuery}
                     onChange={(event) => setPartyMediaQuery(event.target.value)}
                     placeholder={partyMediaType === "gif" ? "costume party gif" : "neon house party"}
                     aria-label="Search media"
-                    disabled={partyMediaSearching || partyMediaSaving}
+                    disabled={partyMediaSaving}
                   />
                 </label>
-
+                {partyMediaSearching ? <p className="dashboard-copy">Searching...</p> : null}
                 {partyMediaError ? <p className="auth-error">{partyMediaError}</p> : null}
-
-                <button
-                  className="auth-submit"
-                  type="submit"
-                  disabled={partyMediaSearching || partyMediaSaving || !partyMediaQuery.trim()}
-                >
-                  {partyMediaSearching ? "Searching..." : "Search"}
-                </button>
-              </form>
+              </div>
 
               {partyMediaResults.length > 0 ? (
                 <div className="party-media-results" aria-label="Search results">
