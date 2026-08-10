@@ -1,0 +1,3 @@
+ALTER TABLE parties
+    ADD COLUMN IF NOT EXISTS summary text NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS partiful_url text NOT NULL DEFAULT '';

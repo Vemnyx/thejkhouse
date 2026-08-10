@@ -197,6 +197,8 @@ export default function HostPage() {
   const [partyDateModalOpen, setPartyDateModalOpen] = useState(false);
   const [partyCalendarDate, setPartyCalendarDate] = useState(() => dateFromInputValue(""));
   const [partyHtml, setPartyHtml] = useState("");
+  const [partySummary, setPartySummary] = useState("");
+  const [partyPartifulUrl, setPartyPartifulUrl] = useState("");
   const [partyDraftPrompt, setPartyDraftPrompt] = useState("");
   const [partyDraftImageUrls, setPartyDraftImageUrls] = useState<string[]>([]);
   const [eventModalOpen, setEventModalOpen] = useState(false);
@@ -423,6 +425,8 @@ export default function HostPage() {
     setPartyMinute("00");
     setPartyPeriod("PM");
     setPartyHtml(defaultPartyHTML);
+    setPartySummary("");
+    setPartyPartifulUrl("");
     setPartyDraftPrompt("");
     setPartyDraftImageUrls([]);
   };
@@ -443,6 +447,8 @@ export default function HostPage() {
     setPartyMinute(parts.minute);
     setPartyPeriod(parts.period);
     setPartyHtml(party.html || defaultPartyHTML);
+    setPartySummary(party.summary || "");
+    setPartyPartifulUrl(party.partifulUrl || "");
     setPartyDraftPrompt("");
     setPartyDraftImageUrls([]);
     setPartyView("edit");
@@ -1291,6 +1297,8 @@ export default function HostPage() {
         label: partyLabelValue.trim(),
         date,
         html: partyHtml,
+        summary: partySummary.trim(),
+        partifulUrl: partyPartifulUrl.trim(),
       };
       if (partyView === "edit" && editingParty) {
         const party = await updateParty(token, editingParty.id, payload);
@@ -1935,6 +1943,23 @@ export default function HostPage() {
                       {formatPartyDateTime(partyDate, partyHour, partyMinute, partyPeriod)}
                     </button>
                   </div>
+                  <label className="auth-field host-message-field">
+                    <span>Summary</span>
+                    <textarea
+                      value={partySummary}
+                      onChange={(event) => setPartySummary(event.target.value)}
+                      rows={3}
+                      placeholder="Short overview shown when the party has no Partiful link"
+                    />
+                  </label>
+                  <label className="auth-field">
+                    <span>Partiful URL</span>
+                    <input
+                      value={partyPartifulUrl}
+                      onChange={(event) => setPartyPartifulUrl(event.target.value)}
+                      placeholder="https://partiful.com/e/..."
+                    />
+                  </label>
                   <div className="ai-draft-box">
                     <label className="auth-field host-message-field">
                       <span>AI Help</span>
@@ -3028,12 +3053,15 @@ export default function HostPage() {
                   <span>{formatDateTime(previewParty.date)}</span>
                 </div>
                 <div className="party-accordion-details">
-                  <article
-                    className="homepage-html"
-                    dangerouslySetInnerHTML={{
-                      __html: previewParty.html || "<p>No announcement HTML set.</p>",
-                    }}
-                  />
+                  {previewParty.partifulUrl ? (
+                    <p className="party-overview-copy">
+                      <a href={previewParty.partifulUrl} target="_blank" rel="noreferrer">
+                        {previewParty.partifulUrl}
+                      </a>
+                    </p>
+                  ) : (
+                    <p className="party-overview-copy">{previewParty.summary || "No summary yet."}</p>
+                  )}
                 </div>
               </article>
             </section>

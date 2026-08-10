@@ -3,13 +3,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import BirthdaySelect, { ImageDateSelect } from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, EventRecord, HomepageContent, ImageRecord, PartyRecord, eventRouteIdentifier, eventTypeLabels, getHomepage, listEvents, listImages, listParties, listUsers, uploadImage } from "../lib/api";
+import { AppUser, EventRecord, HomepageContent, ImageRecord, PartyAttendeeRecord, PartyRecord, addPartyAttendee, eventRouteIdentifier, eventTypeLabels, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, uploadImage } from "../lib/api";
 
 type MainTab = "home" | "parties" | "photos" | "events";
 type MainView = MainTab | "settings";
 type EventDashboardTab = "active" | "upcoming" | "past";
 type CropBox = { x: number; y: number; size: number };
+type RsvpModalView = "rsvp" | "guest";
 
+const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519";
 const avatarCropOutputSize = 800;
 
 const tabs: Array<{ id: MainTab; label: string }> = [
@@ -73,6 +75,18 @@ export default function HomePage() {
   const [parties, setParties] = useState<PartyRecord[]>([]);
   const [partiesLoading, setPartiesLoading] = useState(true);
   const [expandedPartyId, setExpandedPartyId] = useState<number | null>(null);
+  const [rsvpParty, setRsvpParty] = useState<PartyRecord | null>(null);
+  const [rsvpView, setRsvpView] = useState<RsvpModalView>("rsvp");
+  const [rsvpAttendees, setRsvpAttendees] = useState<PartyAttendeeRecord[]>([]);
+  const [rsvpMyAttendee, setRsvpMyAttendee] = useState<PartyAttendeeRecord | null>(null);
+  const [rsvpLoading, setRsvpLoading] = useState(false);
+  const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
+  const [rsvpError, setRsvpError] = useState("");
+  const [rsvpSuccess, setRsvpSuccess] = useState("");
+  const [guestUserId, setGuestUserId] = useState("");
+  const [guestFirstName, setGuestFirstName] = useState("");
+  const [guestLastName, setGuestLastName] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
   const [users, setUsers] = useState<AppUser[]>([]);
   const [photos, setPhotos] = useState<ImageRecord[]>([]);
   const [photosLoading, setPhotosLoading] = useState(true);
@@ -347,6 +361,116 @@ export default function HomePage() {
       setPhotoUploading(false);
     }
   };
+
+  const closeRsvpModal = () => {
+    if (rsvpSubmitting) {
+      return;
+    }
+    setRsvpParty(null);
+    setRsvpView("rsvp");
+    setRsvpAttendees([]);
+    setRsvpMyAttendee(null);
+    setRsvpError("");
+    setRsvpSuccess("");
+    setGuestUserId("");
+    setGuestFirstName("");
+    setGuestLastName("");
+    setGuestEmail("");
+  };
+
+  const refreshRsvpAttendees = async (token: string, partyId: number) => {
+    const attendees = await listPartyAttendees(token, partyId);
+    setRsvpAttendees(attendees);
+    const mine = appUser ? attendees.find((attendee) => attendee.userId === appUser.id) ?? null : null;
+    setRsvpMyAttendee(mine);
+    return { attendees, mine };
+  };
+
+  const openRsvpModal = async (party: PartyRecord) => {
+    if (!firebaseUser || !appUser) {
+      setError("You need to be signed in to RSVP.");
+      return;
+    }
+
+    setRsvpParty(party);
+    setRsvpView("rsvp");
+    setRsvpError("");
+    setRsvpSuccess("");
+    setGuestUserId("");
+    setGuestFirstName("");
+    setGuestLastName("");
+    setGuestEmail("");
+    setRsvpLoading(true);
+
+    try {
+      const token = await firebaseUser.getIdToken();
+      await addPartyAttendee(token, party.id, {});
+      await refreshRsvpAttendees(token, party.id);
+    } catch (err) {
+      const nextError = err instanceof Error ? err.message : "failed to RSVP";
+      setRsvpError(nextError);
+    } finally {
+      setRsvpLoading(false);
+    }
+  };
+
+  const openInviteGuestView = () => {
+    setRsvpView("guest");
+    setRsvpError("");
+    setRsvpSuccess("");
+    setGuestUserId("");
+    setGuestFirstName("");
+    setGuestLastName("");
+    setGuestEmail("");
+  };
+
+  const handleInviteGuest = async (event: FormEvent) => {
+    event.preventDefault();
+    setRsvpError("");
+    setRsvpSuccess("");
+    if (!firebaseUser || !rsvpParty || !rsvpMyAttendee) {
+      setRsvpError("RSVP first before inviting a guest.");
+      return;
+    }
+
+    const selectedUserId = guestUserId ? Number(guestUserId) : 0;
+    const firstName = guestFirstName.trim();
+    const lastName = guestLastName.trim();
+    const email = guestEmail.trim();
+
+    if (!selectedUserId && (!firstName || !lastName)) {
+      setRsvpError("Select a user or enter a first and last name.");
+      return;
+    }
+
+    setRsvpSubmitting(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const payload = selectedUserId
+        ? { userId: selectedUserId, plusOneOf: rsvpMyAttendee.id }
+        : { firstName, lastName, email: email || undefined, plusOneOf: rsvpMyAttendee.id };
+      await addPartyAttendee(token, rsvpParty.id, payload);
+      await refreshRsvpAttendees(token, rsvpParty.id);
+      setRsvpView("rsvp");
+      setRsvpSuccess("Guest invited.");
+      setGuestUserId("");
+      setGuestFirstName("");
+      setGuestLastName("");
+      setGuestEmail("");
+    } catch (err) {
+      const nextError = err instanceof Error ? err.message : "failed to invite guest";
+      setRsvpError(nextError);
+    } finally {
+      setRsvpSubmitting(false);
+    }
+  };
+
+  const myRsvpGuests = useMemo(() => {
+    if (!rsvpMyAttendee) {
+      return [];
+    }
+    return rsvpAttendees.filter((attendee) => attendee.plusOneOf === rsvpMyAttendee.id);
+  }, [rsvpAttendees, rsvpMyAttendee]);
 
   const goToHostDashboard = () => {
     setMobileMenuOpen(false);
@@ -685,6 +809,7 @@ export default function HomePage() {
                     const nextParty = parties[index + 1];
                     const yearChanges = !nextParty || new Date(nextParty.date).getFullYear() !== partyYear;
                     const expanded = expandedPartyId === party.id;
+                    const isFutureParty = new Date(party.date).getTime() > Date.now();
 
                     return (
                       <div className="party-accordion-group" key={party.id}>
@@ -693,19 +818,33 @@ export default function HomePage() {
                             className="party-accordion-summary"
                             type="button"
                             aria-expanded={expanded}
-                            onClick={() => setExpandedPartyId(party.id)}
+                            onClick={() => setExpandedPartyId(expanded ? null : party.id)}
                           >
                             <span>{party.label}</span>
                             <span>{formatDateTime(party.date)}</span>
                           </button>
                           {expanded ? (
                             <div className="party-accordion-details">
-                              <article
-                                className="homepage-html"
-                                dangerouslySetInnerHTML={{
-                                  __html: party.html || "<p>No party details yet.</p>",
-                                }}
-                              />
+                              {party.partifulUrl ? (
+                                <p className="party-overview-copy">
+                                  <a href={party.partifulUrl} target="_blank" rel="noreferrer">
+                                    {party.partifulUrl}
+                                  </a>
+                                </p>
+                              ) : (
+                                <>
+                                  <p className="party-overview-copy">{party.summary || "No summary yet."}</p>
+                                  {isFutureParty ? (
+                                    <button
+                                      className="party-rsvp-button"
+                                      type="button"
+                                      onClick={() => void openRsvpModal(party)}
+                                    >
+                                      RSVP
+                                    </button>
+                                  ) : null}
+                                </>
+                              )}
                             </div>
                           ) : null}
                         </article>
@@ -938,6 +1077,153 @@ export default function HomePage() {
                 {photoUploading ? "Uploading..." : "Upload Image"}
               </button>
             </form>
+          </section>
+        </div>
+      ) : null}
+      {rsvpParty ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeRsvpModal}>
+          <section
+            className="upload-modal gothic-card party-rsvp-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="party-rsvp-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2 className="host-section-title" id="party-rsvp-title">
+                {rsvpView === "guest" ? "Select Guest" : `RSVP to attend ${rsvpParty.label}`}
+              </h2>
+              <button className="modal-close" type="button" onClick={closeRsvpModal} aria-label="Close RSVP modal">
+                x
+              </button>
+            </div>
+
+            {rsvpView === "rsvp" ? (
+              <div className="party-rsvp-body">
+                {rsvpLoading ? <p className="dashboard-copy">Saving your RSVP...</p> : null}
+                <p className="party-overview-copy">
+                  <strong>When:</strong> {formatDateTime(rsvpParty.date)}
+                </p>
+                <p className="party-overview-copy">
+                  <strong>Where:</strong> {partyVenueAddress}
+                </p>
+                {rsvpMyAttendee && !rsvpLoading ? (
+                  <p className="host-success">You&apos;re on the list.</p>
+                ) : null}
+                {myRsvpGuests.length > 0 ? (
+                  <div className="party-rsvp-guests">
+                    <p className="host-section-title">Your guests</p>
+                    <ul>
+                      {myRsvpGuests.map((guest) => (
+                        <li key={guest.id}>
+                          {[guest.firstName, guest.lastName].filter(Boolean).join(" ") || guest.email || "Guest"}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {rsvpError ? <p className="auth-error">{rsvpError}</p> : null}
+                {rsvpSuccess ? <p className="host-success">{rsvpSuccess}</p> : null}
+                <button
+                  className="auth-submit"
+                  type="button"
+                  onClick={openInviteGuestView}
+                  disabled={rsvpLoading || !rsvpMyAttendee}
+                >
+                  Invite Guest
+                </button>
+              </div>
+            ) : (
+              <form className="host-email-form" onSubmit={handleInviteGuest}>
+                <label className="auth-field">
+                  <span>Select a user</span>
+                  <select
+                    value={guestUserId}
+                    onChange={(event) => {
+                      setGuestUserId(event.target.value);
+                      if (event.target.value) {
+                        setGuestFirstName("");
+                        setGuestLastName("");
+                        setGuestEmail("");
+                      }
+                    }}
+                  >
+                    <option value="">Choose a user</option>
+                    {userOptions
+                      .filter((user) => user.id !== appUser?.id)
+                      .map((user) => (
+                        <option value={user.value} key={user.id}>
+                          {user.label}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+
+                <div className="party-or-divider" role="separator">
+                  <span>-- Or --</span>
+                </div>
+
+                <label className="auth-field">
+                  <span>First Name</span>
+                  <input
+                    value={guestFirstName}
+                    onChange={(event) => {
+                      setGuestFirstName(event.target.value);
+                      if (event.target.value) {
+                        setGuestUserId("");
+                      }
+                    }}
+                    disabled={Boolean(guestUserId)}
+                  />
+                </label>
+                <label className="auth-field">
+                  <span>Last Name</span>
+                  <input
+                    value={guestLastName}
+                    onChange={(event) => {
+                      setGuestLastName(event.target.value);
+                      if (event.target.value) {
+                        setGuestUserId("");
+                      }
+                    }}
+                    disabled={Boolean(guestUserId)}
+                  />
+                </label>
+                <label className="auth-field">
+                  <span>Email (optional)</span>
+                  <input
+                    type="email"
+                    value={guestEmail}
+                    onChange={(event) => {
+                      setGuestEmail(event.target.value);
+                      if (event.target.value) {
+                        setGuestUserId("");
+                      }
+                    }}
+                    disabled={Boolean(guestUserId)}
+                  />
+                </label>
+
+                {rsvpError ? <p className="auth-error">{rsvpError}</p> : null}
+
+                <div className="party-rsvp-actions">
+                  <button
+                    className="auth-secondary"
+                    type="button"
+                    onClick={() => {
+                      setRsvpView("rsvp");
+                      setRsvpError("");
+                    }}
+                    disabled={rsvpSubmitting}
+                  >
+                    Back
+                  </button>
+                  <button className="auth-submit" type="submit" disabled={rsvpSubmitting}>
+                    {rsvpSubmitting ? "Inviting..." : "Add Guest"}
+                  </button>
+                </div>
+              </form>
+            )}
           </section>
         </div>
       ) : null}

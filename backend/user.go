@@ -37,10 +37,24 @@ type Image struct {
 }
 
 type Party struct {
-	ID    int64     `json:"id"`
-	Label string    `json:"label"`
-	Date  time.Time `json:"date"`
-	HTML  string    `json:"html"`
+	ID          int64     `json:"id"`
+	Label       string    `json:"label"`
+	Date        time.Time `json:"date"`
+	HTML        string    `json:"html"`
+	Summary     string    `json:"summary"`
+	PartifulURL string    `json:"partifulUrl"`
+}
+
+type PartyAttendee struct {
+	ID        int64           `json:"id"`
+	PartyID   int64           `json:"partyId"`
+	UserID    *int64          `json:"userId"`
+	FirstName string          `json:"firstName"`
+	LastName  string          `json:"lastName"`
+	Email     string          `json:"email"`
+	PlusOneOf *int64          `json:"plusOneOf"`
+	Metadata  json.RawMessage `json:"metadata"`
+	CreatedAt time.Time       `json:"createdAt"`
 }
 
 type EventType string

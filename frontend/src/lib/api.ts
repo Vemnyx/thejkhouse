@@ -60,6 +60,20 @@ export type PartyRecord = {
   label: string;
   date: string;
   html: string;
+  summary: string;
+  partifulUrl: string;
+};
+
+export type PartyAttendeeRecord = {
+  id: number;
+  partyId: number;
+  userId: number | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  plusOneOf: number | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
 };
 
 export type EventType = "0" | "1";
@@ -164,6 +178,17 @@ export type CreatePartyPayload = {
   label: string;
   date: string;
   html: string;
+  summary?: string;
+  partifulUrl?: string;
+};
+
+export type CreatePartyAttendeePayload = {
+  userId?: number;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  plusOneOf?: number;
+  metadata?: Record<string, unknown>;
 };
 
 export type CreateEventPayload = {
@@ -328,6 +353,25 @@ export function updateParty(token: string, id: number, payload: CreatePartyPaylo
 
 export function deleteParty(token: string, id: number) {
   return apiFetch<Record<string, never>>(`/parties/${id}`, token, {
+    method: "DELETE",
+  });
+}
+
+export function listPartyAttendees(token: string, partyId: number) {
+  return apiFetch<PartyAttendeeRecord[] | null>(`/parties/${partyId}/attendees`, token).then(
+    (attendees) => attendees ?? [],
+  );
+}
+
+export function addPartyAttendee(token: string, partyId: number, payload: CreatePartyAttendeePayload = {}) {
+  return apiFetch<PartyAttendeeRecord>(`/parties/${partyId}/attendees`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function removePartyAttendee(token: string, partyId: number, attendeeId: number) {
+  return apiFetch<Record<string, never>>(`/parties/${partyId}/attendees/${attendeeId}`, token, {
     method: "DELETE",
   });
 }
