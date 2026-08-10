@@ -22,6 +22,27 @@ type htmlDraftResponse struct {
 	HTML string `json:"html"`
 }
 
+type partySummaryReviseRequest struct {
+	Title   string `json:"title"`
+	Summary string `json:"summary"`
+}
+
+type partySummaryReviseResponse struct {
+	Summary string `json:"summary"`
+}
+
+type partyThemeSuggestRequest struct {
+	Title   string `json:"title"`
+	Summary string `json:"summary"`
+}
+
+type partyThemeSuggestResponse struct {
+	ThemePrimary    string `json:"themePrimary"`
+	ThemeAccent     string `json:"themeAccent"`
+	ThemeBackground string `json:"themeBackground"`
+	ThemeFont       string `json:"themeFont"`
+}
+
 type aiImageUploadResponse struct {
 	ImageURL string `json:"imageUrl"`
 }
@@ -81,6 +102,113 @@ func (s *apiServer) handleAIHTMLDraft(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, htmlDraftResponse{HTML: html})
+}
+
+func (s *apiServer) handleAIPartySummaryRevise(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+
+	user, err := s.loadUserFromRequest(r)
+	if err != nil {
+		if authErr, ok := err.(*authRequestError); ok {
+			writeError(w, authErr.status, authErr.message)
+			return
+		}
+		log.Error("ai party summary auth", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to authorize ai summary revision")
+		return
+	}
+	if user.Role != RoleHost {
+		writeError(w, http.StatusForbidden, "host access is required")
+		return
+	}
+	if s.ai == nil {
+		writeError(w, http.StatusServiceUnavailable, "ai drafting is not configured")
+		return
+	}
+
+	var payload partySummaryReviseRequest
+	if err := readJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	title := strings.TrimSpace(payload.Title)
+	if title == "" {
+		writeError(w, http.StatusBadRequest, "title is required")
+		return
+	}
+
+	summary, err := s.ai.revisePartySummary(r.Context(), title, payload.Summary)
+	if err != nil {
+		log.Error("ai party summary revise", "error", err)
+		if message, ok := publicAIErrorMessage(err); ok {
+			writeError(w, http.StatusBadGateway, message)
+			return
+		}
+		writeError(w, http.StatusBadGateway, "The AI revision service failed. Please try again.")
+		return
+	}
+
+	writeJSON(w, partySummaryReviseResponse{Summary: summary})
+}
+
+func (s *apiServer) handleAIPartyThemeSuggest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+
+	user, err := s.loadUserFromRequest(r)
+	if err != nil {
+		if authErr, ok := err.(*authRequestError); ok {
+			writeError(w, authErr.status, authErr.message)
+			return
+		}
+		log.Error("ai party theme auth", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to authorize ai theme suggestion")
+		return
+	}
+	if user.Role != RoleHost {
+		writeError(w, http.StatusForbidden, "host access is required")
+		return
+	}
+	if s.ai == nil {
+		writeError(w, http.StatusServiceUnavailable, "ai drafting is not configured")
+		return
+	}
+
+	var payload partyThemeSuggestRequest
+	if err := readJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	title := strings.TrimSpace(payload.Title)
+	if title == "" {
+		writeError(w, http.StatusBadRequest, "title is required")
+		return
+	}
+
+	suggestion, err := s.ai.suggestPartyTheme(r.Context(), title, payload.Summary)
+	if err != nil {
+		log.Error("ai party theme suggest", "error", err)
+		if message, ok := publicAIErrorMessage(err); ok {
+			writeError(w, http.StatusBadGateway, message)
+			return
+		}
+		writeError(w, http.StatusBadGateway, "The AI theme suggestion failed. Please try again.")
+		return
+	}
+
+	writeJSON(w, partyThemeSuggestResponse{
+		ThemePrimary:    suggestion.ThemePrimary,
+		ThemeAccent:     suggestion.ThemeAccent,
+		ThemeBackground: suggestion.ThemeBackground,
+		ThemeFont:       suggestion.ThemeFont,
+	})
 }
 
 func (s *apiServer) handleAIImageUpload(w http.ResponseWriter, r *http.Request) {

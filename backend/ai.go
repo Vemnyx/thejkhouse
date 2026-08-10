@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -120,9 +121,71 @@ func loadCursorAPIKey(ctx context.Context) (string, error) {
 
 func (c *aiClient) generateHTML(ctx context.Context, blockType string, instructions string, existingHTML string, imageURLs []string) (string, error) {
 	prompt := buildHTMLPrompt(blockType, instructions, existingHTML, imageURLs)
+	result, err := c.runPrompt(ctx, "Draft JK House HTML block", prompt)
+	if err != nil {
+		if errors.Is(err, errAIRunTimeout) {
+			return "", newPublicAIError("The AI draft took too long. Try again with shorter instructions.", err)
+		}
+		return "", err
+	}
+
+	html := cleanGeneratedHTML(result)
+	if html == "" {
+		return "", newPublicAIError("The AI returned an empty draft. Try adding more detail to the prompt.", fmt.Errorf("cursor returned empty html"))
+	}
+	html = ensureUploadedImagesIncluded(html, imageURLs)
+	if err := validateGeneratedHTML(blockType, html); err != nil {
+		return "", newPublicAIError(err.Error(), err)
+	}
+
+	return html, nil
+}
+
+func (c *aiClient) revisePartySummary(ctx context.Context, title, summary string) (string, error) {
+	prompt := buildPartySummaryPrompt(title, summary)
+	result, err := c.runPrompt(ctx, "Revise JK House party summary", prompt)
+	if err != nil {
+		if errors.Is(err, errAIRunTimeout) {
+			return "", newPublicAIError("The AI revision took too long. Try again with a shorter summary.", err)
+		}
+		return "", err
+	}
+
+	revised := cleanGeneratedText(result)
+	if revised == "" {
+		return "", newPublicAIError("The AI returned an empty summary. Try adding more detail first.", fmt.Errorf("cursor returned empty summary"))
+	}
+	return revised, nil
+}
+
+type partyThemeSuggestion struct {
+	ThemePrimary    string `json:"themePrimary"`
+	ThemeAccent     string `json:"themeAccent"`
+	ThemeBackground string `json:"themeBackground"`
+	ThemeFont       string `json:"themeFont"`
+}
+
+func (c *aiClient) suggestPartyTheme(ctx context.Context, title, summary string) (partyThemeSuggestion, error) {
+	prompt := buildPartyThemePrompt(title, summary)
+	result, err := c.runPrompt(ctx, "Suggest JK House party theme", prompt)
+	if err != nil {
+		if errors.Is(err, errAIRunTimeout) {
+			return partyThemeSuggestion{}, newPublicAIError("The AI theme suggestion took too long. Please try again.", err)
+		}
+		return partyThemeSuggestion{}, err
+	}
+
+	suggestion, err := parsePartyThemeSuggestion(result)
+	if err != nil {
+		return partyThemeSuggestion{}, newPublicAIError("The AI returned an invalid theme suggestion. Please try again.", err)
+	}
+	return suggestion, nil
+}
+
+func (c *aiClient) runPrompt(ctx context.Context, name, prompt string) (string, error) {
 	createPayload := cursorCreateAgentRequest{
 		Prompt: cursorPrompt{Text: prompt},
-		Name:   "Draft JK House HTML block",
+		Name:   name,
 		Repos: []cursorRepo{
 			{URL: cursorRepoURL, StartingRef: "main"},
 		},
@@ -139,25 +202,13 @@ func (c *aiClient) generateHTML(ctx context.Context, blockType string, instructi
 
 	run, err := c.waitForRun(ctx, created.Agent.ID, created.Run.ID)
 	if err != nil {
-		if errors.Is(err, errAIRunTimeout) {
-			return "", newPublicAIError("The AI draft took too long. Try again with shorter instructions.", err)
-		}
 		return "", err
 	}
 	if strings.ToUpper(run.Status) != "FINISHED" {
-		return "", newPublicAIError("The AI draft could not be completed. Try again with a simpler prompt.", fmt.Errorf("cursor run ended with status %s", run.Status))
+		return "", newPublicAIError("The AI could not complete the request. Please try again.", fmt.Errorf("cursor run ended with status %s", run.Status))
 	}
 
-	html := cleanGeneratedHTML(run.Result)
-	if html == "" {
-		return "", newPublicAIError("The AI returned an empty draft. Try adding more detail to the prompt.", fmt.Errorf("cursor returned empty html"))
-	}
-	html = ensureUploadedImagesIncluded(html, imageURLs)
-	if err := validateGeneratedHTML(blockType, html); err != nil {
-		return "", newPublicAIError(err.Error(), err)
-	}
-
-	return html, nil
+	return run.Result, nil
 }
 
 func (c *aiClient) waitForRun(ctx context.Context, agentID string, runID string) (cursorRun, error) {
@@ -260,12 +311,111 @@ Existing HTML, if any:
 %s`, instructions, imageInstructions, existingHTML)
 }
 
+func buildPartySummaryPrompt(title, summary string) string {
+	title = strings.TrimSpace(title)
+	summary = strings.TrimSpace(summary)
+	if title == "" {
+		title = "Untitled party"
+	}
+	if summary == "" {
+		summary = "(empty — write a fresh summary from the party title)"
+	}
+
+	return fmt.Sprintf(`You are helping The JK House host revise a party invitation summary.
+
+The JK House is a stylish private house party venue with a gothic / rose-and-gold aesthetic. Write inviting, vivid, concise copy that fits that vibe without being cheesy.
+
+Rules:
+- Do not edit files.
+- Return only the revised summary as plain text.
+- Do not include markdown fences, titles, labels, bullet lists, or explanations.
+- Do not include HTML tags.
+- Keep it roughly 2-5 short paragraphs or a tight paragraph block suitable for a party page summary.
+- Preserve any concrete details from the draft (dress code, BYOB, theme, timing notes) unless they conflict.
+- Improve clarity, flow, and atmosphere.
+
+Party title:
+%s
+
+Current summary draft:
+%s`, title, summary)
+}
+
+func buildPartyThemePrompt(title, summary string) string {
+	title = strings.TrimSpace(title)
+	summary = strings.TrimSpace(summary)
+	if title == "" {
+		title = "Untitled party"
+	}
+	if summary == "" {
+		summary = "(no summary provided)"
+	}
+
+	fontIDs := make([]string, 0, len(partyThemeFonts))
+	for id := range partyThemeFonts {
+		fontIDs = append(fontIDs, id)
+	}
+	sort.Strings(fontIDs)
+
+	return fmt.Sprintf(`You are helping The JK House host choose a party page theme.
+
+Pick colors and a title font that fit the party mood. The site is dark and stylish, so background should usually stay dark while primary/accent can be vivid.
+
+Rules:
+- Do not edit files.
+- Return ONLY a single JSON object, no markdown fences or explanation.
+- Use exactly these keys: themePrimary, themeAccent, themeBackground, themeFont.
+- themePrimary, themeAccent, and themeBackground must be 6-digit hex colors like #f2b8c4.
+- themeFont must be exactly one of these ids: %s
+- Prefer readable contrast: light/bright primary and accent on a dark background.
+
+Party title:
+%s
+
+Party summary:
+%s
+
+Example shape:
+{"themePrimary":"#f2b8c4","themeAccent":"#b8926a","themeBackground":"#030303","themeFont":"cinzel-decorative"}`, strings.Join(fontIDs, ", "), title, summary)
+}
+
+func parsePartyThemeSuggestion(value string) (partyThemeSuggestion, error) {
+	text := cleanGeneratedText(value)
+	start := strings.Index(text, "{")
+	end := strings.LastIndex(text, "}")
+	if start < 0 || end <= start {
+		return partyThemeSuggestion{}, fmt.Errorf("theme suggestion missing json object")
+	}
+
+	var suggestion partyThemeSuggestion
+	if err := json.Unmarshal([]byte(text[start:end+1]), &suggestion); err != nil {
+		return partyThemeSuggestion{}, err
+	}
+
+	suggestion.ThemePrimary = normalizePartyThemeColor(suggestion.ThemePrimary, defaultPartyThemePrimary)
+	suggestion.ThemeAccent = normalizePartyThemeColor(suggestion.ThemeAccent, defaultPartyThemeAccent)
+	suggestion.ThemeBackground = normalizePartyThemeColor(suggestion.ThemeBackground, defaultPartyThemeBackground)
+	suggestion.ThemeFont = normalizePartyThemeFont(suggestion.ThemeFont)
+	return suggestion, nil
+}
+
 func cleanGeneratedHTML(value string) string {
 	html := strings.TrimSpace(value)
 	html = strings.TrimPrefix(html, "```html")
 	html = strings.TrimPrefix(html, "```")
 	html = strings.TrimSuffix(html, "```")
 	return strings.TrimSpace(html)
+}
+
+func cleanGeneratedText(value string) string {
+	text := strings.TrimSpace(value)
+	text = strings.TrimPrefix(text, "```text")
+	text = strings.TrimPrefix(text, "```markdown")
+	text = strings.TrimPrefix(text, "```")
+	text = strings.TrimSuffix(text, "```")
+	text = strings.TrimSpace(text)
+	text = regexp.MustCompile(`(?is)</?[a-z][^>]*>`).ReplaceAllString(text, "")
+	return strings.TrimSpace(text)
 }
 
 func ensureUploadedImagesIncluded(html string, imageURLs []string) string {

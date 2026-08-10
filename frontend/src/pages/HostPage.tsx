@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, revisePartySummary, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 import { searchPartyMedia, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, isGifMediaItem } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
@@ -33,6 +33,35 @@ type CropBox = {
   y: number;
   size: number;
 };
+
+type PartyThemeSnapshot = {
+  primary: string;
+  accent: string;
+  background: string;
+  font: string;
+};
+
+function randomPartyThemeHex(kind: "vivid" | "dark") {
+  if (kind === "dark") {
+    const channel = () => Math.floor(Math.random() * 36);
+    const toHex = (value: number) => value.toString(16).padStart(2, "0");
+    return `#${toHex(channel())}${toHex(channel())}${toHex(channel())}`;
+  }
+
+  const channel = () => 120 + Math.floor(Math.random() * 136);
+  const toHex = (value: number) => value.toString(16).padStart(2, "0");
+  return `#${toHex(channel())}${toHex(channel())}${toHex(channel())}`;
+}
+
+function randomPartyThemeSnapshot(): PartyThemeSnapshot {
+  const font = PARTY_THEME_FONTS[Math.floor(Math.random() * PARTY_THEME_FONTS.length)]?.id || DEFAULT_PARTY_THEME_FONT;
+  return {
+    primary: randomPartyThemeHex("vivid"),
+    accent: randomPartyThemeHex("vivid"),
+    background: randomPartyThemeHex("dark"),
+    font,
+  };
+}
 
 const uploadCropSize = 1200;
 const calendarMonths = [
@@ -170,10 +199,14 @@ export default function HostPage() {
   const [partyDateModalOpen, setPartyDateModalOpen] = useState(false);
   const [partyCalendarDate, setPartyCalendarDate] = useState(() => dateFromInputValue(""));
   const [partySummary, setPartySummary] = useState("");
+  const [partySummaryRevisionBackup, setPartySummaryRevisionBackup] = useState<string | null>(null);
+  const [revisingPartySummary, setRevisingPartySummary] = useState(false);
   const [partyThemePrimary, setPartyThemePrimary] = useState(DEFAULT_PARTY_THEME_PRIMARY);
   const [partyThemeAccent, setPartyThemeAccent] = useState(DEFAULT_PARTY_THEME_ACCENT);
   const [partyThemeBackground, setPartyThemeBackground] = useState(DEFAULT_PARTY_THEME_BACKGROUND);
   const [partyThemeFont, setPartyThemeFont] = useState(DEFAULT_PARTY_THEME_FONT);
+  const [partyThemeSuggestionBackup, setPartyThemeSuggestionBackup] = useState<PartyThemeSnapshot | null>(null);
+  const [suggestingPartyTheme, setSuggestingPartyTheme] = useState(false);
   const [partySetupModalOpen, setPartySetupModalOpen] = useState(false);
   const [partySetupStep, setPartySetupStep] = useState<PartySetupStep>("details");
   const [partyThemeModalOpen, setPartyThemeModalOpen] = useState(false);
@@ -509,10 +542,14 @@ export default function HostPage() {
     setPartyMinute("00");
     setPartyPeriod("PM");
     setPartySummary("");
+    setPartySummaryRevisionBackup(null);
+    setRevisingPartySummary(false);
     setPartyThemePrimary(DEFAULT_PARTY_THEME_PRIMARY);
     setPartyThemeAccent(DEFAULT_PARTY_THEME_ACCENT);
     setPartyThemeBackground(DEFAULT_PARTY_THEME_BACKGROUND);
     setPartyThemeFont(DEFAULT_PARTY_THEME_FONT);
+    setPartyThemeSuggestionBackup(null);
+    setSuggestingPartyTheme(false);
     setPartySetupModalOpen(false);
     setPartySetupStep("details");
     setPartyThemeModalOpen(false);
@@ -533,7 +570,7 @@ export default function HostPage() {
   };
 
   const closePartySetupModal = () => {
-    if (partyMediaSearching || partyMediaSaving) {
+    if (partyMediaSearching || partyMediaSaving || savingParty || revisingPartySummary || suggestingPartyTheme) {
       return;
     }
     setPartySetupModalOpen(false);
@@ -561,7 +598,187 @@ export default function HostPage() {
     if (step === "media") {
       resetPartyMediaSearchState();
     }
+    if (step !== "summary") {
+      setPartySummaryRevisionBackup(null);
+      setRevisingPartySummary(false);
+    }
+    if (step !== "theme") {
+      setPartyThemeSuggestionBackup(null);
+      setSuggestingPartyTheme(false);
+    }
     setPartySetupStep(step);
+  };
+
+  const handleRevisePartySummary = async () => {
+    if (!firebaseUser || revisingPartySummary) {
+      return;
+    }
+    if (!partyLabelValue.trim()) {
+      setError("party title is required");
+      return;
+    }
+
+    setError("");
+    setRevisingPartySummary(true);
+    const previousSummary = partySummary;
+    try {
+      const token = await firebaseUser.getIdToken();
+      const revised = await revisePartySummary(token, {
+        title: partyLabelValue.trim(),
+        summary: partySummary,
+      });
+      setPartySummaryRevisionBackup(previousSummary);
+      setPartySummary(revised.summary);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to revise summary";
+      setError(message);
+    } finally {
+      setRevisingPartySummary(false);
+    }
+  };
+
+  const handleUndoPartySummaryRevision = () => {
+    if (partySummaryRevisionBackup == null) {
+      return;
+    }
+    setPartySummary(partySummaryRevisionBackup);
+    setPartySummaryRevisionBackup(null);
+    setError("");
+  };
+
+  const currentPartyThemeSnapshot = (): PartyThemeSnapshot => ({
+    primary: partyThemePrimary,
+    accent: partyThemeAccent,
+    background: partyThemeBackground,
+    font: partyThemeFont,
+  });
+
+  const applyPartyThemeSnapshot = (theme: PartyThemeSnapshot) => {
+    setPartyThemePrimary(normalizePartyThemeHex(theme.primary, DEFAULT_PARTY_THEME_PRIMARY));
+    setPartyThemeAccent(normalizePartyThemeHex(theme.accent, DEFAULT_PARTY_THEME_ACCENT));
+    setPartyThemeBackground(normalizePartyThemeHex(theme.background, DEFAULT_PARTY_THEME_BACKGROUND));
+    setPartyThemeFont(normalizePartyThemeFont(theme.font));
+  };
+
+  const handleSuggestPartyTheme = async () => {
+    if (!firebaseUser || suggestingPartyTheme) {
+      return;
+    }
+    if (!partyLabelValue.trim()) {
+      setError("party title is required");
+      return;
+    }
+
+    setError("");
+    setSuggestingPartyTheme(true);
+    const previousTheme = currentPartyThemeSnapshot();
+    try {
+      const token = await firebaseUser.getIdToken();
+      const suggestion = await suggestPartyTheme(token, {
+        title: partyLabelValue.trim(),
+        summary: partySummary,
+      });
+      setPartyThemeSuggestionBackup(previousTheme);
+      applyPartyThemeSnapshot({
+        primary: suggestion.themePrimary,
+        accent: suggestion.themeAccent,
+        background: suggestion.themeBackground,
+        font: suggestion.themeFont,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to suggest theme";
+      setError(message);
+    } finally {
+      setSuggestingPartyTheme(false);
+    }
+  };
+
+  const handleUndoPartyThemeSuggestion = () => {
+    if (partyThemeSuggestionBackup == null) {
+      return;
+    }
+    applyPartyThemeSnapshot(partyThemeSuggestionBackup);
+    setPartyThemeSuggestionBackup(null);
+    setError("");
+  };
+
+  const handleRandomizePartyTheme = () => {
+    setPartyThemeSuggestionBackup(null);
+    applyPartyThemeSnapshot(randomPartyThemeSnapshot());
+    setError("");
+  };
+
+  const openEditPartyForm = (party: PartyRecord) => {
+    const parts = timePartsFromISO(party.date);
+    setEditingParty(party);
+    setPartyLabelValue(party.label);
+    setPartyDate(parts.date);
+    setPartyHour(parts.hour);
+    setPartyMinute(parts.minute);
+    setPartyPeriod(parts.period);
+    setPartySummary(party.summary || "");
+    setPartyThemePrimary(party.themePrimary || DEFAULT_PARTY_THEME_PRIMARY);
+    setPartyThemeAccent(party.themeAccent || DEFAULT_PARTY_THEME_ACCENT);
+    setPartyThemeBackground(party.themeBackground || DEFAULT_PARTY_THEME_BACKGROUND);
+    setPartyThemeFont(normalizePartyThemeFont(party.themeFont));
+    setPartyMediaUrl(party.mediaUrl || "");
+    setPartyView("edit");
+    setError("");
+    setPartySuccess("");
+  };
+
+  const finishPartySetup = async () => {
+    if (!firebaseUser) {
+      return;
+    }
+    if (!partyLabelValue.trim()) {
+      setError("party title is required");
+      return;
+    }
+    if (!partyDate) {
+      setError("party date is required");
+      return;
+    }
+    if (!partyMediaUrl.trim()) {
+      setError("party media is required");
+      return;
+    }
+    if (!partySummary.trim()) {
+      setError("party summary is required");
+      return;
+    }
+
+    setSavingParty(true);
+    setError("");
+    setPartySuccess("");
+    try {
+      const token = await firebaseUser.getIdToken();
+      const party = await createParty(token, {
+        label: partyLabelValue.trim(),
+        date: partyDateTimeToISO(partyDate, partyHour, partyMinute, partyPeriod),
+        summary: partySummary.trim(),
+        partifulUrl: "",
+        mediaUrl: partyMediaUrl.trim(),
+        themePrimary: normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY),
+        themeAccent: normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT),
+        themeBackground: normalizePartyThemeHex(partyThemeBackground, DEFAULT_PARTY_THEME_BACKGROUND),
+        themeFont: normalizePartyThemeFont(partyThemeFont),
+      });
+      setParties((current) => sortPartiesByDate([party, ...current]));
+      setPartySetupModalOpen(false);
+      setPartySetupStep("details");
+      setPartySummaryRevisionBackup(null);
+      setRevisingPartySummary(false);
+      setPartyThemeSuggestionBackup(null);
+      setSuggestingPartyTheme(false);
+      openEditPartyForm(party);
+      setPartySuccess("Party created.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to create party";
+      setError(message);
+    } finally {
+      setSavingParty(false);
+    }
   };
 
   const advancePartySetup = () => {
@@ -594,13 +811,13 @@ export default function HostPage() {
       return;
     }
 
-    setError("");
-    setPartySetupModalOpen(false);
-    setPartySetupStep("details");
-    setPartyView("create");
+    void finishPartySetup();
   };
 
   const retreatPartySetup = () => {
+    if (savingParty || revisingPartySummary || suggestingPartyTheme) {
+      return;
+    }
     if (partySetupStep === "media") {
       goToPartySetupStep("details");
       return;
@@ -612,25 +829,6 @@ export default function HostPage() {
     if (partySetupStep === "theme") {
       goToPartySetupStep("summary");
     }
-  };
-
-  const openEditPartyForm = (party: PartyRecord) => {
-    const parts = timePartsFromISO(party.date);
-    setEditingParty(party);
-    setPartyLabelValue(party.label);
-    setPartyDate(parts.date);
-    setPartyHour(parts.hour);
-    setPartyMinute(parts.minute);
-    setPartyPeriod(parts.period);
-    setPartySummary(party.summary || "");
-    setPartyThemePrimary(party.themePrimary || DEFAULT_PARTY_THEME_PRIMARY);
-    setPartyThemeAccent(party.themeAccent || DEFAULT_PARTY_THEME_ACCENT);
-    setPartyThemeBackground(party.themeBackground || DEFAULT_PARTY_THEME_BACKGROUND);
-    setPartyThemeFont(normalizePartyThemeFont(party.themeFont));
-    setPartyMediaUrl(party.mediaUrl || "");
-    setPartyView("edit");
-    setError("");
-    setPartySuccess("");
   };
 
   const resetEventForm = () => {
@@ -2733,110 +2931,180 @@ export default function HostPage() {
               ) : null}
 
               {partySetupStep === "summary" ? (
-                <label className="auth-field host-message-field">
-                  <span>Summary</span>
-                  <textarea
-                    value={partySummary}
-                    onChange={(event) => setPartySummary(event.target.value)}
-                    rows={8}
-                    placeholder="Short overview for the party"
-                    required
-                  />
-                </label>
+                <div className="party-setup-summary">
+                  <div className="party-setup-summary-header">
+                    <span>Summary</span>
+                    {partySummaryRevisionBackup != null ? (
+                      <button
+                        className="auth-secondary"
+                        type="button"
+                        onClick={handleUndoPartySummaryRevision}
+                        disabled={revisingPartySummary}
+                      >
+                        Undo Revision
+                      </button>
+                    ) : (
+                      <button
+                        className="auth-secondary"
+                        type="button"
+                        onClick={() => void handleRevisePartySummary()}
+                        disabled={revisingPartySummary || !partyLabelValue.trim()}
+                      >
+                        Revise With AI
+                      </button>
+                    )}
+                  </div>
+                  {revisingPartySummary ? (
+                    <div className="party-setup-summary-loading" role="status" aria-live="polite" aria-busy="true">
+                      <span className="party-media-spinner" aria-hidden="true" />
+                      <p>Revising your summary with AI...</p>
+                    </div>
+                  ) : (
+                    <label className="auth-field host-message-field party-setup-summary-field">
+                      <textarea
+                        value={partySummary}
+                        onChange={(event) => setPartySummary(event.target.value)}
+                        rows={8}
+                        placeholder="Short overview for the party"
+                        required
+                      />
+                    </label>
+                  )}
+                </div>
               ) : null}
 
               {partySetupStep === "theme" ? (
-                <>
-                  <label className="auth-field party-theme-font-field">
-                    <span>Title font</span>
-                    <select
-                      value={normalizePartyThemeFont(partyThemeFont)}
-                      onChange={(event) => setPartyThemeFont(event.target.value)}
-                      aria-label="Party title font"
-                      style={{ fontFamily: partyThemeFontFamily(partyThemeFont) }}
-                    >
-                      {PARTY_THEME_FONTS.map((font) => (
-                        <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>
-                          {font.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="party-theme-fields" aria-label="Party theme colors">
-                    <label className="party-theme-field">
-                      <input
-                        type="color"
-                        value={normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY)}
-                        onChange={(event) => setPartyThemePrimary(event.target.value)}
-                        aria-label="Primary theme color"
-                      />
-                      <span>Primary color</span>
-                      <input
-                        className="party-theme-hex"
-                        value={partyThemePrimary}
-                        onChange={(event) => setPartyThemePrimary(event.target.value)}
-                        spellCheck={false}
-                        aria-label="Primary theme color hex"
-                      />
-                    </label>
-                    <label className="party-theme-field">
-                      <input
-                        type="color"
-                        value={normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT)}
-                        onChange={(event) => setPartyThemeAccent(event.target.value)}
-                        aria-label="Accent theme color"
-                      />
-                      <span>Accent color</span>
-                      <input
-                        className="party-theme-hex"
-                        value={partyThemeAccent}
-                        onChange={(event) => setPartyThemeAccent(event.target.value)}
-                        spellCheck={false}
-                        aria-label="Accent theme color hex"
-                      />
-                    </label>
-                    <label className="party-theme-field">
-                      <input
-                        type="color"
-                        value={normalizePartyThemeHex(partyThemeBackground, DEFAULT_PARTY_THEME_BACKGROUND)}
-                        onChange={(event) => setPartyThemeBackground(event.target.value)}
-                        aria-label="Background theme color"
-                      />
-                      <span>Background color</span>
-                      <input
-                        className="party-theme-hex"
-                        value={partyThemeBackground}
-                        onChange={(event) => setPartyThemeBackground(event.target.value)}
-                        spellCheck={false}
-                        aria-label="Background theme color hex"
-                      />
-                    </label>
+                <div className="party-setup-theme">
+                  <div className="party-setup-theme-header">
+                    <div className="party-setup-theme-actions">
+                      {partyThemeSuggestionBackup != null ? (
+                        <button
+                          className="auth-secondary"
+                          type="button"
+                          onClick={handleUndoPartyThemeSuggestion}
+                          disabled={suggestingPartyTheme || savingParty}
+                        >
+                          Undo Suggestion
+                        </button>
+                      ) : (
+                        <button
+                          className="auth-secondary"
+                          type="button"
+                          onClick={() => void handleSuggestPartyTheme()}
+                          disabled={suggestingPartyTheme || savingParty || !partyLabelValue.trim()}
+                        >
+                          AI Suggestion
+                        </button>
+                      )}
+                      <button
+                        className="auth-secondary"
+                        type="button"
+                        onClick={handleRandomizePartyTheme}
+                        disabled={suggestingPartyTheme || savingParty}
+                      >
+                        Randomize
+                      </button>
+                    </div>
                   </div>
-                  <div
-                    className="party-theme-preview party-themed"
-                    style={partyThemeStyle({
-                      themePrimary: partyThemePrimary,
-                      themeAccent: partyThemeAccent,
-                      themeBackground: partyThemeBackground,
-                      themeFont: partyThemeFont,
-                    })}
-                    aria-hidden="true"
-                  >
-                    <span className="party-theme-preview-title">{partyLabelValue.trim() || "Party title"}</span>
-                    <span className="party-theme-preview-meta">Accent labels</span>
-                  </div>
-                </>
+                  {suggestingPartyTheme ? (
+                    <div className="party-setup-summary-loading" role="status" aria-live="polite" aria-busy="true">
+                      <span className="party-media-spinner" aria-hidden="true" />
+                      <p>Choosing a theme with AI...</p>
+                    </div>
+                  ) : (
+                    <>
+                      <label className="auth-field party-theme-font-field">
+                        <span>Title font</span>
+                        <select
+                          value={normalizePartyThemeFont(partyThemeFont)}
+                          onChange={(event) => setPartyThemeFont(event.target.value)}
+                          aria-label="Party title font"
+                          style={{ fontFamily: partyThemeFontFamily(partyThemeFont) }}
+                        >
+                          {PARTY_THEME_FONTS.map((font) => (
+                            <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>
+                              {font.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="party-theme-fields" aria-label="Party theme colors">
+                        <label className="party-theme-field">
+                          <input
+                            type="color"
+                            value={normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY)}
+                            onChange={(event) => setPartyThemePrimary(event.target.value)}
+                            aria-label="Primary theme color"
+                          />
+                          <span>Primary color</span>
+                          <input
+                            className="party-theme-hex"
+                            value={partyThemePrimary}
+                            onChange={(event) => setPartyThemePrimary(event.target.value)}
+                            spellCheck={false}
+                            aria-label="Primary theme color hex"
+                          />
+                        </label>
+                        <label className="party-theme-field">
+                          <input
+                            type="color"
+                            value={normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT)}
+                            onChange={(event) => setPartyThemeAccent(event.target.value)}
+                            aria-label="Accent theme color"
+                          />
+                          <span>Accent color</span>
+                          <input
+                            className="party-theme-hex"
+                            value={partyThemeAccent}
+                            onChange={(event) => setPartyThemeAccent(event.target.value)}
+                            spellCheck={false}
+                            aria-label="Accent theme color hex"
+                          />
+                        </label>
+                        <label className="party-theme-field">
+                          <input
+                            type="color"
+                            value={normalizePartyThemeHex(partyThemeBackground, DEFAULT_PARTY_THEME_BACKGROUND)}
+                            onChange={(event) => setPartyThemeBackground(event.target.value)}
+                            aria-label="Background theme color"
+                          />
+                          <span>Background color</span>
+                          <input
+                            className="party-theme-hex"
+                            value={partyThemeBackground}
+                            onChange={(event) => setPartyThemeBackground(event.target.value)}
+                            spellCheck={false}
+                            aria-label="Background theme color hex"
+                          />
+                        </label>
+                      </div>
+                      <div
+                        className="party-theme-preview party-themed"
+                        style={partyThemeStyle({
+                          themePrimary: partyThemePrimary,
+                          themeAccent: partyThemeAccent,
+                          themeBackground: partyThemeBackground,
+                          themeFont: partyThemeFont,
+                        })}
+                        aria-hidden="true"
+                      >
+                        <span className="party-theme-preview-title">{partyLabelValue.trim() || "Party title"}</span>
+                        <span className="party-theme-preview-meta">Accent labels</span>
+                      </div>
+                    </>
+                  )}
+                </div>
               ) : null}
 
               {error && partySetupModalOpen ? <p className="auth-error">{error}</p> : null}
 
               <div className="party-setup-actions">
                 {partySetupStep === "details" ? (
-                  <button className="auth-secondary" type="button" onClick={closePartySetupModal}>
+                  <button className="auth-secondary" type="button" onClick={closePartySetupModal} disabled={savingParty}>
                     Cancel
                   </button>
                 ) : (
-                  <button className="auth-secondary" type="button" onClick={retreatPartySetup} disabled={partyMediaSaving}>
+                  <button className="auth-secondary" type="button" onClick={retreatPartySetup} disabled={partyMediaSaving || savingParty || revisingPartySummary || suggestingPartyTheme}>
                     Back
                   </button>
                 )}
@@ -2846,12 +3114,19 @@ export default function HostPage() {
                   onClick={advancePartySetup}
                   disabled={
                     partyMediaSaving ||
+                    savingParty ||
+                    revisingPartySummary ||
+                    suggestingPartyTheme ||
                     (partySetupStep === "details" && (!partyLabelValue.trim() || !partyDate)) ||
                     (partySetupStep === "media" && !partyMediaUrl.trim()) ||
                     (partySetupStep === "summary" && !partySummary.trim())
                   }
                 >
-                  {partySetupStep === "theme" ? "Create Party" : "Next"}
+                  {partySetupStep === "theme"
+                    ? savingParty
+                      ? "Creating..."
+                      : "Create Party"
+                    : "Next"}
                 </button>
               </div>
             </section>

@@ -327,6 +327,27 @@ export type HTMLDraftResponse = {
   html: string;
 };
 
+export type PartySummaryRevisePayload = {
+  title: string;
+  summary: string;
+};
+
+export type PartySummaryReviseResponse = {
+  summary: string;
+};
+
+export type PartyThemeSuggestPayload = {
+  title: string;
+  summary: string;
+};
+
+export type PartyThemeSuggestResponse = {
+  themePrimary: string;
+  themeAccent: string;
+  themeBackground: string;
+  themeFont: string;
+};
+
 export type AIImageUploadResponse = {
   imageUrl: string;
 };
@@ -604,6 +625,20 @@ export function updateHomepage(token: string, html: string) {
 
 export function generateHTMLDraft(token: string, payload: HTMLDraftPayload) {
   return apiFetch<HTMLDraftResponse>("/ai/html-draft", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function revisePartySummary(token: string, payload: PartySummaryRevisePayload) {
+  return apiFetch<PartySummaryReviseResponse>("/ai/party-summary-revise", token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function suggestPartyTheme(token: string, payload: PartyThemeSuggestPayload) {
+  return apiFetch<PartyThemeSuggestResponse>("/ai/party-theme-suggest", token, {
     method: "POST",
     body: JSON.stringify(payload),
   });

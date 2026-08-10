@@ -92,6 +92,8 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ai/html-draft", server.handleAIHTMLDraft)
+	mux.HandleFunc("/ai/party-summary-revise", server.handleAIPartySummaryRevise)
+	mux.HandleFunc("/ai/party-theme-suggest", server.handleAIPartyThemeSuggest)
 	mux.HandleFunc("/ai/images", server.handleAIImageUpload)
 	mux.HandleFunc("/health", server.handleHealth)
 	mux.HandleFunc("/auth/config", server.handleAuthConfig)
