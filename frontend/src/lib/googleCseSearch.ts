@@ -1,4 +1,4 @@
-import type { MediaSearchItem, MediaSearchType } from "./api";
+import type { MediaSearchItem } from "./api";
 
 const GOOGLE_CSE_ID = "b26f26aa1ed1341d4";
 const CSE_ELEMENT_NAME = "jkhouse-party-media";
@@ -24,7 +24,6 @@ type GoogleCseResult = {
 
 type PendingSearch = {
   generation: number;
-  type: MediaSearchType;
   resolve: (items: MediaSearchItem[]) => void;
   reject: (error: Error) => void;
   timeoutId: number;
@@ -147,16 +146,10 @@ function toMediaSearchItem(result: GoogleCseResult): MediaSearchItem | null {
   };
 }
 
-function filterResults(results: GoogleCseResult[] | null | undefined, type: MediaSearchType) {
-  const items = (results ?? [])
+function mapResults(results: GoogleCseResult[] | null | undefined) {
+  return (results ?? [])
     .map(toMediaSearchItem)
     .filter((item): item is MediaSearchItem => item !== null);
-
-  if (type === "gif") {
-    return items.filter((item) => item.mime === "image/gif" || /\.gif(\?|$)/i.test(item.link));
-  }
-
-  return items.filter((item) => item.mime !== "image/gif" && !/\.gif(\?|$)/i.test(item.link));
 }
 
 function finishPendingSearch(results: GoogleCseResult[] | null | undefined) {
@@ -167,7 +160,7 @@ function finishPendingSearch(results: GoogleCseResult[] | null | undefined) {
   const current = pendingSearch;
   pendingSearch = null;
   window.clearTimeout(current.timeoutId);
-  current.resolve(filterResults(results, current.type));
+  current.resolve(mapResults(results));
   return true;
 }
 
@@ -307,7 +300,7 @@ async function ensureInitialized() {
   });
 }
 
-export async function searchPartyMedia(query: string, type: MediaSearchType): Promise<MediaSearchItem[]> {
+export async function searchPartyMedia(query: string): Promise<MediaSearchItem[]> {
   const trimmedQuery = query.trim();
   if (!trimmedQuery) {
     return [];
@@ -325,7 +318,6 @@ export async function searchPartyMedia(query: string, type: MediaSearchType): Pr
   }
 
   const generation = ++searchGeneration;
-  const searchQuery = type === "gif" ? `${trimmedQuery} gif` : trimmedQuery;
 
   return new Promise((resolve, reject) => {
     const timeoutId = window.setTimeout(() => {
@@ -337,13 +329,16 @@ export async function searchPartyMedia(query: string, type: MediaSearchType): Pr
 
     pendingSearch = {
       generation,
-      type,
       resolve,
       reject,
       timeoutId,
     };
 
     element.clearAllResults?.();
-    element.execute(searchQuery);
+    element.execute(trimmedQuery);
   });
+}
+
+export function isGifMediaItem(item: MediaSearchItem) {
+  return item.mime === "image/gif" || /\.gif(\?|$)/i.test(item.link);
 }

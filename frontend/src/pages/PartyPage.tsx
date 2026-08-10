@@ -147,38 +147,41 @@ export default function PartyPage() {
               </section>
             </header>
 
-            <div className={party.mediaUrl ? "party-detail-top has-media" : "party-detail-top"}>
+            <div className="party-detail-body">
               <div className="party-detail-main">
                 {party.summary ? <p className="party-detail-summary">{party.summary}</p> : null}
               </div>
-              {party.mediaUrl ? (
-                <aside className="party-detail-media" aria-label="Party media">
-                  <img src={party.mediaUrl} alt="" />
-                </aside>
-              ) : null}
-            </div>
 
-            <section className="party-attendee-section" aria-label="Attending">
-              <div className="party-attendee-header">
-                <h2>Attending</h2>
-              </div>
-              {attendeeRows.length === 0 ? (
-                <p className="dashboard-copy">No one has RSVP&apos;d yet.</p>
-              ) : (
-                <ul className="party-attendee-list">
-                  {attendeeRows.map((row) => (
-                    <li className="party-attendee-row" key={row.attendee.id}>
-                      <AttendeeAvatar
-                        name={row.displayName}
-                        firstName={row.firstName}
-                        avatarUrl={row.avatarUrl}
-                        colorId={row.colorId}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+              <aside className="party-detail-side">
+                {party.mediaUrl ? (
+                  <div className="party-detail-media" aria-label="Party media">
+                    <img src={party.mediaUrl} alt="" />
+                  </div>
+                ) : null}
+
+                <section className="party-attendee-section" aria-label="Attending">
+                  <div className="party-attendee-header">
+                    <h2>Attending</h2>
+                  </div>
+                  {attendeeRows.length === 0 ? (
+                    <p className="dashboard-copy">No one has RSVP&apos;d yet.</p>
+                  ) : (
+                    <ul className="party-attendee-list">
+                      {attendeeRows.map((row) => (
+                        <li className="party-attendee-row" key={row.attendee.id}>
+                          <AttendeeAvatar
+                            name={row.displayName}
+                            firstName={row.firstName}
+                            avatarUrl={row.avatarUrl}
+                            colorId={row.colorId}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              </aside>
+            </div>
           </section>
         ) : (
           <p className="dashboard-copy">Party not found.</p>
@@ -201,18 +204,22 @@ function AttendeeAvatar({
 }) {
   const initial = (firstName || name).trim().charAt(0).toUpperCase() || "?";
 
-  if (avatarUrl) {
-    return <img className="party-attendee-avatar" src={avatarUrl} alt={name} title={name} />;
-  }
-
   return (
-    <span
-      className="party-attendee-avatar party-attendee-avatar-fallback"
-      style={{ backgroundColor: avatarColorFromUserId(colorId) }}
-      title={name}
-      aria-label={name}
-    >
-      {initial}
+    <span className="party-attendee-avatar-wrap" tabIndex={0} aria-label={name}>
+      {avatarUrl ? (
+        <img className="party-attendee-avatar" src={avatarUrl} alt="" />
+      ) : (
+        <span
+          className="party-attendee-avatar party-attendee-avatar-fallback"
+          style={{ backgroundColor: avatarColorFromUserId(colorId) }}
+          aria-hidden="true"
+        >
+          {initial}
+        </span>
+      )}
+      <span className="party-attendee-tooltip" role="tooltip">
+        {name}
+      </span>
     </span>
   );
 }

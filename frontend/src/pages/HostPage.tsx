@@ -4,7 +4,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
 import { AppUser, BracketParticipant, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
-import { searchPartyMedia, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement } from "../lib/googleCseSearch";
+import { searchPartyMedia, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, isGifMediaItem } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
@@ -131,6 +131,8 @@ export default function HostPage() {
   const homepageAIFileInputRef = useRef<HTMLInputElement | null>(null);
   const cropStageRef = useRef<HTMLDivElement | null>(null);
   const cropDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
+  const partyMediaSearchTimeoutRef = useRef<number | null>(null);
+  const partyMediaSearchGenRef = useRef(0);
   const [activeTab, setActiveTab] = useState<HostTab>("images");
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [imageFilter, setImageFilter] = useState<ImageFilter>("all");
@@ -167,13 +169,13 @@ export default function HostPage() {
   const [partyDateModalOpen, setPartyDateModalOpen] = useState(false);
   const [partyCalendarDate, setPartyCalendarDate] = useState(() => dateFromInputValue(""));
   const [partySummary, setPartySummary] = useState("");
-  const [partyPartifulUrl, setPartyPartifulUrl] = useState("");
   const [partyMediaUrl, setPartyMediaUrl] = useState("");
   const [partyMediaModalOpen, setPartyMediaModalOpen] = useState(false);
   const [partyMediaType, setPartyMediaType] = useState<MediaSearchType>("image");
   const [partyMediaQuery, setPartyMediaQuery] = useState("");
   const [partyMediaResults, setPartyMediaResults] = useState<MediaSearchItem[]>([]);
   const [partyMediaSearching, setPartyMediaSearching] = useState(false);
+  const [partyMediaShowSpinner, setPartyMediaShowSpinner] = useState(false);
   const [partyMediaSaving, setPartyMediaSaving] = useState(false);
   const [partyMediaError, setPartyMediaError] = useState("");
   const [eventModalOpen, setEventModalOpen] = useState(false);
@@ -375,15 +377,15 @@ export default function HostPage() {
       return;
     }
 
+    if (partyMediaSearchTimeoutRef.current != null) {
+      window.clearTimeout(partyMediaSearchTimeoutRef.current);
+      partyMediaSearchTimeoutRef.current = null;
+    }
     resetPartyMediaSearchElement();
   }, [partyMediaModalOpen]);
 
-  useEffect(() => {
-    if (!partyMediaModalOpen) {
-      return;
-    }
-
-    const query = partyMediaQuery.trim();
+  const runPartyMediaSearch = async (rawQuery: string) => {
+    const query = rawQuery.trim();
     if (!query) {
       setPartyMediaResults([]);
       setPartyMediaError("");
@@ -391,38 +393,82 @@ export default function HostPage() {
       return;
     }
 
-    let cancelled = false;
+    const generation = ++partyMediaSearchGenRef.current;
     setPartyMediaError("");
-    const timeoutId = window.setTimeout(() => {
-      void (async () => {
-        setPartyMediaSearching(true);
-        try {
-          const items = await searchPartyMedia(query, partyMediaType);
-          if (cancelled) {
-            return;
-          }
-          setPartyMediaResults(items);
-          setPartyMediaError(items.length === 0 ? "No results found. Try another query." : "");
-        } catch (err) {
-          if (cancelled) {
-            return;
-          }
-          const message = err instanceof Error ? err.message : "failed to search media";
-          setPartyMediaError(message);
-          setPartyMediaResults([]);
-        } finally {
-          if (!cancelled) {
-            setPartyMediaSearching(false);
-          }
-        }
-      })();
-    }, 2000);
+    setPartyMediaSearching(true);
+    try {
+      const items = await searchPartyMedia(query);
+      if (generation !== partyMediaSearchGenRef.current) {
+        return;
+      }
+      setPartyMediaResults(items);
+      setPartyMediaError(items.length === 0 ? "No results found. Try another query." : "");
+    } catch (err) {
+      if (generation !== partyMediaSearchGenRef.current) {
+        return;
+      }
+      const message = err instanceof Error ? err.message : "failed to search media";
+      setPartyMediaError(message);
+      setPartyMediaResults([]);
+    } finally {
+      if (generation === partyMediaSearchGenRef.current) {
+        setPartyMediaSearching(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!partyMediaModalOpen) {
+      return;
+    }
+
+    if (partyMediaSearchTimeoutRef.current != null) {
+      window.clearTimeout(partyMediaSearchTimeoutRef.current);
+      partyMediaSearchTimeoutRef.current = null;
+    }
+
+    const query = partyMediaQuery.trim();
+    if (!query) {
+      partyMediaSearchGenRef.current += 1;
+      setPartyMediaResults([]);
+      setPartyMediaError("");
+      setPartyMediaSearching(false);
+      return;
+    }
+
+    partyMediaSearchTimeoutRef.current = window.setTimeout(() => {
+      partyMediaSearchTimeoutRef.current = null;
+      void runPartyMediaSearch(query);
+    }, 1500);
 
     return () => {
-      cancelled = true;
+      if (partyMediaSearchTimeoutRef.current != null) {
+        window.clearTimeout(partyMediaSearchTimeoutRef.current);
+        partyMediaSearchTimeoutRef.current = null;
+      }
+    };
+  }, [partyMediaModalOpen, partyMediaQuery]);
+
+  useEffect(() => {
+    if (!partyMediaSearching) {
+      setPartyMediaShowSpinner(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setPartyMediaShowSpinner(true);
+    }, 500);
+
+    return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [partyMediaModalOpen, partyMediaQuery, partyMediaType]);
+  }, [partyMediaSearching]);
+
+  const visiblePartyMediaResults = useMemo(() => {
+    return partyMediaResults.filter((item) =>
+      partyMediaType === "gif" ? isGifMediaItem(item) : !isGifMediaItem(item),
+    );
+  }, [partyMediaResults, partyMediaType]);
 
   if (appUser?.role !== "host") {
     return <Navigate to="/" replace />;
@@ -453,7 +499,6 @@ export default function HostPage() {
     setPartyMinute("00");
     setPartyPeriod("PM");
     setPartySummary("");
-    setPartyPartifulUrl("");
     setPartyMediaUrl("");
     setPartyMediaModalOpen(false);
     setPartyMediaType("image");
@@ -478,7 +523,6 @@ export default function HostPage() {
     setPartyMinute(parts.minute);
     setPartyPeriod(parts.period);
     setPartySummary(party.summary || "");
-    setPartyPartifulUrl(party.partifulUrl || "");
     setPartyMediaUrl(party.mediaUrl || "");
     setPartyView("edit");
     setError("");
@@ -1330,7 +1374,7 @@ export default function HostPage() {
         label: partyLabelValue.trim(),
         date,
         summary: partySummary.trim(),
-        partifulUrl: partyPartifulUrl.trim(),
+        partifulUrl: partyView === "edit" && editingParty ? editingParty.partifulUrl || "" : "",
         mediaUrl: partyMediaUrl.trim(),
       };
       if (partyView === "edit" && editingParty) {
@@ -1363,7 +1407,6 @@ export default function HostPage() {
 
   const selectPartyMediaType = (type: MediaSearchType) => {
     setPartyMediaType(type);
-    setPartyMediaResults([]);
     setPartyMediaError("");
   };
 
@@ -1975,8 +2018,8 @@ export default function HostPage() {
                   </div>
                 </>
               ) : (
-                <form className="party-form" onSubmit={handleCreateParty}>
-                  <div className="host-panel-header">
+                <form className="party-form party-detail-view" onSubmit={handleCreateParty}>
+                  <div className="host-panel-header party-form-toolbar">
                     <button className="auth-secondary back-text-link" type="button" onClick={() => {
                       setPartyView("list");
                       resetPartyForm();
@@ -1986,52 +2029,77 @@ export default function HostPage() {
                     </button>
                   </div>
 
-                  <label className="auth-field">
-                    <span>Party label</span>
-                    <input value={partyLabelValue} onChange={(event) => setPartyLabelValue(event.target.value)} required />
-                  </label>
-                  <div className="auth-field party-date-field">
-                    <span>Date</span>
-                    <button className="auth-secondary party-date-trigger" type="button" onClick={openPartyDateModal}>
-                      {formatPartyDateTime(partyDate, partyHour, partyMinute, partyPeriod)}
-                    </button>
-                  </div>
-                  <label className="auth-field host-message-field">
-                    <span>Summary</span>
-                    <textarea
-                      value={partySummary}
-                      onChange={(event) => setPartySummary(event.target.value)}
-                      rows={3}
-                      placeholder="Short overview shown when the party has no Partiful link"
-                    />
-                  </label>
-                  <label className="auth-field">
-                    <span>Partiful URL</span>
-                    <input
-                      value={partyPartifulUrl}
-                      onChange={(event) => setPartyPartifulUrl(event.target.value)}
-                      placeholder="https://partiful.com/e/..."
-                    />
-                  </label>
-                  <div className="auth-field party-media-field">
-                    <span>Party media</span>
-                    {partyMediaUrl ? (
-                      <button
-                        className="party-media-preview-button"
-                        type="button"
-                        onClick={openPartyMediaModal}
-                        aria-label="Replace party media"
-                      >
-                        <img src={partyMediaUrl} alt="Selected party media" className="party-media-preview" />
-                      </button>
-                    ) : (
-                      <button className="auth-secondary" type="button" onClick={openPartyMediaModal}>
-                        Select Image or GIF
-                      </button>
-                    )}
-                  </div>
-                  {partySuccess ? <p className="host-success">{partySuccess}</p> : null}
+                  <header className="party-detail-header party-form-header">
+                    <label className="auth-field party-form-title-field">
+                      <span>Party name</span>
+                      <input
+                        className="party-form-title-input"
+                        value={partyLabelValue}
+                        onChange={(event) => setPartyLabelValue(event.target.value)}
+                        placeholder="Party name"
+                        required
+                      />
+                    </label>
+                    <section className="party-detail-meta" aria-label="When and where">
+                      <article className="party-form-meta-card">
+                        <span>When</span>
+                        <button className="party-form-meta-button" type="button" onClick={openPartyDateModal}>
+                          {formatPartyDateTime(partyDate, partyHour, partyMinute, partyPeriod)}
+                        </button>
+                      </article>
+                      <article>
+                        <span>Where</span>
+                        <strong>1116 Rosepine Dr, Cary, NC 27519</strong>
+                      </article>
+                    </section>
+                  </header>
 
+                  <div className="party-detail-body">
+                    <div className="party-detail-main">
+                      <label className="auth-field host-message-field party-form-summary-field">
+                        <span>Summary</span>
+                        <textarea
+                          value={partySummary}
+                          onChange={(event) => setPartySummary(event.target.value)}
+                          rows={8}
+                          placeholder="Short overview for the party"
+                        />
+                      </label>
+                    </div>
+
+                    <aside className="party-detail-side">
+                      <div className="auth-field party-media-field">
+                        <span>Party media</span>
+                        {partyMediaUrl ? (
+                          <button
+                            className="party-media-preview-button party-form-media-button"
+                            type="button"
+                            onClick={openPartyMediaModal}
+                            aria-label="Replace party media"
+                          >
+                            <img src={partyMediaUrl} alt="Selected party media" className="party-media-preview party-form-media-preview" />
+                          </button>
+                        ) : (
+                          <button className="auth-secondary party-form-media-empty" type="button" onClick={openPartyMediaModal}>
+                            Select Image or GIF
+                          </button>
+                        )}
+                      </div>
+
+                      <section className="party-attendee-section party-form-attending" aria-label="Attending">
+                        <div className="party-attendee-header">
+                          <h2>Attending</h2>
+                        </div>
+                        <p className="dashboard-copy">
+                          {partyView === "edit"
+                            ? "Guest avatars appear here after people RSVP."
+                            : "Guest avatars will appear here after people RSVP."}
+                        </p>
+                      </section>
+                    </aside>
+                  </div>
+
+                  {partySuccess ? <p className="host-success">{partySuccess}</p> : null}
                   {error ? <p className="auth-error">{error}</p> : null}
 
                   <button className="auth-submit" type="submit" disabled={savingParty || !partyMediaUrl.trim()}>
@@ -2413,6 +2481,36 @@ export default function HostPage() {
                 x
               </button>
 
+              <div className="party-media-search">
+                <label className="auth-field">
+                  <input
+                    value={partyMediaQuery}
+                    onChange={(event) => setPartyMediaQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter") {
+                        return;
+                      }
+                      event.preventDefault();
+                      if (partyMediaSearchTimeoutRef.current != null) {
+                        window.clearTimeout(partyMediaSearchTimeoutRef.current);
+                        partyMediaSearchTimeoutRef.current = null;
+                      }
+                      void runPartyMediaSearch(partyMediaQuery);
+                    }}
+                    placeholder="neon house party"
+                    aria-label="Search media"
+                    disabled={partyMediaSaving}
+                  />
+                </label>
+                {partyMediaShowSpinner ? (
+                  <div className="party-media-search-status" aria-live="polite" aria-busy="true">
+                    <span className="party-media-spinner" aria-hidden="true" />
+                    <span>Searching...</span>
+                  </div>
+                ) : null}
+                {partyMediaError ? <p className="auth-error">{partyMediaError}</p> : null}
+              </div>
+
               <div className="party-media-tabs" role="tablist">
                 <button
                   className={partyMediaType === "image" ? "auth-secondary party-media-type-button active" : "auth-secondary party-media-type-button"}
@@ -2420,7 +2518,7 @@ export default function HostPage() {
                   role="tab"
                   aria-selected={partyMediaType === "image"}
                   onClick={() => selectPartyMediaType("image")}
-                  disabled={partyMediaSearching || partyMediaSaving}
+                  disabled={partyMediaSaving}
                 >
                   Image
                 </button>
@@ -2430,29 +2528,21 @@ export default function HostPage() {
                   role="tab"
                   aria-selected={partyMediaType === "gif"}
                   onClick={() => selectPartyMediaType("gif")}
-                  disabled={partyMediaSearching || partyMediaSaving}
+                  disabled={partyMediaSaving}
                 >
                   GIF
                 </button>
               </div>
 
-              <div className="party-media-search">
-                <label className="auth-field">
-                  <input
-                    value={partyMediaQuery}
-                    onChange={(event) => setPartyMediaQuery(event.target.value)}
-                    placeholder={partyMediaType === "gif" ? "costume party gif" : "neon house party"}
-                    aria-label="Search media"
-                    disabled={partyMediaSaving}
-                  />
-                </label>
-                {partyMediaSearching ? <p className="dashboard-copy">Searching...</p> : null}
-                {partyMediaError ? <p className="auth-error">{partyMediaError}</p> : null}
-              </div>
+              {partyMediaResults.length > 0 && visiblePartyMediaResults.length === 0 ? (
+                <p className="dashboard-copy">
+                  {partyMediaType === "gif" ? "No GIFs in these results. Try the Image tab." : "No still images in these results. Try the GIF tab."}
+                </p>
+              ) : null}
 
-              {partyMediaResults.length > 0 ? (
+              {visiblePartyMediaResults.length > 0 ? (
                 <div className="party-media-results" aria-label="Search results">
-                  {partyMediaResults.map((item) => (
+                  {visiblePartyMediaResults.map((item) => (
                     <button
                       className="party-media-result"
                       type="button"
@@ -2461,7 +2551,7 @@ export default function HostPage() {
                       disabled={partyMediaSaving}
                     >
                       <img
-                        src={partyMediaType === "gif" || item.mime === "image/gif" ? item.link : item.thumbnail || item.link}
+                        src={isGifMediaItem(item) ? item.link : item.thumbnail || item.link}
                         alt={item.title || "Search result"}
                       />
                     </button>
