@@ -2040,7 +2040,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: start;
-  gap: 1.25rem;
+  gap: 1.25rem 2.25rem;
 }
 
 .party-detail-header h1 {
@@ -2501,10 +2501,52 @@ body {
   gap: 1rem;
 }
 
+.party-setup-modal-media {
+  width: min(calc(100% - 2rem), 72rem);
+  max-width: 72rem;
+}
+
+.party-setup-date-button {
+  width: 100%;
+  border: 1px solid rgba(232, 120, 143, 0.28);
+  border-radius: 0.7rem;
+  background: rgba(3, 3, 3, 0.55);
+  color: var(--ink);
+  padding: 0.8rem 0.9rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.party-setup-date-button:hover {
+  border-color: var(--rose-glow);
+}
+
+.party-setup-media {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.party-setup-media-selected {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+}
+
+.party-setup-media-selected img {
+  display: block;
+  width: min(100%, 18rem);
+  max-height: 14rem;
+  object-fit: cover;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(232, 120, 143, 0.22);
+}
+
 .party-setup-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 0.75rem;
 }
 

@@ -8,6 +8,7 @@ import { searchPartyMedia, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
+type PartySetupStep = "details" | "media" | "summary" | "theme";
 type EventView = "list" | "setup";
 type ImageFilter = "all" | "homepage";
 type AIDraftType = "homepage";
@@ -174,6 +175,7 @@ export default function HostPage() {
   const [partyThemeBackground, setPartyThemeBackground] = useState(DEFAULT_PARTY_THEME_BACKGROUND);
   const [partyThemeFont, setPartyThemeFont] = useState(DEFAULT_PARTY_THEME_FONT);
   const [partySetupModalOpen, setPartySetupModalOpen] = useState(false);
+  const [partySetupStep, setPartySetupStep] = useState<PartySetupStep>("details");
   const [partyThemeModalOpen, setPartyThemeModalOpen] = useState(false);
   const [partyMediaUrl, setPartyMediaUrl] = useState("");
   const [partyMediaModalOpen, setPartyMediaModalOpen] = useState(false);
@@ -378,8 +380,10 @@ export default function HostPage() {
     return cells;
   }, [partyCalendarDate]);
 
+  const partyMediaPickerActive = partyMediaModalOpen || (partySetupModalOpen && partySetupStep === "media");
+
   useEffect(() => {
-    if (partyMediaModalOpen) {
+    if (partyMediaPickerActive) {
       return;
     }
 
@@ -388,7 +392,7 @@ export default function HostPage() {
       partyMediaSearchTimeoutRef.current = null;
     }
     resetPartyMediaSearchElement();
-  }, [partyMediaModalOpen]);
+  }, [partyMediaPickerActive]);
 
   const runPartyMediaSearch = async (rawQuery: string) => {
     const query = rawQuery.trim();
@@ -424,7 +428,7 @@ export default function HostPage() {
   };
 
   useEffect(() => {
-    if (!partyMediaModalOpen) {
+    if (!partyMediaPickerActive) {
       return;
     }
 
@@ -453,7 +457,7 @@ export default function HostPage() {
         partyMediaSearchTimeoutRef.current = null;
       }
     };
-  }, [partyMediaModalOpen, partyMediaQuery]);
+  }, [partyMediaPickerActive, partyMediaQuery]);
 
   useEffect(() => {
     if (!partyMediaSearching) {
@@ -510,6 +514,7 @@ export default function HostPage() {
     setPartyThemeBackground(DEFAULT_PARTY_THEME_BACKGROUND);
     setPartyThemeFont(DEFAULT_PARTY_THEME_FONT);
     setPartySetupModalOpen(false);
+    setPartySetupStep("details");
     setPartyThemeModalOpen(false);
     setPartyMediaUrl("");
     setPartyMediaModalOpen(false);
@@ -521,13 +526,18 @@ export default function HostPage() {
 
   const openCreatePartySetup = () => {
     resetPartyForm();
+    setPartySetupStep("details");
     setPartySetupModalOpen(true);
     setError("");
     setPartySuccess("");
   };
 
   const closePartySetupModal = () => {
+    if (partyMediaSearching || partyMediaSaving) {
+      return;
+    }
     setPartySetupModalOpen(false);
+    setPartySetupStep("details");
   };
 
   const openPartyThemeModal = () => {
@@ -539,14 +549,69 @@ export default function HostPage() {
     setPartyThemeModalOpen(false);
   };
 
-  const continuePartySetup = () => {
-    if (!partySummary.trim()) {
-      setError("party summary is required");
+  const resetPartyMediaSearchState = () => {
+    setPartyMediaType("image");
+    setPartyMediaQuery("");
+    setPartyMediaResults([]);
+    setPartyMediaError("");
+  };
+
+  const goToPartySetupStep = (step: PartySetupStep) => {
+    setError("");
+    if (step === "media") {
+      resetPartyMediaSearchState();
+    }
+    setPartySetupStep(step);
+  };
+
+  const advancePartySetup = () => {
+    if (partySetupStep === "details") {
+      if (!partyLabelValue.trim()) {
+        setError("party title is required");
+        return;
+      }
+      if (!partyDate) {
+        setError("party date is required");
+        return;
+      }
+      goToPartySetupStep("media");
       return;
     }
+    if (partySetupStep === "media") {
+      if (!partyMediaUrl.trim()) {
+        setError("party media is required");
+        return;
+      }
+      goToPartySetupStep("summary");
+      return;
+    }
+    if (partySetupStep === "summary") {
+      if (!partySummary.trim()) {
+        setError("party summary is required");
+        return;
+      }
+      goToPartySetupStep("theme");
+      return;
+    }
+
     setError("");
     setPartySetupModalOpen(false);
+    setPartySetupStep("details");
     setPartyView("create");
+  };
+
+  const retreatPartySetup = () => {
+    if (partySetupStep === "media") {
+      goToPartySetupStep("details");
+      return;
+    }
+    if (partySetupStep === "summary") {
+      goToPartySetupStep("media");
+      return;
+    }
+    if (partySetupStep === "theme") {
+      goToPartySetupStep("summary");
+    }
   };
 
   const openEditPartyForm = (party: PartyRecord) => {
@@ -1471,10 +1536,13 @@ export default function HostPage() {
       const token = await firebaseUser.getIdToken();
       const saved = await saveMediaFromURL(token, item.link);
       setPartyMediaUrl(saved.imageUrl);
-      setPartyMediaModalOpen(false);
+      if (partyMediaModalOpen) {
+        setPartyMediaModalOpen(false);
+      }
       setPartyMediaResults([]);
       setPartyMediaQuery("");
       setPartyMediaType("image");
+      setError("");
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to save media";
       setPartyMediaError(message);
@@ -2527,113 +2595,263 @@ export default function HostPage() {
           {partySetupModalOpen ? (
           <div className="modal-backdrop" role="presentation" onMouseDown={closePartySetupModal}>
             <section
-              className="upload-modal gothic-card party-setup-modal"
+              className={
+                partySetupStep === "media"
+                  ? "upload-modal gothic-card party-setup-modal party-setup-modal-media"
+                  : "upload-modal gothic-card party-setup-modal"
+              }
               role="dialog"
               aria-modal="true"
               aria-labelledby="party-setup-modal-title"
               onMouseDown={(event) => event.stopPropagation()}
             >
               <div className="modal-header">
-                <h2 className="host-section-title" id="party-setup-modal-title">New Party Setup</h2>
+                <h2 className="host-section-title" id="party-setup-modal-title">
+                  {partySetupStep === "details"
+                    ? "Party Details"
+                    : partySetupStep === "media"
+                      ? "Party Media"
+                      : partySetupStep === "summary"
+                        ? "Party Summary"
+                        : "Party Theme"}
+                </h2>
                 <button className="modal-close" type="button" onClick={closePartySetupModal} aria-label="Close party setup">
                   ×
                 </button>
               </div>
-              <p className="dashboard-copy">Write the summary and choose theme colors and font before the full party form.</p>
-              <label className="auth-field host-message-field">
-                <span>Summary</span>
-                <textarea
-                  value={partySummary}
-                  onChange={(event) => setPartySummary(event.target.value)}
-                  rows={6}
-                  placeholder="Short overview for the party"
-                  required
-                />
-              </label>
-              <label className="auth-field party-theme-font-field">
-                <span>Title font</span>
-                <select
-                  value={normalizePartyThemeFont(partyThemeFont)}
-                  onChange={(event) => setPartyThemeFont(event.target.value)}
-                  aria-label="Party title font"
-                  style={{ fontFamily: partyThemeFontFamily(partyThemeFont) }}
-                >
-                  {PARTY_THEME_FONTS.map((font) => (
-                    <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>
-                      {font.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="party-theme-fields" aria-label="Party theme colors">
-                <label className="party-theme-field">
-                  <input
-                    type="color"
-                    value={normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY)}
-                    onChange={(event) => setPartyThemePrimary(event.target.value)}
-                    aria-label="Primary theme color"
-                  />
-                  <span>Primary color</span>
-                  <input
-                    className="party-theme-hex"
-                    value={partyThemePrimary}
-                    onChange={(event) => setPartyThemePrimary(event.target.value)}
-                    spellCheck={false}
-                    aria-label="Primary theme color hex"
+
+              {partySetupStep === "details" ? (
+                <>
+                  <label className="auth-field">
+                    <span>Title</span>
+                    <input
+                      value={partyLabelValue}
+                      onChange={(event) => setPartyLabelValue(event.target.value)}
+                      placeholder="Party title"
+                      required
+                    />
+                  </label>
+                  <div className="auth-field">
+                    <span>Date & time</span>
+                    <button className="party-setup-date-button" type="button" onClick={openPartyDateModal}>
+                      {formatPartyDateTime(partyDate, partyHour, partyMinute, partyPeriod)}
+                    </button>
+                  </div>
+                </>
+              ) : null}
+
+              {partySetupStep === "media" ? (
+                <div className="party-setup-media">
+                  {partyMediaUrl ? (
+                    <div className="party-setup-media-selected">
+                      <img src={partyMediaUrl} alt="Selected party media" />
+                      <button className="auth-secondary" type="button" onClick={() => setPartyMediaUrl("")} disabled={partyMediaSaving}>
+                        Choose different media
+                      </button>
+                    </div>
+                  ) : null}
+                  <div className="party-media-search">
+                    <label className="auth-field">
+                      <input
+                        value={partyMediaQuery}
+                        onChange={(event) => setPartyMediaQuery(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter") {
+                            return;
+                          }
+                          event.preventDefault();
+                          if (partyMediaSearchTimeoutRef.current != null) {
+                            window.clearTimeout(partyMediaSearchTimeoutRef.current);
+                            partyMediaSearchTimeoutRef.current = null;
+                          }
+                          void runPartyMediaSearch(partyMediaQuery);
+                        }}
+                        placeholder="neon house party"
+                        aria-label="Search media"
+                        disabled={partyMediaSaving}
+                      />
+                    </label>
+                    {partyMediaShowSpinner ? (
+                      <div className="party-media-search-status" aria-live="polite" aria-busy="true">
+                        <span className="party-media-spinner" aria-hidden="true" />
+                        <span>Searching...</span>
+                      </div>
+                    ) : null}
+                    {partyMediaError ? <p className="auth-error">{partyMediaError}</p> : null}
+                  </div>
+
+                  <div className="party-media-tabs" role="tablist">
+                    <button
+                      className={partyMediaType === "image" ? "auth-secondary party-media-type-button active" : "auth-secondary party-media-type-button"}
+                      type="button"
+                      role="tab"
+                      aria-selected={partyMediaType === "image"}
+                      onClick={() => selectPartyMediaType("image")}
+                      disabled={partyMediaSaving}
+                    >
+                      Image
+                    </button>
+                    <button
+                      className={partyMediaType === "gif" ? "auth-secondary party-media-type-button active" : "auth-secondary party-media-type-button"}
+                      type="button"
+                      role="tab"
+                      aria-selected={partyMediaType === "gif"}
+                      onClick={() => selectPartyMediaType("gif")}
+                      disabled={partyMediaSaving}
+                    >
+                      GIF
+                    </button>
+                  </div>
+
+                  {partyMediaResults.length > 0 && visiblePartyMediaResults.length === 0 ? (
+                    <p className="dashboard-copy">
+                      {partyMediaType === "gif" ? "No GIFs in these results. Try the Image tab." : "No still images in these results. Try the GIF tab."}
+                    </p>
+                  ) : null}
+
+                  {visiblePartyMediaResults.length > 0 ? (
+                    <div className="party-media-results" aria-label="Search results">
+                      {visiblePartyMediaResults.map((item) => (
+                        <button
+                          className="party-media-result"
+                          type="button"
+                          key={`${item.link}-${item.thumbnail}`}
+                          onClick={() => void handleSelectPartyMedia(item)}
+                          disabled={partyMediaSaving}
+                        >
+                          <img
+                            src={isGifMediaItem(item) ? item.link : item.thumbnail || item.link}
+                            alt={item.title || "Search result"}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  {partyMediaSaving ? <p className="dashboard-copy">Saving selected media to storage...</p> : null}
+                  <div id={PARTY_MEDIA_CSE_HOST_ID} className="party-media-cse-host" aria-hidden="true" />
+                </div>
+              ) : null}
+
+              {partySetupStep === "summary" ? (
+                <label className="auth-field host-message-field">
+                  <span>Summary</span>
+                  <textarea
+                    value={partySummary}
+                    onChange={(event) => setPartySummary(event.target.value)}
+                    rows={8}
+                    placeholder="Short overview for the party"
+                    required
                   />
                 </label>
-                <label className="party-theme-field">
-                  <input
-                    type="color"
-                    value={normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT)}
-                    onChange={(event) => setPartyThemeAccent(event.target.value)}
-                    aria-label="Accent theme color"
-                  />
-                  <span>Accent color</span>
-                  <input
-                    className="party-theme-hex"
-                    value={partyThemeAccent}
-                    onChange={(event) => setPartyThemeAccent(event.target.value)}
-                    spellCheck={false}
-                    aria-label="Accent theme color hex"
-                  />
-                </label>
-                <label className="party-theme-field">
-                  <input
-                    type="color"
-                    value={normalizePartyThemeHex(partyThemeBackground, DEFAULT_PARTY_THEME_BACKGROUND)}
-                    onChange={(event) => setPartyThemeBackground(event.target.value)}
-                    aria-label="Background theme color"
-                  />
-                  <span>Background color</span>
-                  <input
-                    className="party-theme-hex"
-                    value={partyThemeBackground}
-                    onChange={(event) => setPartyThemeBackground(event.target.value)}
-                    spellCheck={false}
-                    aria-label="Background theme color hex"
-                  />
-                </label>
-              </div>
-              <div
-                className="party-theme-preview party-themed"
-                style={partyThemeStyle({
-                  themePrimary: partyThemePrimary,
-                  themeAccent: partyThemeAccent,
-                  themeBackground: partyThemeBackground,
-                  themeFont: partyThemeFont,
-                })}
-                aria-hidden="true"
-              >
-                <span className="party-theme-preview-title">Party title</span>
-                <span className="party-theme-preview-meta">Accent labels</span>
-              </div>
+              ) : null}
+
+              {partySetupStep === "theme" ? (
+                <>
+                  <label className="auth-field party-theme-font-field">
+                    <span>Title font</span>
+                    <select
+                      value={normalizePartyThemeFont(partyThemeFont)}
+                      onChange={(event) => setPartyThemeFont(event.target.value)}
+                      aria-label="Party title font"
+                      style={{ fontFamily: partyThemeFontFamily(partyThemeFont) }}
+                    >
+                      {PARTY_THEME_FONTS.map((font) => (
+                        <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>
+                          {font.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="party-theme-fields" aria-label="Party theme colors">
+                    <label className="party-theme-field">
+                      <input
+                        type="color"
+                        value={normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY)}
+                        onChange={(event) => setPartyThemePrimary(event.target.value)}
+                        aria-label="Primary theme color"
+                      />
+                      <span>Primary color</span>
+                      <input
+                        className="party-theme-hex"
+                        value={partyThemePrimary}
+                        onChange={(event) => setPartyThemePrimary(event.target.value)}
+                        spellCheck={false}
+                        aria-label="Primary theme color hex"
+                      />
+                    </label>
+                    <label className="party-theme-field">
+                      <input
+                        type="color"
+                        value={normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT)}
+                        onChange={(event) => setPartyThemeAccent(event.target.value)}
+                        aria-label="Accent theme color"
+                      />
+                      <span>Accent color</span>
+                      <input
+                        className="party-theme-hex"
+                        value={partyThemeAccent}
+                        onChange={(event) => setPartyThemeAccent(event.target.value)}
+                        spellCheck={false}
+                        aria-label="Accent theme color hex"
+                      />
+                    </label>
+                    <label className="party-theme-field">
+                      <input
+                        type="color"
+                        value={normalizePartyThemeHex(partyThemeBackground, DEFAULT_PARTY_THEME_BACKGROUND)}
+                        onChange={(event) => setPartyThemeBackground(event.target.value)}
+                        aria-label="Background theme color"
+                      />
+                      <span>Background color</span>
+                      <input
+                        className="party-theme-hex"
+                        value={partyThemeBackground}
+                        onChange={(event) => setPartyThemeBackground(event.target.value)}
+                        spellCheck={false}
+                        aria-label="Background theme color hex"
+                      />
+                    </label>
+                  </div>
+                  <div
+                    className="party-theme-preview party-themed"
+                    style={partyThemeStyle({
+                      themePrimary: partyThemePrimary,
+                      themeAccent: partyThemeAccent,
+                      themeBackground: partyThemeBackground,
+                      themeFont: partyThemeFont,
+                    })}
+                    aria-hidden="true"
+                  >
+                    <span className="party-theme-preview-title">{partyLabelValue.trim() || "Party title"}</span>
+                    <span className="party-theme-preview-meta">Accent labels</span>
+                  </div>
+                </>
+              ) : null}
+
+              {error && partySetupModalOpen ? <p className="auth-error">{error}</p> : null}
+
               <div className="party-setup-actions">
-                <button className="auth-secondary" type="button" onClick={closePartySetupModal}>
-                  Cancel
-                </button>
-                <button className="auth-submit" type="button" onClick={continuePartySetup} disabled={!partySummary.trim()}>
-                  Continue
+                {partySetupStep === "details" ? (
+                  <button className="auth-secondary" type="button" onClick={closePartySetupModal}>
+                    Cancel
+                  </button>
+                ) : (
+                  <button className="auth-secondary" type="button" onClick={retreatPartySetup} disabled={partyMediaSaving}>
+                    Back
+                  </button>
+                )}
+                <button
+                  className="auth-submit"
+                  type="button"
+                  onClick={advancePartySetup}
+                  disabled={
+                    partyMediaSaving ||
+                    (partySetupStep === "details" && (!partyLabelValue.trim() || !partyDate)) ||
+                    (partySetupStep === "media" && !partyMediaUrl.trim()) ||
+                    (partySetupStep === "summary" && !partySummary.trim())
+                  }
+                >
+                  {partySetupStep === "theme" ? "Create Party" : "Next"}
                 </button>
               </div>
             </section>
