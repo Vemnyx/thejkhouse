@@ -169,7 +169,7 @@ export default function HostPage() {
   const [partyPartifulUrl, setPartyPartifulUrl] = useState("");
   const [partyMediaUrl, setPartyMediaUrl] = useState("");
   const [partyMediaModalOpen, setPartyMediaModalOpen] = useState(false);
-  const [partyMediaType, setPartyMediaType] = useState<MediaSearchType | "">("");
+  const [partyMediaType, setPartyMediaType] = useState<MediaSearchType>("image");
   const [partyMediaQuery, setPartyMediaQuery] = useState("");
   const [partyMediaResults, setPartyMediaResults] = useState<MediaSearchItem[]>([]);
   const [partyMediaSearching, setPartyMediaSearching] = useState(false);
@@ -401,7 +401,7 @@ export default function HostPage() {
     setPartyPartifulUrl("");
     setPartyMediaUrl("");
     setPartyMediaModalOpen(false);
-    setPartyMediaType("");
+    setPartyMediaType("image");
     setPartyMediaQuery("");
     setPartyMediaResults([]);
     setPartyMediaError("");
@@ -1296,8 +1296,14 @@ export default function HostPage() {
 
   const openPartyMediaModal = () => {
     setPartyMediaModalOpen(true);
-    setPartyMediaType("");
+    setPartyMediaType("image");
     setPartyMediaQuery("");
+    setPartyMediaResults([]);
+    setPartyMediaError("");
+  };
+
+  const selectPartyMediaType = (type: MediaSearchType) => {
+    setPartyMediaType(type);
     setPartyMediaResults([]);
     setPartyMediaError("");
   };
@@ -1314,10 +1320,6 @@ export default function HostPage() {
     event.preventDefault();
     setPartyMediaError("");
     if (!firebaseUser) {
-      return;
-    }
-    if (!partyMediaType) {
-      setPartyMediaError("Choose image or gif first.");
       return;
     }
     const query = partyMediaQuery.trim();
@@ -1356,7 +1358,7 @@ export default function HostPage() {
       setPartyMediaModalOpen(false);
       setPartyMediaResults([]);
       setPartyMediaQuery("");
-      setPartyMediaType("");
+      setPartyMediaType("image");
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to save media";
       setPartyMediaError(message);
@@ -2387,46 +2389,41 @@ export default function HostPage() {
                 </button>
               </div>
 
-              <form className="host-email-form" onSubmit={(event) => void handlePartyMediaSearch(event)}>
-                <fieldset className="party-media-type-fieldset">
-                  <legend>Media type</legend>
-                  <label className="party-media-type-option">
-                    <input
-                      type="radio"
-                      name="party-media-type"
-                      value="image"
-                      checked={partyMediaType === "image"}
-                      onChange={() => {
-                        setPartyMediaType("image");
-                        setPartyMediaResults([]);
-                        setPartyMediaError("");
-                      }}
-                    />
-                    <span>Image</span>
-                  </label>
-                  <label className="party-media-type-option">
-                    <input
-                      type="radio"
-                      name="party-media-type"
-                      value="gif"
-                      checked={partyMediaType === "gif"}
-                      onChange={() => {
-                        setPartyMediaType("gif");
-                        setPartyMediaResults([]);
-                        setPartyMediaError("");
-                      }}
-                    />
-                    <span>GIF</span>
-                  </label>
-                </fieldset>
+              <div
+                className="party-media-tabs"
+                role="tablist"
+                aria-label="Media type"
+              >
+                <button
+                  className={partyMediaType === "image" ? "party-media-tab active" : "party-media-tab"}
+                  type="button"
+                  role="tab"
+                  aria-selected={partyMediaType === "image"}
+                  onClick={() => selectPartyMediaType("image")}
+                  disabled={partyMediaSearching || partyMediaSaving}
+                >
+                  Image
+                </button>
+                <button
+                  className={partyMediaType === "gif" ? "party-media-tab active" : "party-media-tab"}
+                  type="button"
+                  role="tab"
+                  aria-selected={partyMediaType === "gif"}
+                  onClick={() => selectPartyMediaType("gif")}
+                  disabled={partyMediaSearching || partyMediaSaving}
+                >
+                  GIF
+                </button>
+              </div>
 
+              <form className="host-email-form" onSubmit={(event) => void handlePartyMediaSearch(event)}>
                 <label className="auth-field">
-                  <span>Search Google</span>
                   <input
                     value={partyMediaQuery}
                     onChange={(event) => setPartyMediaQuery(event.target.value)}
                     placeholder={partyMediaType === "gif" ? "costume party gif" : "neon house party"}
-                    disabled={!partyMediaType || partyMediaSearching || partyMediaSaving}
+                    aria-label="Search media"
+                    disabled={partyMediaSearching || partyMediaSaving}
                   />
                 </label>
 
@@ -2435,7 +2432,7 @@ export default function HostPage() {
                 <button
                   className="auth-submit"
                   type="submit"
-                  disabled={!partyMediaType || partyMediaSearching || partyMediaSaving || !partyMediaQuery.trim()}
+                  disabled={partyMediaSearching || partyMediaSaving || !partyMediaQuery.trim()}
                 >
                   {partyMediaSearching ? "Searching..." : "Search"}
                 </button>

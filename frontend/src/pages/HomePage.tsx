@@ -866,7 +866,7 @@ export default function HomePage() {
                                   ) : (
                                     <span />
                                   )}
-                                  <span className="party-to-page-link">To Party Page...</span>
+                                  <span className="party-to-page-link">To Party Page</span>
                                 </div>
                               </div>
                             </div>

@@ -457,6 +457,25 @@ func (s *apiServer) sendPartyCreatedInvites(party Party) {
 		URL:   partyDetailURL(party),
 	}
 
+	if testOnly := strings.TrimSpace(partyInviteTestOnlyEmail); testOnly != "" {
+		greetingName := "Jake"
+		for _, user := range users {
+			if strings.EqualFold(strings.TrimSpace(user.Email), testOnly) {
+				greetingName = user.FirstName
+				break
+			}
+		}
+
+		htmlBody, textBody := partyInviteEmail(party, greetingName, cta)
+		emailID, err := s.email.send(ctx, []string{testOnly}, subject, htmlBody, textBody)
+		if err != nil {
+			log.Error("party create invite send", "error", err, "party_id", party.ID, "to", testOnly)
+			return
+		}
+		log.Info("party create invite sent (test mode)", "email_id", emailID, "party_id", party.ID, "to", testOnly)
+		return
+	}
+
 	for _, user := range users {
 		to := strings.TrimSpace(user.Email)
 		if to == "" {
@@ -484,6 +503,9 @@ func (s *apiServer) sendPartyPlusOneInvite(party Party, firstName, email string)
 	to := strings.TrimSpace(email)
 	if to == "" {
 		return
+	}
+	if testOnly := strings.TrimSpace(partyInviteTestOnlyEmail); testOnly != "" {
+		to = testOnly
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
