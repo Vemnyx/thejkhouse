@@ -3,7 +3,8 @@ import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, saveMediaFromURL, searchMedia, sendHostEmail, startBracketEvent, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, BracketParticipant, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { searchPartyMedia } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
@@ -1319,9 +1320,6 @@ export default function HostPage() {
   const handlePartyMediaSearch = async (event: FormEvent) => {
     event.preventDefault();
     setPartyMediaError("");
-    if (!firebaseUser) {
-      return;
-    }
     const query = partyMediaQuery.trim();
     if (!query) {
       setPartyMediaError("Enter a search query.");
@@ -1330,8 +1328,7 @@ export default function HostPage() {
 
     setPartyMediaSearching(true);
     try {
-      const token = await firebaseUser.getIdToken();
-      const items = await searchMedia(token, query, partyMediaType);
+      const items = await searchPartyMedia(query, partyMediaType);
       setPartyMediaResults(items);
       if (items.length === 0) {
         setPartyMediaError("No results found. Try another query.");
@@ -2379,23 +2376,16 @@ export default function HostPage() {
               className="upload-modal gothic-card party-media-modal"
               role="dialog"
               aria-modal="true"
-              aria-labelledby="party-media-modal-title"
+              aria-label="Party media picker"
               onMouseDown={(event) => event.stopPropagation()}
             >
-              <div className="modal-header">
-                <h2 className="host-section-title" id="party-media-modal-title">Select party media</h2>
-                <button className="modal-close" type="button" onClick={closePartyMediaModal} aria-label="Close media picker">
-                  x
-                </button>
-              </div>
+              <button className="modal-close party-media-modal-close" type="button" onClick={closePartyMediaModal} aria-label="Close media picker">
+                x
+              </button>
 
-              <div
-                className="party-media-tabs"
-                role="tablist"
-                aria-label="Media type"
-              >
+              <div className="party-media-tabs" role="tablist">
                 <button
-                  className={partyMediaType === "image" ? "party-media-tab active" : "party-media-tab"}
+                  className={partyMediaType === "image" ? "auth-secondary party-media-type-button active" : "auth-secondary party-media-type-button"}
                   type="button"
                   role="tab"
                   aria-selected={partyMediaType === "image"}
@@ -2405,7 +2395,7 @@ export default function HostPage() {
                   Image
                 </button>
                 <button
-                  className={partyMediaType === "gif" ? "party-media-tab active" : "party-media-tab"}
+                  className={partyMediaType === "gif" ? "auth-secondary party-media-type-button active" : "auth-secondary party-media-type-button"}
                   type="button"
                   role="tab"
                   aria-selected={partyMediaType === "gif"}
