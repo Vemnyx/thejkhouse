@@ -20,6 +20,8 @@ Environment=IMAGE_BUCKET=thejkhouse-assets
 Environment="EMAIL_FROM=The JK House <host@thejkhouse.com>"
 Environment=RESEND_API_KEY_SECRET=projects/the-jk-house/secrets/resend_api_key/versions/latest
 Environment=CURSOR_API_KEY_SECRET=projects/the-jk-house/secrets/cursor_api_key/versions/latest
+Environment=GOOGLE_CSE_API_KEY_SECRET=projects/the-jk-house/secrets/google_cse_api_key/versions/latest
+Environment=GOOGLE_CSE_CX_SECRET=projects/the-jk-house/secrets/google_cse_cx/versions/latest
 Environment=APP_BASE_URL=https://thejkhouse.com
 
 [Install]

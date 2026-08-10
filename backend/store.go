@@ -517,7 +517,7 @@ func (s *userStore) deleteImage(ctx context.Context, id int64) error {
 func (s *userStore) listParties(ctx context.Context) ([]Party, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, label, date, html, summary, partiful_url
+		`SELECT id, label, date, summary, partiful_url, media_url
 		 FROM parties
 		 ORDER BY date DESC`,
 	)
@@ -529,7 +529,7 @@ func (s *userStore) listParties(ctx context.Context) ([]Party, error) {
 	parties := make([]Party, 0)
 	for rows.Next() {
 		var party Party
-		if err := rows.Scan(&party.ID, &party.Label, &party.Date, &party.HTML, &party.Summary, &party.PartifulURL); err != nil {
+		if err := rows.Scan(&party.ID, &party.Label, &party.Date, &party.Summary, &party.PartifulURL, &party.MediaURL); err != nil {
 			return nil, err
 		}
 		parties = append(parties, party)
@@ -545,30 +545,30 @@ func (s *userStore) getPartyByID(ctx context.Context, id int64) (Party, error) {
 	var party Party
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, label, date, html, summary, partiful_url
+		`SELECT id, label, date, summary, partiful_url, media_url
 		 FROM parties
 		 WHERE id = $1`,
 		id,
-	).Scan(&party.ID, &party.Label, &party.Date, &party.HTML, &party.Summary, &party.PartifulURL)
+	).Scan(&party.ID, &party.Label, &party.Date, &party.Summary, &party.PartifulURL, &party.MediaURL)
 	if err != nil {
 		return Party{}, err
 	}
 	return party, nil
 }
 
-func (s *userStore) createParty(ctx context.Context, label string, date time.Time, html, summary, partifulURL string) (Party, error) {
+func (s *userStore) createParty(ctx context.Context, label string, date time.Time, summary, partifulURL, mediaURL string) (Party, error) {
 	var party Party
 	err := s.pool.QueryRow(
 		ctx,
-		`INSERT INTO parties (label, date, html, summary, partiful_url)
+		`INSERT INTO parties (label, date, summary, partiful_url, media_url)
 		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, label, date, html, summary, partiful_url`,
+		 RETURNING id, label, date, summary, partiful_url, media_url`,
 		label,
 		date,
-		html,
 		summary,
 		partifulURL,
-	).Scan(&party.ID, &party.Label, &party.Date, &party.HTML, &party.Summary, &party.PartifulURL)
+		mediaURL,
+	).Scan(&party.ID, &party.Label, &party.Date, &party.Summary, &party.PartifulURL, &party.MediaURL)
 	if err != nil {
 		return Party{}, err
 	}
@@ -576,21 +576,21 @@ func (s *userStore) createParty(ctx context.Context, label string, date time.Tim
 	return party, nil
 }
 
-func (s *userStore) updateParty(ctx context.Context, id int64, label string, date time.Time, html, summary, partifulURL string) (Party, error) {
+func (s *userStore) updateParty(ctx context.Context, id int64, label string, date time.Time, summary, partifulURL, mediaURL string) (Party, error) {
 	var party Party
 	err := s.pool.QueryRow(
 		ctx,
 		`UPDATE parties
-		 SET label = $2, date = $3, html = $4, summary = $5, partiful_url = $6
+		 SET label = $2, date = $3, summary = $4, partiful_url = $5, media_url = $6
 		 WHERE id = $1
-		 RETURNING id, label, date, html, summary, partiful_url`,
+		 RETURNING id, label, date, summary, partiful_url, media_url`,
 		id,
 		label,
 		date,
-		html,
 		summary,
 		partifulURL,
-	).Scan(&party.ID, &party.Label, &party.Date, &party.HTML, &party.Summary, &party.PartifulURL)
+		mediaURL,
+	).Scan(&party.ID, &party.Label, &party.Date, &party.Summary, &party.PartifulURL, &party.MediaURL)
 	if err != nil {
 		return Party{}, err
 	}

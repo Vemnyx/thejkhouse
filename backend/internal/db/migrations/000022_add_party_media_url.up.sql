@@ -1,0 +1,2 @@
+ALTER TABLE parties
+    ADD COLUMN IF NOT EXISTS media_url text NOT NULL DEFAULT '';

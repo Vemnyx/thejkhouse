@@ -20,39 +20,7 @@ import (
 const (
 	cursorAPIEndpoint = "https://api.cursor.com/v1"
 	cursorRepoURL     = "https://github.com/Vemnyx/thejkhouse.git"
-	partyAddress      = "1116 Rosepine Dr\nCary, NC 27519"
 )
-
-const partyHTMLTemplate = `<section class="party-template">
-  <header class="party-template-hero">
-    <p class="party-template-kicker">The JK House Presents</p>
-    <h2>Party Name</h2>
-    <p>Short intro for what guests should expect.</p>
-  </header>
-  <section class="party-template-details" aria-label="Party details">
-    <article>
-      <span>When</span>
-      <strong>Date and time</strong>
-    </article>
-    <article>
-      <span>Where</span>
-      <strong>1116 Rosepine Dr<br />Cary, NC 27519</strong>
-    </article>
-    <article>
-      <span>Theme</span>
-      <strong>What to wear or bring</strong>
-    </article>
-  </section>
-  <section class="party-template-actions" aria-label="Party actions">
-    <span>RSVP coming soon</span>
-    <span>Calendar sync coming soon</span>
-    <span>Sign-up sheets coming soon</span>
-  </section>
-  <section class="party-template-copy">
-    <h3>About the party</h3>
-    <p>Add the announcement, food notes, house rules, schedule, and anything guests should know.</p>
-  </section>
-</section>`
 
 type aiClient struct {
 	apiKey     string
@@ -260,28 +228,14 @@ func (c *aiClient) doJSON(ctx context.Context, method string, path string, paylo
 }
 
 func buildHTMLPrompt(blockType string, instructions string, existingHTML string, imageURLs []string) string {
-	var target string
-	var addressInstructions string
-	var templateInstructions string
-	var markupInstructions string
-	if blockType == "party" {
-		target = "a party announcement block"
-		addressInstructions = partyAddress
-		templateInstructions = partyHTMLTemplate
-		markupInstructions = "Party drafts may include script tags, javascript: URLs, and inline event handlers when useful. Do not include iframes."
-	} else {
-		target = "a homepage announcement block"
-		addressInstructions = "No party address applies."
-		templateInstructions = "No fixed template applies."
-		markupInstructions = "Do not include scripts, javascript: URLs, inline event handlers, or iframes."
-	}
+	_ = blockType
 
 	imageInstructions := "No uploaded images were provided."
 	if len(imageURLs) > 0 {
 		imageInstructions = "The host uploaded these public CDN image URLs. You MUST include every uploaded image URL in the returned HTML using img tags with useful alt text. Place the images where they best support the announcement, and do not invent or use any image URLs beyond this list:\n- " + strings.Join(imageURLs, "\n- ")
 	}
 
-	return fmt.Sprintf(`You are helping The JK House website host draft %s.
+	return fmt.Sprintf(`You are helping The JK House website host draft a homepage announcement block.
 
 Use the repository context to match the existing frontend aesthetic and CSS conventions. Relevant files include frontend/src/index.css, frontend/src/pages/HomePage.tsx, and frontend/src/pages/HostPage.tsx.
 
@@ -289,28 +243,21 @@ Rules:
 - Do not edit files.
 - Return only an HTML fragment, not a full document.
 - Do not include markdown fences or explanations.
-- %s
+- Do not include scripts, javascript: URLs, inline event handlers, or iframes.
 - Do not use external assets except the uploaded CDN image URLs listed below.
 - If uploaded images are provided, include every uploaded image in the fragment.
 - Any uploaded image URL omitted from your draft will be appended automatically at the end, so place them intentionally in the layout instead.
-- For party blocks, preserve and fill the provided party template structure and class names unless the host explicitly asks for a different layout.
 - Prefer semantic HTML elements and copy that fits The JK House tone.
 - Keep the fragment concise enough to paste into the existing editor.
 
 Host instructions:
 %s
 
-Party address:
-%s
-
-Party template:
-%s
-
 Uploaded images:
 %s
 
 Existing HTML, if any:
-%s`, target, markupInstructions, instructions, addressInstructions, templateInstructions, imageInstructions, existingHTML)
+%s`, instructions, imageInstructions, existingHTML)
 }
 
 func cleanGeneratedHTML(value string) string {
@@ -336,21 +283,19 @@ func ensureUploadedImagesIncluded(html string, imageURLs []string) string {
 
 	var builder strings.Builder
 	builder.WriteString(strings.TrimSpace(html))
-	builder.WriteString("\n\n<section class=\"party-template-images\" aria-label=\"Party images\">\n")
+	builder.WriteString("\n\n<section class=\"homepage-draft-images\" aria-label=\"Homepage images\">\n")
 	for index, imageURL := range missing {
-		builder.WriteString(fmt.Sprintf("  <figure>\n    <img src=%q alt=%q />\n  </figure>\n", imageURL, fmt.Sprintf("Party image %d", index+1)))
+		builder.WriteString(fmt.Sprintf("  <figure>\n    <img src=%q alt=%q />\n  </figure>\n", imageURL, fmt.Sprintf("Homepage image %d", index+1)))
 	}
 	builder.WriteString("</section>")
 	return builder.String()
 }
 
 func validateGeneratedHTML(blockType string, html string) error {
+	_ = blockType
 	lower := strings.ToLower(html)
 	if strings.Contains(lower, "<iframe") {
 		return fmt.Errorf("The AI returned an iframe, which is not allowed. Ask it to describe embeds as plain links instead.")
-	}
-	if blockType == "party" {
-		return nil
 	}
 	if strings.Contains(lower, "<script") {
 		return fmt.Errorf("The AI returned a script tag, which is not allowed. Ask it for static HTML only.")

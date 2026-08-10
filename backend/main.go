@@ -70,14 +70,24 @@ func main() {
 		log.Fatal("ai client", "error", err)
 	}
 
+	mediaSearch, err := newMediaSearchClient(ctx)
+	if err != nil {
+		log.Error("media search client", "error", err)
+		mediaSearch = nil
+	}
+	if mediaSearch == nil {
+		log.Info("media search disabled; set GOOGLE_CSE_API_KEY and GOOGLE_CSE_CX to enable")
+	}
+
 	log.Info("database connection established")
 
 	server := &apiServer{
-		store:  store,
-		auth:   authService,
-		images: imageUploader,
-		email:  emailClient,
-		ai:     aiClient,
+		store:       store,
+		auth:        authService,
+		images:      imageUploader,
+		email:       emailClient,
+		ai:          aiClient,
+		mediaSearch: mediaSearch,
 	}
 
 	mux := http.NewServeMux()
@@ -97,6 +107,8 @@ func main() {
 	mux.HandleFunc("/homepage/images", server.handleHomepageImages)
 	mux.HandleFunc("/images", server.handleImages)
 	mux.HandleFunc("/images/", server.handleImageByID)
+	mux.HandleFunc("/media/search", server.handleMediaSearch)
+	mux.HandleFunc("/media/from-url", server.handleMediaFromURL)
 	mux.HandleFunc("/parties", server.handleParties)
 	mux.HandleFunc("/parties/", server.handlePartyByID)
 	mux.HandleFunc("/users", server.handleUsers)

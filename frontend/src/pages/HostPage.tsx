@@ -3,13 +3,13 @@ import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, sendHostEmail, startBracketEvent, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, BracketParticipant, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, saveMediaFromURL, searchMedia, sendHostEmail, startBracketEvent, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
 type EventView = "list" | "setup";
 type ImageFilter = "all" | "homepage";
-type AIDraftType = "homepage" | "party";
+type AIDraftType = "homepage";
 type EventCategory = {
   name: string;
   type: "individual" | "team";
@@ -55,36 +55,6 @@ const partyMinutes = Array.from({ length: 60 }, (_, index) => String(index).padS
 const partyPeriods = ["AM", "PM"] as const;
 const bracketSizes = [4, 8, 16];
 const bracketTeamSizes = [2, 3, 4];
-const defaultPartyHTML = `<section class="party-template">
-  <header class="party-template-hero">
-    <p class="party-template-kicker">The JK House Presents</p>
-    <h2>Party Name</h2>
-    <p>Short intro for what guests should expect.</p>
-  </header>
-  <section class="party-template-details" aria-label="Party details">
-    <article>
-      <span>When</span>
-      <strong>Date and time</strong>
-    </article>
-    <article>
-      <span>Where</span>
-      <strong>1116 Rosepine Dr<br />Cary, NC 27519</strong>
-    </article>
-    <article>
-      <span>Theme</span>
-      <strong>What to wear or bring</strong>
-    </article>
-  </section>
-  <section class="party-template-actions" aria-label="Party actions">
-    <span>RSVP coming soon</span>
-    <span>Calendar sync coming soon</span>
-    <span>Sign-up sheets coming soon</span>
-  </section>
-  <section class="party-template-copy">
-    <h3>About the party</h3>
-    <p>Add the announcement, food notes, house rules, schedule, and anything guests should know.</p>
-  </section>
-</section>`;
 
 function toDateInputValue(date: Date) {
   const year = date.getFullYear();
@@ -158,7 +128,6 @@ export default function HostPage() {
   const contestantCropStageRef = useRef<HTMLDivElement | null>(null);
   const contestantCropDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const homepageAIFileInputRef = useRef<HTMLInputElement | null>(null);
-  const partyAIFileInputRef = useRef<HTMLInputElement | null>(null);
   const cropStageRef = useRef<HTMLDivElement | null>(null);
   const cropDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const [activeTab, setActiveTab] = useState<HostTab>("images");
@@ -196,11 +165,16 @@ export default function HostPage() {
   const [partyPeriod, setPartyPeriod] = useState<(typeof partyPeriods)[number]>("PM");
   const [partyDateModalOpen, setPartyDateModalOpen] = useState(false);
   const [partyCalendarDate, setPartyCalendarDate] = useState(() => dateFromInputValue(""));
-  const [partyHtml, setPartyHtml] = useState("");
   const [partySummary, setPartySummary] = useState("");
   const [partyPartifulUrl, setPartyPartifulUrl] = useState("");
-  const [partyDraftPrompt, setPartyDraftPrompt] = useState("");
-  const [partyDraftImageUrls, setPartyDraftImageUrls] = useState<string[]>([]);
+  const [partyMediaUrl, setPartyMediaUrl] = useState("");
+  const [partyMediaModalOpen, setPartyMediaModalOpen] = useState(false);
+  const [partyMediaType, setPartyMediaType] = useState<MediaSearchType | "">("");
+  const [partyMediaQuery, setPartyMediaQuery] = useState("");
+  const [partyMediaResults, setPartyMediaResults] = useState<MediaSearchItem[]>([]);
+  const [partyMediaSearching, setPartyMediaSearching] = useState(false);
+  const [partyMediaSaving, setPartyMediaSaving] = useState(false);
+  const [partyMediaError, setPartyMediaError] = useState("");
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [eventType, setEventType] = useState<EventType>("0");
   const [eventLabel, setEventLabel] = useState("");
@@ -241,7 +215,6 @@ export default function HostPage() {
   const [savingParty, setSavingParty] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
   const [generatingHomepageDraft, setGeneratingHomepageDraft] = useState(false);
-  const [generatingPartyDraft, setGeneratingPartyDraft] = useState(false);
   const [uploadingAIImages, setUploadingAIImages] = useState<AIDraftType | null>(null);
   const [draggingAIImages, setDraggingAIImages] = useState<AIDraftType | null>(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -424,11 +397,14 @@ export default function HostPage() {
     setPartyHour("7");
     setPartyMinute("00");
     setPartyPeriod("PM");
-    setPartyHtml(defaultPartyHTML);
     setPartySummary("");
     setPartyPartifulUrl("");
-    setPartyDraftPrompt("");
-    setPartyDraftImageUrls([]);
+    setPartyMediaUrl("");
+    setPartyMediaModalOpen(false);
+    setPartyMediaType("");
+    setPartyMediaQuery("");
+    setPartyMediaResults([]);
+    setPartyMediaError("");
   };
 
   const openCreatePartyForm = () => {
@@ -446,11 +422,9 @@ export default function HostPage() {
     setPartyHour(parts.hour);
     setPartyMinute(parts.minute);
     setPartyPeriod(parts.period);
-    setPartyHtml(party.html || defaultPartyHTML);
     setPartySummary(party.summary || "");
     setPartyPartifulUrl(party.partifulUrl || "");
-    setPartyDraftPrompt("");
-    setPartyDraftImageUrls([]);
+    setPartyMediaUrl(party.mediaUrl || "");
     setPartyView("edit");
     setError("");
     setPartySuccess("");
@@ -1207,7 +1181,7 @@ export default function HostPage() {
       : deleteTarget?.type === "user"
         ? deletingUserId === deleteTarget.user.id
         : false;
-  const generatingHTMLDraft = generatingHomepageDraft || generatingPartyDraft;
+  const generatingHTMLDraft = generatingHomepageDraft;
   const eventAllowsDates = eventType !== "0" && eventType !== "1";
 
   const filteredImages = imageFilter === "homepage"
@@ -1296,9 +1270,9 @@ export default function HostPage() {
       const payload = {
         label: partyLabelValue.trim(),
         date,
-        html: partyHtml,
         summary: partySummary.trim(),
         partifulUrl: partyPartifulUrl.trim(),
+        mediaUrl: partyMediaUrl.trim(),
       };
       if (partyView === "edit" && editingParty) {
         const party = await updateParty(token, editingParty.id, payload);
@@ -1320,55 +1294,113 @@ export default function HostPage() {
     }
   };
 
-  const handleGenerateHTMLDraft = async (type: "homepage" | "party") => {
+  const openPartyMediaModal = () => {
+    setPartyMediaModalOpen(true);
+    setPartyMediaType("");
+    setPartyMediaQuery("");
+    setPartyMediaResults([]);
+    setPartyMediaError("");
+  };
+
+  const closePartyMediaModal = () => {
+    if (partyMediaSearching || partyMediaSaving) {
+      return;
+    }
+    setPartyMediaModalOpen(false);
+    setPartyMediaError("");
+  };
+
+  const handlePartyMediaSearch = async (event: FormEvent) => {
+    event.preventDefault();
+    setPartyMediaError("");
+    if (!firebaseUser) {
+      return;
+    }
+    if (!partyMediaType) {
+      setPartyMediaError("Choose image or gif first.");
+      return;
+    }
+    const query = partyMediaQuery.trim();
+    if (!query) {
+      setPartyMediaError("Enter a search query.");
+      return;
+    }
+
+    setPartyMediaSearching(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const items = await searchMedia(token, query, partyMediaType);
+      setPartyMediaResults(items);
+      if (items.length === 0) {
+        setPartyMediaError("No results found. Try another query.");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to search media";
+      setPartyMediaError(message);
+      setPartyMediaResults([]);
+    } finally {
+      setPartyMediaSearching(false);
+    }
+  };
+
+  const handleSelectPartyMedia = async (item: MediaSearchItem) => {
+    if (!firebaseUser || partyMediaSaving) {
+      return;
+    }
+    setPartyMediaError("");
+    setPartyMediaSaving(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const saved = await saveMediaFromURL(token, item.link);
+      setPartyMediaUrl(saved.imageUrl);
+      setPartyMediaModalOpen(false);
+      setPartyMediaResults([]);
+      setPartyMediaQuery("");
+      setPartyMediaType("");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to save media";
+      setPartyMediaError(message);
+    } finally {
+      setPartyMediaSaving(false);
+    }
+  };
+
+  const handleGenerateHTMLDraft = async () => {
     setError("");
     setHomepageSuccess("");
-    setPartySuccess("");
 
     if (!firebaseUser) {
       return;
     }
 
-    const instructions = type === "homepage" ? homepageDraftPrompt.trim() : partyDraftPrompt.trim();
-    const imageUrls = type === "homepage" ? homepageDraftImageUrls : partyDraftImageUrls;
+    const instructions = homepageDraftPrompt.trim();
     if (!instructions) {
       setError("tell the AI what to write first");
       return;
     }
 
-    if (type === "homepage") {
-      setGeneratingHomepageDraft(true);
-    } else {
-      setGeneratingPartyDraft(true);
-    }
+    setGeneratingHomepageDraft(true);
 
     try {
       const token = await firebaseUser.getIdToken();
       const draft = await generateHTMLDraft(token, {
-        type,
+        type: "homepage",
         instructions,
-        existingHtml: type === "homepage" ? homepageHtml : partyHtml,
-        imageUrls,
+        existingHtml: homepageHtml,
+        imageUrls: homepageDraftImageUrls,
       });
-      if (type === "homepage") {
-        setHomepageHtml(draft.html);
-        setHomepageSuccess("AI draft added.");
-        setHomepageDraftImageUrls([]);
-      } else {
-        setPartyHtml(draft.html);
-        setPartySuccess("AI draft added.");
-        setPartyDraftImageUrls([]);
-      }
+      setHomepageHtml(draft.html);
+      setHomepageSuccess("AI draft added.");
+      setHomepageDraftImageUrls([]);
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to generate html draft";
       setError(message);
     } finally {
       setGeneratingHomepageDraft(false);
-      setGeneratingPartyDraft(false);
     }
   };
 
-  const handleAIDraftImageFiles = async (type: AIDraftType, files: FileList | File[]) => {
+  const handleAIDraftImageFiles = async (files: FileList | File[]) => {
     if (!firebaseUser) {
       return;
     }
@@ -1380,16 +1412,12 @@ export default function HostPage() {
     }
 
     setError("");
-    setUploadingAIImages(type);
+    setUploadingAIImages("homepage");
     try {
       const token = await firebaseUser.getIdToken();
       const uploaded = await Promise.all(imageFiles.map((file) => uploadAIImage(token, file)));
       const urls = uploaded.map((item) => item.imageUrl);
-      if (type === "homepage") {
-        setHomepageDraftImageUrls((current) => [...current, ...urls]);
-      } else {
-        setPartyDraftImageUrls((current) => [...current, ...urls]);
-      }
+      setHomepageDraftImageUrls((current) => [...current, ...urls]);
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to upload AI helper image";
       setError(message);
@@ -1399,35 +1427,30 @@ export default function HostPage() {
     }
   };
 
-  const handleAIDraftImageDrop = (type: AIDraftType, event: DragEvent<HTMLDivElement>) => {
+  const handleAIDraftImageDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDraggingAIImages(null);
-    void handleAIDraftImageFiles(type, event.dataTransfer.files);
+    void handleAIDraftImageFiles(event.dataTransfer.files);
   };
 
-  const removeAIDraftImage = (type: AIDraftType, imageUrl: string) => {
-    if (type === "homepage") {
-      setHomepageDraftImageUrls((current) => current.filter((item) => item !== imageUrl));
-    } else {
-      setPartyDraftImageUrls((current) => current.filter((item) => item !== imageUrl));
-    }
+  const removeAIDraftImage = (imageUrl: string) => {
+    setHomepageDraftImageUrls((current) => current.filter((item) => item !== imageUrl));
   };
 
-  const renderAIDraftImageAssist = (type: AIDraftType) => {
-    const imageUrls = type === "homepage" ? homepageDraftImageUrls : partyDraftImageUrls;
-    const inputRef = type === "homepage" ? homepageAIFileInputRef : partyAIFileInputRef;
-    const uploading = uploadingAIImages === type;
-    const dragging = draggingAIImages === type;
+  const renderAIDraftImageAssist = () => {
+    const imageUrls = homepageDraftImageUrls;
+    const uploading = uploadingAIImages === "homepage";
+    const dragging = draggingAIImages === "homepage";
 
     return (
       <div
         className={dragging ? "ai-image-dropzone dragging" : "ai-image-dropzone"}
         onDragOver={(event) => {
           event.preventDefault();
-          setDraggingAIImages(type);
+          setDraggingAIImages("homepage");
         }}
         onDragLeave={() => setDraggingAIImages(null)}
-        onDrop={(event) => handleAIDraftImageDrop(type, event)}
+        onDrop={(event) => handleAIDraftImageDrop(event)}
       >
         <div>
           <p>Drop images here for the AI to use.</p>
@@ -1436,7 +1459,7 @@ export default function HostPage() {
               {imageUrls.map((imageUrl) => (
                 <figure className="ai-image-preview" key={imageUrl}>
                   <img src={imageUrl} alt="Uploaded AI helper" />
-                  <button type="button" onClick={() => removeAIDraftImage(type, imageUrl)} aria-label="Remove AI helper image">
+                  <button type="button" onClick={() => removeAIDraftImage(imageUrl)} aria-label="Remove AI helper image">
                     x
                   </button>
                 </figure>
@@ -1447,13 +1470,13 @@ export default function HostPage() {
         <button
           className="ai-image-upload-button"
           type="button"
-          onClick={() => inputRef.current?.click()}
+          onClick={() => homepageAIFileInputRef.current?.click()}
           disabled={uploading}
         >
           {uploading ? "Uploading..." : "Add image"}
         </button>
         <input
-          ref={inputRef}
+          ref={homepageAIFileInputRef}
           className="visually-hidden"
           type="file"
           accept="image/png,image/jpeg,image/gif,image/webp"
@@ -1461,7 +1484,7 @@ export default function HostPage() {
           disabled={uploading}
           onChange={(event) => {
             if (event.target.files) {
-              void handleAIDraftImageFiles(type, event.target.files);
+              void handleAIDraftImageFiles(event.target.files);
             }
             event.target.value = "";
           }}
@@ -1877,7 +1900,6 @@ export default function HostPage() {
                         <tr>
                           <th>Party</th>
                           <th>Date</th>
-                          <th>HTML</th>
                           <th aria-label="Actions" />
                         </tr>
                       </thead>
@@ -1886,7 +1908,6 @@ export default function HostPage() {
                           <tr className="clickable-row" key={party.id} onClick={() => setPreviewParty(party)}>
                             <td>{party.label}</td>
                             <td>{formatDateTime(party.date)}</td>
-                            <td>{party.html.trim() ? "Added" : "Empty"}</td>
                             <td className="party-row-actions">
                               <button
                                 className="auth-secondary table-action-button"
@@ -1914,7 +1935,7 @@ export default function HostPage() {
                         ))}
                         {parties.length === 0 ? (
                           <tr>
-                            <td colSpan={4}>No parties yet.</td>
+                            <td colSpan={3}>No parties yet.</td>
                           </tr>
                         ) : null}
                       </tbody>
@@ -1960,46 +1981,27 @@ export default function HostPage() {
                       placeholder="https://partiful.com/e/..."
                     />
                   </label>
-                  <div className="ai-draft-box">
-                    <label className="auth-field host-message-field">
-                      <span>AI Help</span>
-                      <textarea
-                        value={partyDraftPrompt}
-                        onChange={(event) => setPartyDraftPrompt(event.target.value)}
-                        rows={3}
-                        placeholder="Describe the party announcement you want..."
-                      />
-                    </label>
-                    {renderAIDraftImageAssist("party")}
-                    <button
-                      className="auth-secondary"
-                      type="button"
-                      onClick={() => void handleGenerateHTMLDraft("party")}
-                      disabled={generatingPartyDraft}
-                    >
-                      {generatingPartyDraft ? "Writing..." : "Draft Party HTML"}
-                    </button>
-                    {partySuccess ? <p className="host-success">{partySuccess}</p> : null}
+                  <div className="auth-field party-media-field">
+                    <span>Party media</span>
+                    {partyMediaUrl ? (
+                      <div className="party-media-preview-block">
+                        <img src={partyMediaUrl} alt="Selected party media" className="party-media-preview" />
+                        <div className="party-media-preview-actions">
+                          <button className="auth-secondary" type="button" onClick={openPartyMediaModal}>
+                            Change Media
+                          </button>
+                          <button className="auth-secondary" type="button" onClick={() => setPartyMediaUrl("")}>
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button className="auth-secondary" type="button" onClick={openPartyMediaModal}>
+                        Select Image or GIF
+                      </button>
+                    )}
                   </div>
-                  <label className="auth-field host-message-field">
-                    <span>Announcement HTML</span>
-                    <textarea
-                      value={partyHtml}
-                      onChange={(event) => setPartyHtml(event.target.value)}
-                      rows={10}
-                      placeholder="<h2>Party announcement</h2><p>Details...</p>"
-                    />
-                  </label>
-
-                  <div className="homepage-preview-shell party-preview-shell">
-                    <p className="host-section-title">Preview</p>
-                    <article
-                      className="homepage-html homepage-preview"
-                      dangerouslySetInnerHTML={{
-                        __html: partyHtml || "<p>Party preview will appear here.</p>",
-                      }}
-                    />
-                  </div>
+                  {partySuccess ? <p className="host-success">{partySuccess}</p> : null}
 
                   {error ? <p className="auth-error">{error}</p> : null}
 
@@ -2235,11 +2237,11 @@ export default function HostPage() {
                     placeholder="Describe the homepage announcement you want..."
                   />
                 </label>
-                {renderAIDraftImageAssist("homepage")}
+                {renderAIDraftImageAssist()}
                 <button
                   className="auth-secondary"
                   type="button"
-                  onClick={() => void handleGenerateHTMLDraft("homepage")}
+                  onClick={() => void handleGenerateHTMLDraft()}
                   disabled={generatingHomepageDraft}
                 >
                   {generatingHomepageDraft ? "Writing..." : "Draft Homepage HTML"}
@@ -2368,6 +2370,97 @@ export default function HostPage() {
             </section>
           )}
         </section>
+
+        {partyMediaModalOpen ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={closePartyMediaModal}>
+            <section
+              className="upload-modal gothic-card party-media-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="party-media-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <h2 className="host-section-title" id="party-media-modal-title">Select party media</h2>
+                <button className="modal-close" type="button" onClick={closePartyMediaModal} aria-label="Close media picker">
+                  x
+                </button>
+              </div>
+
+              <form className="host-email-form" onSubmit={(event) => void handlePartyMediaSearch(event)}>
+                <fieldset className="party-media-type-fieldset">
+                  <legend>Media type</legend>
+                  <label className="party-media-type-option">
+                    <input
+                      type="radio"
+                      name="party-media-type"
+                      value="image"
+                      checked={partyMediaType === "image"}
+                      onChange={() => {
+                        setPartyMediaType("image");
+                        setPartyMediaResults([]);
+                        setPartyMediaError("");
+                      }}
+                    />
+                    <span>Image</span>
+                  </label>
+                  <label className="party-media-type-option">
+                    <input
+                      type="radio"
+                      name="party-media-type"
+                      value="gif"
+                      checked={partyMediaType === "gif"}
+                      onChange={() => {
+                        setPartyMediaType("gif");
+                        setPartyMediaResults([]);
+                        setPartyMediaError("");
+                      }}
+                    />
+                    <span>GIF</span>
+                  </label>
+                </fieldset>
+
+                <label className="auth-field">
+                  <span>Search Google</span>
+                  <input
+                    value={partyMediaQuery}
+                    onChange={(event) => setPartyMediaQuery(event.target.value)}
+                    placeholder={partyMediaType === "gif" ? "costume party gif" : "neon house party"}
+                    disabled={!partyMediaType || partyMediaSearching || partyMediaSaving}
+                  />
+                </label>
+
+                {partyMediaError ? <p className="auth-error">{partyMediaError}</p> : null}
+
+                <button
+                  className="auth-submit"
+                  type="submit"
+                  disabled={!partyMediaType || partyMediaSearching || partyMediaSaving || !partyMediaQuery.trim()}
+                >
+                  {partyMediaSearching ? "Searching..." : "Search"}
+                </button>
+              </form>
+
+              {partyMediaResults.length > 0 ? (
+                <div className="party-media-results" aria-label="Search results">
+                  {partyMediaResults.map((item) => (
+                    <button
+                      className="party-media-result"
+                      type="button"
+                      key={`${item.link}-${item.thumbnail}`}
+                      onClick={() => void handleSelectPartyMedia(item)}
+                      disabled={partyMediaSaving}
+                    >
+                      <img src={item.thumbnail || item.link} alt={item.title || "Search result"} />
+                      <span>{item.title || "Select"}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {partyMediaSaving ? <p className="dashboard-copy">Saving selected media to storage...</p> : null}
+            </section>
+          </div>
+        ) : null}
 
         {partyDateModalOpen ? (
           <div className="modal-backdrop" role="presentation" onMouseDown={() => setPartyDateModalOpen(false)}>

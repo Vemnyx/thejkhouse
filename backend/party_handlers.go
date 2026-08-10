@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"net/mail"
 	"strconv"
 	"strings"
 	"time"
@@ -16,9 +18,9 @@ import (
 type createPartyRequest struct {
 	Label       string `json:"label"`
 	Date        string `json:"date"`
-	HTML        string `json:"html"`
 	Summary     string `json:"summary"`
 	PartifulURL string `json:"partifulUrl"`
+	MediaURL    string `json:"mediaUrl"`
 }
 
 type partyAttendeeRequest struct {
@@ -86,15 +88,17 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 		r.Context(),
 		label,
 		date,
-		req.HTML,
 		strings.TrimSpace(req.Summary),
 		strings.TrimSpace(req.PartifulURL),
+		strings.TrimSpace(req.MediaURL),
 	)
 	if err != nil {
 		log.Error("party create", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to create party")
 		return
 	}
+
+	go s.sendPartyCreatedInvites(party)
 
 	writeJSON(w, party)
 }
@@ -184,9 +188,9 @@ func (s *apiServer) handlePartyByID(w http.ResponseWriter, r *http.Request) {
 			id,
 			label,
 			date,
-			req.HTML,
 			strings.TrimSpace(req.Summary),
 			strings.TrimSpace(req.PartifulURL),
+			strings.TrimSpace(req.MediaURL),
 		)
 		if err != nil {
 			if isNotFound(err) {
@@ -373,6 +377,19 @@ func (s *apiServer) handleCreatePartyAttendee(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	if guestUserID == nil && email != "" {
+		if _, err := mail.ParseAddress(email); err == nil {
+			party, partyErr := s.store.getPartyByID(r.Context(), partyID)
+			if partyErr != nil {
+				log.Error("party plus-one invite party load", "error", partyErr, "party_id", partyID)
+			} else {
+				go s.sendPartyPlusOneInvite(party, firstName, email)
+			}
+		} else {
+			log.Error("party plus-one invite skipped invalid email", "email", email, "party_id", partyID)
+		}
+	}
+
 	writeJSONStatus(w, http.StatusCreated, attendee)
 }
 
@@ -418,4 +435,68 @@ func (s *apiServer) handleDeletePartyAttendee(w http.ResponseWriter, r *http.Req
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *apiServer) sendPartyCreatedInvites(party Party) {
+	if s.email == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	users, err := s.store.listUsers(ctx)
+	if err != nil {
+		log.Error("party create invites list users", "error", err, "party_id", party.ID)
+		return
+	}
+
+	subject := partyCreatedInviteSubject(party)
+	cta := partyInviteCTA{
+		Label: "RSVP",
+		URL:   partyDetailURL(party),
+	}
+
+	for _, user := range users {
+		to := strings.TrimSpace(user.Email)
+		if to == "" {
+			continue
+		}
+		if _, err := mail.ParseAddress(to); err != nil {
+			continue
+		}
+
+		htmlBody, textBody := partyInviteEmail(party, user.FirstName, cta)
+		emailID, err := s.email.send(ctx, []string{to}, subject, htmlBody, textBody)
+		if err != nil {
+			log.Error("party create invite send", "error", err, "party_id", party.ID, "to", to)
+			continue
+		}
+		log.Info("party create invite sent", "email_id", emailID, "party_id", party.ID, "to", to)
+	}
+}
+
+func (s *apiServer) sendPartyPlusOneInvite(party Party, firstName, email string) {
+	if s.email == nil {
+		return
+	}
+
+	to := strings.TrimSpace(email)
+	if to == "" {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	htmlBody, textBody := partyInviteEmail(party, firstName, partyInviteCTA{
+		Label: "Create Account",
+		URL:   partySignupURL(to),
+	})
+	emailID, err := s.email.send(ctx, []string{to}, partyPlusOneInviteSubject(party), htmlBody, textBody)
+	if err != nil {
+		log.Error("party plus-one invite send", "error", err, "party_id", party.ID, "to", to)
+		return
+	}
+	log.Info("party plus-one invite sent", "email_id", emailID, "party_id", party.ID, "to", to)
 }

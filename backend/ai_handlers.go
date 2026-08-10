@@ -58,8 +58,8 @@ func (s *apiServer) handleAIHTMLDraft(w http.ResponseWriter, r *http.Request) {
 	}
 
 	blockType := strings.TrimSpace(payload.Type)
-	if blockType != "homepage" && blockType != "party" {
-		writeError(w, http.StatusBadRequest, "type must be homepage or party")
+	if blockType != "homepage" {
+		writeError(w, http.StatusBadRequest, "type must be homepage")
 		return
 	}
 

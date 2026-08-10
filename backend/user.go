@@ -40,9 +40,9 @@ type Party struct {
 	ID          int64     `json:"id"`
 	Label       string    `json:"label"`
 	Date        time.Time `json:"date"`
-	HTML        string    `json:"html"`
 	Summary     string    `json:"summary"`
 	PartifulURL string    `json:"partifulUrl"`
+	MediaURL    string    `json:"mediaUrl"`
 }
 
 type PartyAttendee struct {

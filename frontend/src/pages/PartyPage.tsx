@@ -124,37 +124,50 @@ export default function PartyPage() {
           <p className="auth-error">{error}</p>
         ) : party ? (
           <section className="party-detail-view" aria-label={`${party.label} party details`}>
-            <header className="party-detail-hero">
-              <p className="eyebrow">The JK House</p>
-              <h1>{party.label}</h1>
-              {party.summary ? <p className="party-detail-summary">{party.summary}</p> : null}
-            </header>
+            <div className="party-detail-top">
+              <div className="party-detail-main">
+                <header className="party-detail-hero">
+                  <p className="eyebrow">The JK House</p>
+                  <h1>{party.label}</h1>
+                  {party.summary ? <p className="party-detail-summary">{party.summary}</p> : null}
+                </header>
 
-            <section className="party-detail-meta" aria-label="When and where">
-              <article>
-                <span>When</span>
-                <strong>{formatPartyDateTime(party.date)}</strong>
-              </article>
-              <article>
-                <span>Where</span>
-                <strong>{partyVenueAddress}</strong>
-              </article>
-              {party.partifulUrl ? (
-                <article>
-                  <span>Partiful</span>
-                  <strong>
-                    <a href={party.partifulUrl} target="_blank" rel="noreferrer">
-                      Open invite
-                    </a>
-                  </strong>
-                </article>
-              ) : null}
-            </section>
+                <section className="party-detail-meta" aria-label="When and where">
+                  <article>
+                    <span>When</span>
+                    <strong>{formatPartyDateTime(party.date)}</strong>
+                  </article>
+                  <article>
+                    <span>Where</span>
+                    <strong>{partyVenueAddress}</strong>
+                  </article>
+                  {party.partifulUrl ? (
+                    <article>
+                      <span>Partiful</span>
+                      <strong>
+                        <a href={party.partifulUrl} target="_blank" rel="noreferrer">
+                          Open invite
+                        </a>
+                      </strong>
+                    </article>
+                  ) : null}
+                </section>
+              </div>
+
+              <aside className="party-detail-media-card" aria-label="Party media">
+                {party.mediaUrl ? (
+                  <img src={party.mediaUrl} alt="" />
+                ) : (
+                  <div className="party-detail-media-empty">
+                    <span>No media yet</span>
+                  </div>
+                )}
+              </aside>
+            </div>
 
             <section className="party-attendee-section" aria-label="Attendees">
               <div className="party-attendee-header">
                 <h2>Attendees</h2>
-                <span>{attendeeRows.length}</span>
               </div>
               {attendeeRows.length === 0 ? (
                 <p className="dashboard-copy">No one has RSVP&apos;d yet.</p>
@@ -170,7 +183,6 @@ export default function PartyPage() {
                       />
                       <div className="party-attendee-copy">
                         <span className="party-attendee-name">{row.displayName}</span>
-                        {row.isPlusOne ? <span className="party-attendee-tag">+1</span> : null}
                       </div>
                     </li>
                   ))}

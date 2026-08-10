@@ -27,8 +27,22 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [resendingConfirmation, setResendingConfirmation] = useState(false);
   const [introImages, setIntroImages] = useState<ImageRecord[]>([]);
-  const [introDismissed, setIntroDismissed] = useState(() => Boolean(searchParams.get("confirm_signup_token")));
+  const [introDismissed, setIntroDismissed] = useState(() =>
+    Boolean(searchParams.get("confirm_signup_token") || searchParams.get("mode") === "signup"),
+  );
   const confirmationToken = searchParams.get("confirm_signup_token");
+  const inviteMode = searchParams.get("mode");
+  const inviteEmail = searchParams.get("email");
+
+  useEffect(() => {
+    if (inviteMode === "signup") {
+      setMode("signup");
+      setIntroDismissed(true);
+    }
+    if (inviteEmail) {
+      setEmail(inviteEmail);
+    }
+  }, [inviteEmail, inviteMode]);
 
   useEffect(() => {
     let cancelled = false;

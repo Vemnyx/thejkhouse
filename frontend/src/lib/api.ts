@@ -59,9 +59,9 @@ export type PartyRecord = {
   id: number;
   label: string;
   date: string;
-  html: string;
   summary: string;
   partifulUrl: string;
+  mediaUrl: string;
 };
 
 export function partyRouteIdentifier(party: Pick<PartyRecord, "id" | "label">) {
@@ -187,9 +187,19 @@ export type CreateContestantResponse = {
 export type CreatePartyPayload = {
   label: string;
   date: string;
-  html: string;
   summary?: string;
   partifulUrl?: string;
+  mediaUrl?: string;
+};
+
+export type MediaSearchType = "image" | "gif";
+
+export type MediaSearchItem = {
+  title: string;
+  link: string;
+  thumbnail: string;
+  context: string;
+  mime: string;
 };
 
 export type CreatePartyAttendeePayload = {
@@ -236,7 +246,7 @@ export type HomepageContent = {
 };
 
 export type HTMLDraftPayload = {
-  type: "homepage" | "party";
+  type: "homepage";
   instructions: string;
   existingHtml: string;
   imageUrls?: string[];
@@ -349,6 +359,23 @@ export function listParties(token: string) {
 
 export function getParty(token: string, id: number) {
   return apiFetch<PartyRecord>(`/parties/${id}`, token);
+}
+
+export function searchMedia(token: string, query: string, type: MediaSearchType) {
+  const params = new URLSearchParams({
+    q: query,
+    type,
+  });
+  return apiFetch<{ items: MediaSearchItem[] | null }>(`/media/search?${params.toString()}`, token).then(
+    (response) => response.items ?? [],
+  );
+}
+
+export function saveMediaFromURL(token: string, url: string) {
+  return apiFetch<{ imageUrl: string }>("/media/from-url", token, {
+    method: "POST",
+    body: JSON.stringify({ url }),
+  });
 }
 
 export function createParty(token: string, payload: CreatePartyPayload) {

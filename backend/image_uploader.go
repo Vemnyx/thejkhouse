@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -61,6 +62,62 @@ func (u *imageUploader) upload(ctx context.Context, r io.Reader, originalFilenam
 	}
 
 	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", u.bucket, objectName), nil
+}
+
+func (u *imageUploader) uploadFromURL(ctx context.Context, sourceURL string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(sourceURL))
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("invalid image url")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", fmt.Errorf("image url must be http or https")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "thejkhouse-media-fetcher/1.0")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	res, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("download image: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return "", fmt.Errorf("download image status %d", res.StatusCode)
+	}
+
+	limited := io.LimitReader(res.Body, 10<<20+1)
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return "", fmt.Errorf("read image: %w", err)
+	}
+	if len(data) == 0 {
+		return "", fmt.Errorf("downloaded image is empty")
+	}
+	if len(data) > 10<<20 {
+		return "", fmt.Errorf("downloaded image exceeds 10MB")
+	}
+
+	contentType, ok := detectImageContentType(data)
+	if !ok {
+		headerType := strings.TrimSpace(strings.Split(res.Header.Get("Content-Type"), ";")[0])
+		if headerType == "image/jpeg" || headerType == "image/png" || headerType == "image/gif" || headerType == "image/webp" {
+			contentType = headerType
+		} else {
+			return "", fmt.Errorf("downloaded file is not a supported image")
+		}
+	}
+
+	filename := filepath.Base(parsed.Path)
+	if filename == "" || filename == "." || filename == "/" {
+		filename = "media"
+	}
+
+	return u.upload(ctx, bytes.NewReader(data), filename, contentType, time.Now().UTC())
 }
 
 func (u *imageUploader) close() {
