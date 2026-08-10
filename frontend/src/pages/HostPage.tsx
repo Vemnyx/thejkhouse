@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 import { searchPartyMedia, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, isGifMediaItem } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
@@ -171,6 +171,7 @@ export default function HostPage() {
   const [partySummary, setPartySummary] = useState("");
   const [partyThemePrimary, setPartyThemePrimary] = useState(DEFAULT_PARTY_THEME_PRIMARY);
   const [partyThemeAccent, setPartyThemeAccent] = useState(DEFAULT_PARTY_THEME_ACCENT);
+  const [partyThemeBackground, setPartyThemeBackground] = useState(DEFAULT_PARTY_THEME_BACKGROUND);
   const [partyThemeFont, setPartyThemeFont] = useState(DEFAULT_PARTY_THEME_FONT);
   const [partySetupModalOpen, setPartySetupModalOpen] = useState(false);
   const [partyThemeModalOpen, setPartyThemeModalOpen] = useState(false);
@@ -506,6 +507,7 @@ export default function HostPage() {
     setPartySummary("");
     setPartyThemePrimary(DEFAULT_PARTY_THEME_PRIMARY);
     setPartyThemeAccent(DEFAULT_PARTY_THEME_ACCENT);
+    setPartyThemeBackground(DEFAULT_PARTY_THEME_BACKGROUND);
     setPartyThemeFont(DEFAULT_PARTY_THEME_FONT);
     setPartySetupModalOpen(false);
     setPartyThemeModalOpen(false);
@@ -558,6 +560,7 @@ export default function HostPage() {
     setPartySummary(party.summary || "");
     setPartyThemePrimary(party.themePrimary || DEFAULT_PARTY_THEME_PRIMARY);
     setPartyThemeAccent(party.themeAccent || DEFAULT_PARTY_THEME_ACCENT);
+    setPartyThemeBackground(party.themeBackground || DEFAULT_PARTY_THEME_BACKGROUND);
     setPartyThemeFont(normalizePartyThemeFont(party.themeFont));
     setPartyMediaUrl(party.mediaUrl || "");
     setPartyView("edit");
@@ -1414,6 +1417,7 @@ export default function HostPage() {
         mediaUrl: partyMediaUrl.trim(),
         themePrimary: normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY),
         themeAccent: normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT),
+        themeBackground: normalizePartyThemeHex(partyThemeBackground, DEFAULT_PARTY_THEME_BACKGROUND),
         themeFont: normalizePartyThemeFont(partyThemeFont),
       };
       if (partyView === "edit" && editingParty) {
@@ -2059,7 +2063,12 @@ export default function HostPage() {
               ) : (
                 <form
                   className="party-form party-detail-view party-themed"
-                  style={partyThemeStyle({ themePrimary: partyThemePrimary, themeAccent: partyThemeAccent, themeFont: partyThemeFont })}
+                  style={partyThemeStyle({
+                    themePrimary: partyThemePrimary,
+                    themeAccent: partyThemeAccent,
+                    themeBackground: partyThemeBackground,
+                    themeFont: partyThemeFont,
+                  })}
                   onSubmit={handleCreateParty}
                 >
                   <div className="host-panel-header party-form-toolbar">
@@ -2557,46 +2566,63 @@ export default function HostPage() {
                 </select>
               </label>
               <div className="party-theme-fields" aria-label="Party theme colors">
-                <label className="auth-field party-theme-field">
+                <label className="party-theme-field">
+                  <input
+                    type="color"
+                    value={normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY)}
+                    onChange={(event) => setPartyThemePrimary(event.target.value)}
+                    aria-label="Primary theme color"
+                  />
                   <span>Primary color</span>
-                  <div className="party-theme-swatch-row">
-                    <input
-                      type="color"
-                      value={normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY)}
-                      onChange={(event) => setPartyThemePrimary(event.target.value)}
-                      aria-label="Primary theme color"
-                    />
-                    <input
-                      className="party-theme-hex"
-                      value={partyThemePrimary}
-                      onChange={(event) => setPartyThemePrimary(event.target.value)}
-                      spellCheck={false}
-                      aria-label="Primary theme color hex"
-                    />
-                  </div>
+                  <input
+                    className="party-theme-hex"
+                    value={partyThemePrimary}
+                    onChange={(event) => setPartyThemePrimary(event.target.value)}
+                    spellCheck={false}
+                    aria-label="Primary theme color hex"
+                  />
                 </label>
-                <label className="auth-field party-theme-field">
+                <label className="party-theme-field">
+                  <input
+                    type="color"
+                    value={normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT)}
+                    onChange={(event) => setPartyThemeAccent(event.target.value)}
+                    aria-label="Accent theme color"
+                  />
                   <span>Accent color</span>
-                  <div className="party-theme-swatch-row">
-                    <input
-                      type="color"
-                      value={normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT)}
-                      onChange={(event) => setPartyThemeAccent(event.target.value)}
-                      aria-label="Accent theme color"
-                    />
-                    <input
-                      className="party-theme-hex"
-                      value={partyThemeAccent}
-                      onChange={(event) => setPartyThemeAccent(event.target.value)}
-                      spellCheck={false}
-                      aria-label="Accent theme color hex"
-                    />
-                  </div>
+                  <input
+                    className="party-theme-hex"
+                    value={partyThemeAccent}
+                    onChange={(event) => setPartyThemeAccent(event.target.value)}
+                    spellCheck={false}
+                    aria-label="Accent theme color hex"
+                  />
+                </label>
+                <label className="party-theme-field">
+                  <input
+                    type="color"
+                    value={normalizePartyThemeHex(partyThemeBackground, DEFAULT_PARTY_THEME_BACKGROUND)}
+                    onChange={(event) => setPartyThemeBackground(event.target.value)}
+                    aria-label="Background theme color"
+                  />
+                  <span>Background color</span>
+                  <input
+                    className="party-theme-hex"
+                    value={partyThemeBackground}
+                    onChange={(event) => setPartyThemeBackground(event.target.value)}
+                    spellCheck={false}
+                    aria-label="Background theme color hex"
+                  />
                 </label>
               </div>
               <div
                 className="party-theme-preview party-themed"
-                style={partyThemeStyle({ themePrimary: partyThemePrimary, themeAccent: partyThemeAccent, themeFont: partyThemeFont })}
+                style={partyThemeStyle({
+                  themePrimary: partyThemePrimary,
+                  themeAccent: partyThemeAccent,
+                  themeBackground: partyThemeBackground,
+                  themeFont: partyThemeFont,
+                })}
                 aria-hidden="true"
               >
                 <span className="party-theme-preview-title">Party title</span>
@@ -2646,46 +2672,63 @@ export default function HostPage() {
                 </select>
               </label>
               <div className="party-theme-fields" aria-label="Party theme colors">
-                <label className="auth-field party-theme-field">
+                <label className="party-theme-field">
+                  <input
+                    type="color"
+                    value={normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY)}
+                    onChange={(event) => setPartyThemePrimary(event.target.value)}
+                    aria-label="Primary theme color"
+                  />
                   <span>Primary color</span>
-                  <div className="party-theme-swatch-row">
-                    <input
-                      type="color"
-                      value={normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY)}
-                      onChange={(event) => setPartyThemePrimary(event.target.value)}
-                      aria-label="Primary theme color"
-                    />
-                    <input
-                      className="party-theme-hex"
-                      value={partyThemePrimary}
-                      onChange={(event) => setPartyThemePrimary(event.target.value)}
-                      spellCheck={false}
-                      aria-label="Primary theme color hex"
-                    />
-                  </div>
+                  <input
+                    className="party-theme-hex"
+                    value={partyThemePrimary}
+                    onChange={(event) => setPartyThemePrimary(event.target.value)}
+                    spellCheck={false}
+                    aria-label="Primary theme color hex"
+                  />
                 </label>
-                <label className="auth-field party-theme-field">
+                <label className="party-theme-field">
+                  <input
+                    type="color"
+                    value={normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT)}
+                    onChange={(event) => setPartyThemeAccent(event.target.value)}
+                    aria-label="Accent theme color"
+                  />
                   <span>Accent color</span>
-                  <div className="party-theme-swatch-row">
-                    <input
-                      type="color"
-                      value={normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT)}
-                      onChange={(event) => setPartyThemeAccent(event.target.value)}
-                      aria-label="Accent theme color"
-                    />
-                    <input
-                      className="party-theme-hex"
-                      value={partyThemeAccent}
-                      onChange={(event) => setPartyThemeAccent(event.target.value)}
-                      spellCheck={false}
-                      aria-label="Accent theme color hex"
-                    />
-                  </div>
+                  <input
+                    className="party-theme-hex"
+                    value={partyThemeAccent}
+                    onChange={(event) => setPartyThemeAccent(event.target.value)}
+                    spellCheck={false}
+                    aria-label="Accent theme color hex"
+                  />
+                </label>
+                <label className="party-theme-field">
+                  <input
+                    type="color"
+                    value={normalizePartyThemeHex(partyThemeBackground, DEFAULT_PARTY_THEME_BACKGROUND)}
+                    onChange={(event) => setPartyThemeBackground(event.target.value)}
+                    aria-label="Background theme color"
+                  />
+                  <span>Background color</span>
+                  <input
+                    className="party-theme-hex"
+                    value={partyThemeBackground}
+                    onChange={(event) => setPartyThemeBackground(event.target.value)}
+                    spellCheck={false}
+                    aria-label="Background theme color hex"
+                  />
                 </label>
               </div>
               <div
                 className="party-theme-preview party-themed"
-                style={partyThemeStyle({ themePrimary: partyThemePrimary, themeAccent: partyThemeAccent, themeFont: partyThemeFont })}
+                style={partyThemeStyle({
+                  themePrimary: partyThemePrimary,
+                  themeAccent: partyThemeAccent,
+                  themeBackground: partyThemeBackground,
+                  themeFont: partyThemeFont,
+                })}
                 aria-hidden="true"
               >
                 <span className="party-theme-preview-title">Party title</span>

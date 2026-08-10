@@ -37,15 +37,16 @@ type Image struct {
 }
 
 type Party struct {
-	ID           int64     `json:"id"`
-	Label        string    `json:"label"`
-	Date         time.Time `json:"date"`
-	Summary      string    `json:"summary"`
-	PartifulURL  string    `json:"partifulUrl"`
-	MediaURL     string    `json:"mediaUrl"`
-	ThemePrimary string    `json:"themePrimary"`
-	ThemeAccent  string    `json:"themeAccent"`
-	ThemeFont    string    `json:"themeFont"`
+	ID              int64     `json:"id"`
+	Label           string    `json:"label"`
+	Date            time.Time `json:"date"`
+	Summary         string    `json:"summary"`
+	PartifulURL     string    `json:"partifulUrl"`
+	MediaURL        string    `json:"mediaUrl"`
+	ThemePrimary    string    `json:"themePrimary"`
+	ThemeAccent     string    `json:"themeAccent"`
+	ThemeBackground string    `json:"themeBackground"`
+	ThemeFont       string    `json:"themeFont"`
 }
 
 type PartyAttendee struct {

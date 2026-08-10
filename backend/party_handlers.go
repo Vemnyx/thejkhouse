@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	defaultPartyThemePrimary = "#f2b8c4"
-	defaultPartyThemeAccent  = "#b8926a"
-	defaultPartyThemeFont    = "cinzel-decorative"
+	defaultPartyThemePrimary    = "#f2b8c4"
+	defaultPartyThemeAccent     = "#b8926a"
+	defaultPartyThemeBackground = "#030303"
+	defaultPartyThemeFont       = "cinzel-decorative"
 )
 
 var partyThemeHexRE = regexp.MustCompile(`(?i)^#[0-9a-f]{6}$`)
@@ -96,14 +97,15 @@ func (s *apiServer) resolvePartyMediaURL(ctx context.Context, mediaURL, previous
 }
 
 type createPartyRequest struct {
-	Label        string `json:"label"`
-	Date         string `json:"date"`
-	Summary      string `json:"summary"`
-	PartifulURL  string `json:"partifulUrl"`
-	MediaURL     string `json:"mediaUrl"`
-	ThemePrimary string `json:"themePrimary"`
-	ThemeAccent  string `json:"themeAccent"`
-	ThemeFont    string `json:"themeFont"`
+	Label           string `json:"label"`
+	Date            string `json:"date"`
+	Summary         string `json:"summary"`
+	PartifulURL     string `json:"partifulUrl"`
+	MediaURL        string `json:"mediaUrl"`
+	ThemePrimary    string `json:"themePrimary"`
+	ThemeAccent     string `json:"themeAccent"`
+	ThemeBackground string `json:"themeBackground"`
+	ThemeFont       string `json:"themeFont"`
 }
 
 type partyAttendeeRequest struct {
@@ -183,6 +185,7 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 		mediaURL,
 		normalizePartyThemeColor(req.ThemePrimary, defaultPartyThemePrimary),
 		normalizePartyThemeColor(req.ThemeAccent, defaultPartyThemeAccent),
+		normalizePartyThemeColor(req.ThemeBackground, defaultPartyThemeBackground),
 		normalizePartyThemeFont(req.ThemeFont),
 	)
 	if err != nil {
@@ -304,6 +307,7 @@ func (s *apiServer) handlePartyByID(w http.ResponseWriter, r *http.Request) {
 			mediaURL,
 			normalizePartyThemeColor(req.ThemePrimary, defaultPartyThemePrimary),
 			normalizePartyThemeColor(req.ThemeAccent, defaultPartyThemeAccent),
+			normalizePartyThemeColor(req.ThemeBackground, defaultPartyThemeBackground),
 			normalizePartyThemeFont(req.ThemeFont),
 		)
 		if err != nil {

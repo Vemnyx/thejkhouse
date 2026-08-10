@@ -64,11 +64,13 @@ export type PartyRecord = {
   mediaUrl: string;
   themePrimary: string;
   themeAccent: string;
+  themeBackground: string;
   themeFont: string;
 };
 
 export const DEFAULT_PARTY_THEME_PRIMARY = "#f2b8c4";
 export const DEFAULT_PARTY_THEME_ACCENT = "#b8926a";
+export const DEFAULT_PARTY_THEME_BACKGROUND = "#030303";
 export const DEFAULT_PARTY_THEME_FONT = "cinzel-decorative";
 
 export type PartyThemeFontOption = {
@@ -118,11 +120,13 @@ export function partyThemeFontFamily(value: string | undefined) {
 export function partyThemeStyle(party: {
   themePrimary?: string;
   themeAccent?: string;
+  themeBackground?: string;
   themeFont?: string;
 }): Record<string, string> {
   return {
     "--party-theme-primary": normalizePartyThemeHex(party.themePrimary, DEFAULT_PARTY_THEME_PRIMARY),
     "--party-theme-accent": normalizePartyThemeHex(party.themeAccent, DEFAULT_PARTY_THEME_ACCENT),
+    "--party-theme-background": normalizePartyThemeHex(party.themeBackground, DEFAULT_PARTY_THEME_BACKGROUND),
     "--party-theme-font": partyThemeFontFamily(party.themeFont),
   };
 }
@@ -255,6 +259,7 @@ export type CreatePartyPayload = {
   mediaUrl?: string;
   themePrimary?: string;
   themeAccent?: string;
+  themeBackground?: string;
   themeFont?: string;
 };
 

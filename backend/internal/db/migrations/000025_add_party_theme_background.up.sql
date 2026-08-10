@@ -1,0 +1,2 @@
+ALTER TABLE parties
+    ADD COLUMN IF NOT EXISTS theme_background text NOT NULL DEFAULT '#030303';

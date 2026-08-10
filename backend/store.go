@@ -517,7 +517,7 @@ func (s *userStore) deleteImage(ctx context.Context, id int64) error {
 func (s *userStore) listParties(ctx context.Context) ([]Party, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, label, date, summary, partiful_url, media_url, theme_primary, theme_accent, theme_font
+		`SELECT id, label, date, summary, partiful_url, media_url, theme_primary, theme_accent, theme_background, theme_font
 		 FROM parties
 		 ORDER BY date DESC`,
 	)
@@ -538,6 +538,7 @@ func (s *userStore) listParties(ctx context.Context) ([]Party, error) {
 			&party.MediaURL,
 			&party.ThemePrimary,
 			&party.ThemeAccent,
+			&party.ThemeBackground,
 			&party.ThemeFont,
 		); err != nil {
 			return nil, err
@@ -555,7 +556,7 @@ func (s *userStore) getPartyByID(ctx context.Context, id int64) (Party, error) {
 	var party Party
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, label, date, summary, partiful_url, media_url, theme_primary, theme_accent, theme_font
+		`SELECT id, label, date, summary, partiful_url, media_url, theme_primary, theme_accent, theme_background, theme_font
 		 FROM parties
 		 WHERE id = $1`,
 		id,
@@ -568,6 +569,7 @@ func (s *userStore) getPartyByID(ctx context.Context, id int64) (Party, error) {
 		&party.MediaURL,
 		&party.ThemePrimary,
 		&party.ThemeAccent,
+		&party.ThemeBackground,
 		&party.ThemeFont,
 	)
 	if err != nil {
@@ -576,13 +578,13 @@ func (s *userStore) getPartyByID(ctx context.Context, id int64) (Party, error) {
 	return party, nil
 }
 
-func (s *userStore) createParty(ctx context.Context, label string, date time.Time, summary, partifulURL, mediaURL, themePrimary, themeAccent, themeFont string) (Party, error) {
+func (s *userStore) createParty(ctx context.Context, label string, date time.Time, summary, partifulURL, mediaURL, themePrimary, themeAccent, themeBackground, themeFont string) (Party, error) {
 	var party Party
 	err := s.pool.QueryRow(
 		ctx,
-		`INSERT INTO parties (label, date, summary, partiful_url, media_url, theme_primary, theme_accent, theme_font)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		 RETURNING id, label, date, summary, partiful_url, media_url, theme_primary, theme_accent, theme_font`,
+		`INSERT INTO parties (label, date, summary, partiful_url, media_url, theme_primary, theme_accent, theme_background, theme_font)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 RETURNING id, label, date, summary, partiful_url, media_url, theme_primary, theme_accent, theme_background, theme_font`,
 		label,
 		date,
 		summary,
@@ -590,6 +592,7 @@ func (s *userStore) createParty(ctx context.Context, label string, date time.Tim
 		mediaURL,
 		themePrimary,
 		themeAccent,
+		themeBackground,
 		themeFont,
 	).Scan(
 		&party.ID,
@@ -600,6 +603,7 @@ func (s *userStore) createParty(ctx context.Context, label string, date time.Tim
 		&party.MediaURL,
 		&party.ThemePrimary,
 		&party.ThemeAccent,
+		&party.ThemeBackground,
 		&party.ThemeFont,
 	)
 	if err != nil {
@@ -609,14 +613,14 @@ func (s *userStore) createParty(ctx context.Context, label string, date time.Tim
 	return party, nil
 }
 
-func (s *userStore) updateParty(ctx context.Context, id int64, label string, date time.Time, summary, partifulURL, mediaURL, themePrimary, themeAccent, themeFont string) (Party, error) {
+func (s *userStore) updateParty(ctx context.Context, id int64, label string, date time.Time, summary, partifulURL, mediaURL, themePrimary, themeAccent, themeBackground, themeFont string) (Party, error) {
 	var party Party
 	err := s.pool.QueryRow(
 		ctx,
 		`UPDATE parties
-		 SET label = $2, date = $3, summary = $4, partiful_url = $5, media_url = $6, theme_primary = $7, theme_accent = $8, theme_font = $9
+		 SET label = $2, date = $3, summary = $4, partiful_url = $5, media_url = $6, theme_primary = $7, theme_accent = $8, theme_background = $9, theme_font = $10
 		 WHERE id = $1
-		 RETURNING id, label, date, summary, partiful_url, media_url, theme_primary, theme_accent, theme_font`,
+		 RETURNING id, label, date, summary, partiful_url, media_url, theme_primary, theme_accent, theme_background, theme_font`,
 		id,
 		label,
 		date,
@@ -625,6 +629,7 @@ func (s *userStore) updateParty(ctx context.Context, id int64, label string, dat
 		mediaURL,
 		themePrimary,
 		themeAccent,
+		themeBackground,
 		themeFont,
 	).Scan(
 		&party.ID,
@@ -635,6 +640,7 @@ func (s *userStore) updateParty(ctx context.Context, id int64, label string, dat
 		&party.MediaURL,
 		&party.ThemePrimary,
 		&party.ThemeAccent,
+		&party.ThemeBackground,
 		&party.ThemeFont,
 	)
 	if err != nil {

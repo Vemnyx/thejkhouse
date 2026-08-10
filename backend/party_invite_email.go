@@ -56,6 +56,7 @@ func partyInviteEmail(party Party, greetingName string, cta partyInviteCTA) (str
 
 	primary := normalizePartyThemeColor(party.ThemePrimary, defaultPartyThemePrimary)
 	accent := normalizePartyThemeColor(party.ThemeAccent, defaultPartyThemeAccent)
+	background := normalizePartyThemeColor(party.ThemeBackground, defaultPartyThemeBackground)
 	fontFamily := partyThemeFontFamily(party.ThemeFont)
 	primaryBorder := partyThemeRGBA(primary, 0.35)
 	primaryBorderSoft := partyThemeRGBA(primary, 0.16)
@@ -74,6 +75,7 @@ func partyInviteEmail(party Party, greetingName string, cta partyInviteCTA) (str
 	escapedCTAURL := html.EscapeString(cta.URL)
 	escapedPrimary := html.EscapeString(primary)
 	escapedAccent := html.EscapeString(accent)
+	escapedBackground := html.EscapeString(background)
 	escapedFontFamily := html.EscapeString(fontFamily)
 
 	mediaBlock := ""
@@ -106,9 +108,9 @@ func partyInviteEmail(party Party, greetingName string, cta partyInviteCTA) (str
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Archivo+Black&family=Bangers&family=Bebas+Neue&family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600&family=Dancing+Script:wght@400;700&family=Fredoka:wght@400;600&family=Great+Vibes&family=Lobster&family=Orbitron:wght@400;700&family=Pacifico&family=Playfair+Display:wght@400;700&family=Press+Start+2P&family=Righteous&family=UnifrakturMaguntia&display=swap" rel="stylesheet" />
   </head>
-  <body style="margin:0;background:#030303;color:#f8ecee;font-family:Georgia,'Times New Roman',serif;">
+  <body style="margin:0;background:%s;color:#f8ecee;font-family:Georgia,'Times New Roman',serif;">
     <div style="max-width:640px;margin:0 auto;padding:40px 20px;">
-      <div style="border:1px solid %s;background:linear-gradient(180deg,%s,rgba(10,10,10,.98));padding:36px;box-shadow:0 24px 80px rgba(0,0,0,.45);">
+      <div style="border:1px solid %s;background:linear-gradient(180deg,%s,%s);padding:36px;box-shadow:0 24px 80px rgba(0,0,0,.45);">
         <p style="margin:0 0 12px;color:%s;font-size:12px;letter-spacing:.28em;text-transform:uppercase;text-align:center;">The JK House</p>
         <h1 style="margin:0;color:%s;font-family:%s;font-size:32px;line-height:1.15;letter-spacing:.06em;text-align:center;">%s</h1>
         %s
@@ -139,8 +141,10 @@ func partyInviteEmail(party Party, greetingName string, cta partyInviteCTA) (str
     </div>
   </body>
 </html>`,
+		escapedBackground,
 		primaryBorder,
 		primaryWash,
+		escapedBackground,
 		escapedAccent,
 		escapedPrimary,
 		escapedFontFamily,
