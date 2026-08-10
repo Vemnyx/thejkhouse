@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import BirthdaySelect, { ImageDateSelect } from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, EventRecord, HomepageContent, ImageRecord, PartyAttendeeRecord, PartyRecord, addPartyAttendee, eventRouteIdentifier, eventTypeLabels, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, partyRouteIdentifier, uploadImage } from "../lib/api";
+import { AppUser, EventRecord, HomepageContent, ImageRecord, PartyAttendeeRecord, PartyRecord, addPartyAttendee, eventRouteIdentifier, eventTypeLabels, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, partyRouteIdentifier, partyThemeStyle, uploadImage } from "../lib/api";
 
 type MainTab = "home" | "parties" | "photos" | "events";
 type MainView = MainTab | "settings";
@@ -813,7 +813,10 @@ export default function HomePage() {
 
                     return (
                       <div className="party-accordion-group" key={party.id}>
-                        <article className={expanded ? "party-accordion-row expanded" : "party-accordion-row"}>
+                        <article
+                          className={expanded ? "party-accordion-row expanded party-themed" : "party-accordion-row party-themed"}
+                          style={partyThemeStyle(party)}
+                        >
                           <button
                             className="party-accordion-summary"
                             type="button"
@@ -837,20 +840,29 @@ export default function HomePage() {
                                   }
                                 }}
                               >
-                                {party.partifulUrl ? (
-                                  <p className="party-overview-copy">
-                                    <a
-                                      href={party.partifulUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      onClick={(event) => event.stopPropagation()}
-                                    >
-                                      {party.partifulUrl}
-                                    </a>
-                                  </p>
-                                ) : (
-                                  <p className="party-overview-copy">{party.summary || "No summary yet."}</p>
-                                )}
+                                <div className={party.mediaUrl ? "party-summary-card-body has-media" : "party-summary-card-body"}>
+                                  <div className="party-summary-card-main">
+                                    {party.partifulUrl ? (
+                                      <p className="party-overview-copy">
+                                        <a
+                                          href={party.partifulUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          onClick={(event) => event.stopPropagation()}
+                                        >
+                                          {party.partifulUrl}
+                                        </a>
+                                      </p>
+                                    ) : (
+                                      <p className="party-overview-copy">{party.summary || "No summary yet."}</p>
+                                    )}
+                                  </div>
+                                  {party.mediaUrl ? (
+                                    <div className="party-summary-card-media" aria-hidden="true">
+                                      <img src={party.mediaUrl} alt="" />
+                                    </div>
+                                  ) : null}
+                                </div>
                                 <div className="party-summary-card-footer">
                                   {isFutureParty && !party.partifulUrl ? (
                                     <button

@@ -62,7 +62,70 @@ export type PartyRecord = {
   summary: string;
   partifulUrl: string;
   mediaUrl: string;
+  themePrimary: string;
+  themeAccent: string;
+  themeFont: string;
 };
+
+export const DEFAULT_PARTY_THEME_PRIMARY = "#f2b8c4";
+export const DEFAULT_PARTY_THEME_ACCENT = "#b8926a";
+export const DEFAULT_PARTY_THEME_FONT = "cinzel-decorative";
+
+export type PartyThemeFontOption = {
+  id: string;
+  label: string;
+  family: string;
+};
+
+export const PARTY_THEME_FONTS: PartyThemeFontOption[] = [
+  { id: "cinzel-decorative", label: "Cinzel Decorative", family: '"Cinzel Decorative", Cinzel, Georgia, serif' },
+  { id: "playfair-display", label: "Playfair Display", family: '"Playfair Display", Georgia, serif' },
+  { id: "great-vibes", label: "Great Vibes", family: '"Great Vibes", "Brush Script MT", cursive' },
+  { id: "bebas-neue", label: "Bebas Neue", family: '"Bebas Neue", Impact, "Arial Narrow", sans-serif' },
+  { id: "pacifico", label: "Pacifico", family: 'Pacifico, "Comic Sans MS", cursive' },
+  { id: "abril-fatface", label: "Abril Fatface", family: '"Abril Fatface", Georgia, serif' },
+  { id: "lobster", label: "Lobster", family: 'Lobster, "Brush Script MT", cursive' },
+  { id: "righteous", label: "Righteous", family: "Righteous, Impact, sans-serif" },
+  { id: "orbitron", label: "Orbitron", family: 'Orbitron, "Segoe UI", sans-serif' },
+  { id: "press-start-2p", label: "Press Start 2P", family: '"Press Start 2P", "Courier New", monospace' },
+  { id: "bangers", label: "Bangers", family: "Bangers, Impact, sans-serif" },
+  { id: "dancing-script", label: "Dancing Script", family: '"Dancing Script", "Brush Script MT", cursive' },
+  { id: "unifrakturmaguntia", label: "Unifraktur Maguntia", family: 'UnifrakturMaguntia, "Times New Roman", serif' },
+  { id: "fredoka", label: "Fredoka", family: 'Fredoka, "Trebuchet MS", sans-serif' },
+  { id: "archivo-black", label: "Archivo Black", family: '"Archivo Black", Impact, sans-serif' },
+];
+
+const partyThemeFontById = new Map(PARTY_THEME_FONTS.map((font) => [font.id, font]));
+
+export function normalizePartyThemeHex(value: string | undefined, fallback: string) {
+  const trimmed = (value || "").trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+  return fallback;
+}
+
+export function normalizePartyThemeFont(value: string | undefined) {
+  const id = (value || "").trim().toLowerCase();
+  return partyThemeFontById.has(id) ? id : DEFAULT_PARTY_THEME_FONT;
+}
+
+export function partyThemeFontFamily(value: string | undefined) {
+  const font = partyThemeFontById.get(normalizePartyThemeFont(value));
+  return font?.family || partyThemeFontById.get(DEFAULT_PARTY_THEME_FONT)!.family;
+}
+
+export function partyThemeStyle(party: {
+  themePrimary?: string;
+  themeAccent?: string;
+  themeFont?: string;
+}): Record<string, string> {
+  return {
+    "--party-theme-primary": normalizePartyThemeHex(party.themePrimary, DEFAULT_PARTY_THEME_PRIMARY),
+    "--party-theme-accent": normalizePartyThemeHex(party.themeAccent, DEFAULT_PARTY_THEME_ACCENT),
+    "--party-theme-font": partyThemeFontFamily(party.themeFont),
+  };
+}
 
 export function partyRouteIdentifier(party: Pick<PartyRecord, "id" | "label">) {
   const slug = party.label
@@ -190,6 +253,9 @@ export type CreatePartyPayload = {
   summary?: string;
   partifulUrl?: string;
   mediaUrl?: string;
+  themePrimary?: string;
+  themeAccent?: string;
+  themeFont?: string;
 };
 
 export type MediaSearchType = "image" | "gif";

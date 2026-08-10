@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/mail"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +16,67 @@ import (
 	"github.com/Vemnyx/thejkhouse/backend/log"
 	"github.com/jackc/pgx/v5/pgconn"
 )
+
+const (
+	defaultPartyThemePrimary = "#f2b8c4"
+	defaultPartyThemeAccent  = "#b8926a"
+	defaultPartyThemeFont    = "cinzel-decorative"
+)
+
+var partyThemeHexRE = regexp.MustCompile(`(?i)^#[0-9a-f]{6}$`)
+
+var partyThemeFonts = map[string]string{
+	"cinzel-decorative":  `"Cinzel Decorative", Cinzel, Georgia, serif`,
+	"playfair-display":   `"Playfair Display", Georgia, serif`,
+	"great-vibes":        `"Great Vibes", "Brush Script MT", cursive`,
+	"bebas-neue":         `"Bebas Neue", Impact, "Arial Narrow", sans-serif`,
+	"pacifico":           `Pacifico, "Comic Sans MS", cursive`,
+	"abril-fatface":      `"Abril Fatface", Georgia, serif`,
+	"lobster":            `Lobster, "Brush Script MT", cursive`,
+	"righteous":          `Righteous, Impact, sans-serif`,
+	"orbitron":           `Orbitron, "Segoe UI", sans-serif`,
+	"press-start-2p":     `"Press Start 2P", "Courier New", monospace`,
+	"bangers":            `Bangers, Impact, sans-serif`,
+	"dancing-script":     `"Dancing Script", "Brush Script MT", cursive`,
+	"unifrakturmaguntia": `UnifrakturMaguntia, "Times New Roman", serif`,
+	"fredoka":            `Fredoka, "Trebuchet MS", sans-serif`,
+	"archivo-black":      `"Archivo Black", Impact, sans-serif`,
+}
+
+func normalizePartyThemeColor(value, fallback string) string {
+	value = strings.TrimSpace(value)
+	if partyThemeHexRE.MatchString(value) {
+		return strings.ToLower(value)
+	}
+	return fallback
+}
+
+func normalizePartyThemeFont(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if _, ok := partyThemeFonts[value]; ok {
+		return value
+	}
+	return defaultPartyThemeFont
+}
+
+func partyThemeFontFamily(value string) string {
+	id := normalizePartyThemeFont(value)
+	return partyThemeFonts[id]
+}
+
+func partyThemeRGBA(hex string, alpha float64) string {
+	hex = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(hex)), "#")
+	if len(hex) != 6 {
+		return fmt.Sprintf("rgba(232,120,143,%.2f)", alpha)
+	}
+	r, errR := strconv.ParseUint(hex[0:2], 16, 8)
+	g, errG := strconv.ParseUint(hex[2:4], 16, 8)
+	b, errB := strconv.ParseUint(hex[4:6], 16, 8)
+	if errR != nil || errG != nil || errB != nil {
+		return fmt.Sprintf("rgba(232,120,143,%.2f)", alpha)
+	}
+	return fmt.Sprintf("rgba(%d,%d,%d,%.2f)", r, g, b, alpha)
+}
 
 func (s *apiServer) resolvePartyMediaURL(ctx context.Context, mediaURL, previousURL string) (string, error) {
 	mediaURL = strings.TrimSpace(mediaURL)
@@ -33,11 +96,14 @@ func (s *apiServer) resolvePartyMediaURL(ctx context.Context, mediaURL, previous
 }
 
 type createPartyRequest struct {
-	Label       string `json:"label"`
-	Date        string `json:"date"`
-	Summary     string `json:"summary"`
-	PartifulURL string `json:"partifulUrl"`
-	MediaURL    string `json:"mediaUrl"`
+	Label        string `json:"label"`
+	Date         string `json:"date"`
+	Summary      string `json:"summary"`
+	PartifulURL  string `json:"partifulUrl"`
+	MediaURL     string `json:"mediaUrl"`
+	ThemePrimary string `json:"themePrimary"`
+	ThemeAccent  string `json:"themeAccent"`
+	ThemeFont    string `json:"themeFont"`
 }
 
 type partyAttendeeRequest struct {
@@ -115,6 +181,9 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 		strings.TrimSpace(req.Summary),
 		strings.TrimSpace(req.PartifulURL),
 		mediaURL,
+		normalizePartyThemeColor(req.ThemePrimary, defaultPartyThemePrimary),
+		normalizePartyThemeColor(req.ThemeAccent, defaultPartyThemeAccent),
+		normalizePartyThemeFont(req.ThemeFont),
 	)
 	if err != nil {
 		log.Error("party create", "error", err)
@@ -233,6 +302,9 @@ func (s *apiServer) handlePartyByID(w http.ResponseWriter, r *http.Request) {
 			strings.TrimSpace(req.Summary),
 			strings.TrimSpace(req.PartifulURL),
 			mediaURL,
+			normalizePartyThemeColor(req.ThemePrimary, defaultPartyThemePrimary),
+			normalizePartyThemeColor(req.ThemeAccent, defaultPartyThemeAccent),
+			normalizePartyThemeFont(req.ThemeFont),
 		)
 		if err != nil {
 			if isNotFound(err) {

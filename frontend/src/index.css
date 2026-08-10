@@ -1700,6 +1700,12 @@ body {
   gap: 0.85rem;
 }
 
+.party-themed {
+  --party-theme-primary: var(--rose-pale);
+  --party-theme-accent: var(--gold);
+  --party-theme-font: var(--decorative-font);
+}
+
 .party-accordion-group {
   display: grid;
   gap: 0.85rem;
@@ -1707,18 +1713,18 @@ body {
 
 .party-accordion-row {
   overflow: hidden;
-  border: 1px solid rgba(232, 120, 143, 0.14);
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 14%, transparent);
   border-radius: 0.95rem;
   background:
-    linear-gradient(135deg, rgba(232, 120, 143, 0.08), transparent 42%),
+    linear-gradient(135deg, color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 8%, transparent), transparent 42%),
     rgba(3, 3, 3, 0.22);
   box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.22);
 }
 
 .party-accordion-row.expanded {
-  border-color: rgba(232, 120, 143, 0.26);
+  border-color: color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 26%, transparent);
   background:
-    radial-gradient(circle at 12% 0%, rgba(249, 214, 143, 0.08), transparent 40%),
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--party-theme-accent, var(--gold)) 8%, transparent), transparent 40%),
     rgba(3, 3, 3, 0.26);
 }
 
@@ -1739,7 +1745,8 @@ body {
 
 .party-accordion-summary span:first-child {
   overflow: hidden;
-  color: var(--gold);
+  color: var(--party-theme-accent, var(--gold));
+  font-family: var(--party-theme-font, var(--decorative-font));
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1760,18 +1767,46 @@ body {
   display: grid;
   gap: 1.1rem;
   padding: 1rem 1.05rem 0.9rem;
-  border: 1px solid rgba(232, 120, 143, 0.18);
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 18%, transparent);
   border-radius: 0.85rem;
   background:
-    linear-gradient(160deg, rgba(232, 120, 143, 0.08), transparent 48%),
+    linear-gradient(160deg, color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 8%, transparent), transparent 48%),
     rgba(3, 3, 3, 0.28);
   cursor: pointer;
 }
 
 .party-summary-card:hover,
 .party-summary-card:focus-visible {
-  border-color: rgba(232, 120, 143, 0.34);
+  border-color: color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 34%, transparent);
   outline: none;
+}
+
+.party-summary-card-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.party-summary-card-body.has-media {
+  grid-template-columns: minmax(0, 1fr) minmax(7rem, 11rem);
+}
+
+.party-summary-card-main {
+  min-width: 0;
+}
+
+.party-summary-card-media {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 0.7rem;
+}
+
+.party-summary-card-media img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
 }
 
 .party-summary-card-footer {
@@ -1790,7 +1825,7 @@ body {
 }
 
 .party-overview-copy a {
-  color: var(--gold);
+  color: var(--party-theme-accent, var(--gold));
   word-break: break-word;
 }
 
@@ -1946,11 +1981,15 @@ body {
 .party-rsvp-button {
   width: fit-content;
   min-width: 12rem;
-  border: 1px solid rgba(249, 214, 143, 0.42);
+  border: 1px solid color-mix(in srgb, var(--party-theme-accent, var(--gold)) 45%, transparent);
   border-radius: 0.9rem;
   padding: 1.05rem 2.75rem;
   background:
-    linear-gradient(135deg, rgba(249, 214, 143, 0.22), rgba(232, 120, 143, 0.18)),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--party-theme-accent, var(--gold)) 22%, transparent),
+      color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 18%, transparent)
+    ),
     rgba(3, 3, 3, 0.35);
   color: var(--gold);
   font-size: 1.35rem;
@@ -1961,9 +2000,13 @@ body {
 }
 
 .party-rsvp-button:hover {
-  border-color: rgba(249, 214, 143, 0.7);
+  border-color: color-mix(in srgb, var(--party-theme-accent, var(--gold)) 70%, transparent);
   background:
-    linear-gradient(135deg, rgba(249, 214, 143, 0.3), rgba(232, 120, 143, 0.24)),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--party-theme-accent, var(--gold)) 30%, transparent),
+      color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 24%, transparent)
+    ),
     rgba(3, 3, 3, 0.42);
 }
 
@@ -1985,43 +2028,41 @@ body {
 }
 
 .party-detail-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  justify-content: space-between;
   gap: 1.25rem;
-  flex-wrap: wrap;
 }
 
 .party-detail-header h1 {
   margin: 0;
-  flex: 1 1 14rem;
   min-width: 0;
-  color: var(--rose-pale);
-  font-family: var(--decorative-font);
+  color: var(--party-theme-primary, var(--rose-pale));
+  font-family: var(--party-theme-font, var(--decorative-font));
   font-size: clamp(1.5rem, 4vw, 2.6rem);
   letter-spacing: 0.08em;
 }
 
 .party-detail-meta {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(10rem, 13rem));
   gap: 0.65rem;
-  flex: 0 1 28rem;
-  min-width: min(100%, 20rem);
+  width: max-content;
+  max-width: 100%;
 }
 
 .party-detail-meta article {
   display: grid;
   gap: 0.3rem;
   padding: 0.8rem 0.95rem;
-  border: 1px solid rgba(232, 120, 143, 0.16);
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 16%, transparent);
   border-radius: 0.85rem;
   background: rgba(3, 3, 3, 0.22);
   min-width: 0;
 }
 
 .party-detail-meta span {
-  color: var(--ink-muted);
+  color: var(--party-theme-accent, var(--ink-muted));
   font-size: 0.72rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2035,7 +2076,7 @@ body {
 }
 
 .party-detail-meta a {
-  color: var(--gold);
+  color: var(--party-theme-accent, var(--gold));
 }
 
 .party-detail-body {
@@ -2067,14 +2108,17 @@ body {
 
 .party-detail-media {
   min-width: 0;
+  display: flex;
+  justify-content: flex-start;
 }
 
 .party-detail-media img {
   display: block;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   max-height: 28rem;
   object-fit: contain;
-  object-position: top right;
+  object-position: top left;
 }
 
 .party-attendee-section {
@@ -2095,8 +2139,8 @@ body {
 
 .party-attendee-header h2 {
   margin: 0;
-  color: var(--rose-pale);
-  font-family: var(--decorative-font);
+  color: var(--party-theme-primary, var(--rose-pale));
+  font-family: var(--party-theme-font, var(--decorative-font));
   font-size: 1.05rem;
   letter-spacing: 0.08em;
 }
@@ -2353,21 +2397,43 @@ body {
   width: 100%;
 }
 
-.party-form-header {
-  align-items: end;
+.party-form-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
-.party-form-title-field {
-  flex: 1 1 14rem;
-  min-width: 0;
+.party-form-header {
+  align-items: center;
 }
 
 .party-form-title-input {
+  min-width: 0;
   width: 100%;
-  font-family: var(--decorative-font);
-  font-size: clamp(1.25rem, 3vw, 2rem);
-  letter-spacing: 0.06em;
-  color: var(--rose-pale);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--party-theme-primary, var(--rose-pale));
+  font-family: var(--party-theme-font, var(--decorative-font));
+  font-size: clamp(1.5rem, 4vw, 2.6rem);
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+}
+
+.party-form-title-input::placeholder {
+  color: color-mix(in srgb, var(--party-theme-primary, var(--rose-pale)) 45%, transparent);
+}
+
+.party-form-title-input:focus {
+  outline: none;
+  border: 0;
+  box-shadow: none;
 }
 
 .party-form-meta-card {
@@ -2390,11 +2456,13 @@ body {
 }
 
 .party-form-meta-button:hover {
-  color: var(--rose-pale);
+  color: var(--party-theme-primary, var(--rose-pale));
 }
 
 .party-form-summary-field textarea {
-  min-height: 12rem;
+  height: 14rem;
+  min-height: 14rem;
+  resize: vertical;
 }
 
 .party-form-media-button,
@@ -2409,9 +2477,86 @@ body {
 }
 
 .party-form-media-empty {
-  min-height: 10rem;
+  min-height: 14rem;
+  height: 14rem;
   display: grid;
   place-items: center;
+}
+
+.party-setup-modal {
+  max-width: 34rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.party-setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.party-theme-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.party-theme-font-field {
+  grid-column: 1 / -1;
+}
+
+.party-theme-font-field select {
+  font-size: 1rem;
+}
+
+.party-theme-swatch-row {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.party-theme-swatch-row input[type="color"] {
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0.15rem;
+  border-radius: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 28%, transparent);
+  background: rgba(3, 3, 3, 0.35);
+  cursor: pointer;
+}
+
+.party-theme-hex {
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+
+.party-theme-preview {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary) 22%, transparent);
+  border-radius: 0.85rem;
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--party-theme-primary) 10%, transparent), transparent 48%),
+    rgba(3, 3, 3, 0.28);
+}
+
+.party-theme-preview-title {
+  color: var(--party-theme-primary);
+  font-family: var(--party-theme-font, var(--decorative-font));
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+}
+
+.party-theme-preview-meta {
+  color: var(--party-theme-accent);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .party-form-attending .dashboard-copy {
@@ -3515,12 +3660,24 @@ body {
     gap: 0.35rem;
   }
 
+  .party-summary-card-body,
+  .party-summary-card-body.has-media {
+    grid-template-columns: 1fr;
+  }
+
+  .party-theme-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .party-summary-card-media img {
+    aspect-ratio: 16 / 9;
+  }
+
   .party-detail-header {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
   .party-detail-meta {
-    flex: 1 1 auto;
     width: 100%;
     grid-template-columns: 1fr;
   }
@@ -3530,7 +3687,7 @@ body {
   }
 
   .party-detail-media img {
-    object-position: center top;
+    object-position: top left;
     max-height: 22rem;
   }
 

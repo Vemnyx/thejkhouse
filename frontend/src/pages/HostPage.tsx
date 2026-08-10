@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 import { searchPartyMedia, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, isGifMediaItem } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
@@ -169,6 +169,11 @@ export default function HostPage() {
   const [partyDateModalOpen, setPartyDateModalOpen] = useState(false);
   const [partyCalendarDate, setPartyCalendarDate] = useState(() => dateFromInputValue(""));
   const [partySummary, setPartySummary] = useState("");
+  const [partyThemePrimary, setPartyThemePrimary] = useState(DEFAULT_PARTY_THEME_PRIMARY);
+  const [partyThemeAccent, setPartyThemeAccent] = useState(DEFAULT_PARTY_THEME_ACCENT);
+  const [partyThemeFont, setPartyThemeFont] = useState(DEFAULT_PARTY_THEME_FONT);
+  const [partySetupModalOpen, setPartySetupModalOpen] = useState(false);
+  const [partyThemeModalOpen, setPartyThemeModalOpen] = useState(false);
   const [partyMediaUrl, setPartyMediaUrl] = useState("");
   const [partyMediaModalOpen, setPartyMediaModalOpen] = useState(false);
   const [partyMediaType, setPartyMediaType] = useState<MediaSearchType>("image");
@@ -499,6 +504,11 @@ export default function HostPage() {
     setPartyMinute("00");
     setPartyPeriod("PM");
     setPartySummary("");
+    setPartyThemePrimary(DEFAULT_PARTY_THEME_PRIMARY);
+    setPartyThemeAccent(DEFAULT_PARTY_THEME_ACCENT);
+    setPartyThemeFont(DEFAULT_PARTY_THEME_FONT);
+    setPartySetupModalOpen(false);
+    setPartyThemeModalOpen(false);
     setPartyMediaUrl("");
     setPartyMediaModalOpen(false);
     setPartyMediaType("image");
@@ -507,11 +517,34 @@ export default function HostPage() {
     setPartyMediaError("");
   };
 
-  const openCreatePartyForm = () => {
+  const openCreatePartySetup = () => {
     resetPartyForm();
-    setPartyView("create");
+    setPartySetupModalOpen(true);
     setError("");
     setPartySuccess("");
+  };
+
+  const closePartySetupModal = () => {
+    setPartySetupModalOpen(false);
+  };
+
+  const openPartyThemeModal = () => {
+    setPartyThemeModalOpen(true);
+    setError("");
+  };
+
+  const closePartyThemeModal = () => {
+    setPartyThemeModalOpen(false);
+  };
+
+  const continuePartySetup = () => {
+    if (!partySummary.trim()) {
+      setError("party summary is required");
+      return;
+    }
+    setError("");
+    setPartySetupModalOpen(false);
+    setPartyView("create");
   };
 
   const openEditPartyForm = (party: PartyRecord) => {
@@ -523,6 +556,9 @@ export default function HostPage() {
     setPartyMinute(parts.minute);
     setPartyPeriod(parts.period);
     setPartySummary(party.summary || "");
+    setPartyThemePrimary(party.themePrimary || DEFAULT_PARTY_THEME_PRIMARY);
+    setPartyThemeAccent(party.themeAccent || DEFAULT_PARTY_THEME_ACCENT);
+    setPartyThemeFont(normalizePartyThemeFont(party.themeFont));
     setPartyMediaUrl(party.mediaUrl || "");
     setPartyView("edit");
     setError("");
@@ -1376,6 +1412,9 @@ export default function HostPage() {
         summary: partySummary.trim(),
         partifulUrl: partyView === "edit" && editingParty ? editingParty.partifulUrl || "" : "",
         mediaUrl: partyMediaUrl.trim(),
+        themePrimary: normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY),
+        themeAccent: normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT),
+        themeFont: normalizePartyThemeFont(partyThemeFont),
       };
       if (partyView === "edit" && editingParty) {
         const party = await updateParty(token, editingParty.id, payload);
@@ -1961,7 +2000,7 @@ export default function HostPage() {
               {partyView === "list" ? (
                 <>
                   <div className="host-panel-header">
-                    <button className="auth-submit" type="button" onClick={openCreatePartyForm}>
+                    <button className="auth-submit" type="button" onClick={openCreatePartySetup}>
                       Add New Party
                     </button>
                   </div>
@@ -2018,7 +2057,11 @@ export default function HostPage() {
                   </div>
                 </>
               ) : (
-                <form className="party-form party-detail-view" onSubmit={handleCreateParty}>
+                <form
+                  className="party-form party-detail-view party-themed"
+                  style={partyThemeStyle({ themePrimary: partyThemePrimary, themeAccent: partyThemeAccent, themeFont: partyThemeFont })}
+                  onSubmit={handleCreateParty}
+                >
                   <div className="host-panel-header party-form-toolbar">
                     <button className="auth-secondary back-text-link" type="button" onClick={() => {
                       setPartyView("list");
@@ -2027,19 +2070,22 @@ export default function HostPage() {
                     }}>
                       Back to Parties
                     </button>
+                    {partyView === "edit" ? (
+                      <button className="auth-secondary" type="button" onClick={openPartyThemeModal}>
+                        Edit Theme
+                      </button>
+                    ) : null}
                   </div>
 
                   <header className="party-detail-header party-form-header">
-                    <label className="auth-field party-form-title-field">
-                      <span>Party name</span>
-                      <input
-                        className="party-form-title-input"
-                        value={partyLabelValue}
-                        onChange={(event) => setPartyLabelValue(event.target.value)}
-                        placeholder="Party name"
-                        required
-                      />
-                    </label>
+                    <input
+                      className="party-form-title-input"
+                      value={partyLabelValue}
+                      onChange={(event) => setPartyLabelValue(event.target.value)}
+                      placeholder="Title"
+                      aria-label="Party title"
+                      required
+                    />
                     <section className="party-detail-meta" aria-label="When and where">
                       <article className="party-form-meta-card">
                         <span>When</span>
@@ -2063,6 +2109,7 @@ export default function HostPage() {
                           onChange={(event) => setPartySummary(event.target.value)}
                           rows={8}
                           placeholder="Short overview for the party"
+                          required
                         />
                       </label>
                     </div>
@@ -2468,7 +2515,192 @@ export default function HostPage() {
           )}
         </section>
 
-        {partyMediaModalOpen ? (
+          {partySetupModalOpen ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={closePartySetupModal}>
+            <section
+              className="upload-modal gothic-card party-setup-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="party-setup-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <h2 className="host-section-title" id="party-setup-modal-title">New Party Setup</h2>
+                <button className="modal-close" type="button" onClick={closePartySetupModal} aria-label="Close party setup">
+                  ×
+                </button>
+              </div>
+              <p className="dashboard-copy">Write the summary and choose theme colors and font before the full party form.</p>
+              <label className="auth-field host-message-field">
+                <span>Summary</span>
+                <textarea
+                  value={partySummary}
+                  onChange={(event) => setPartySummary(event.target.value)}
+                  rows={6}
+                  placeholder="Short overview for the party"
+                  required
+                />
+              </label>
+              <label className="auth-field party-theme-font-field">
+                <span>Title font</span>
+                <select
+                  value={normalizePartyThemeFont(partyThemeFont)}
+                  onChange={(event) => setPartyThemeFont(event.target.value)}
+                  aria-label="Party title font"
+                  style={{ fontFamily: partyThemeFontFamily(partyThemeFont) }}
+                >
+                  {PARTY_THEME_FONTS.map((font) => (
+                    <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>
+                      {font.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="party-theme-fields" aria-label="Party theme colors">
+                <label className="auth-field party-theme-field">
+                  <span>Primary color</span>
+                  <div className="party-theme-swatch-row">
+                    <input
+                      type="color"
+                      value={normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY)}
+                      onChange={(event) => setPartyThemePrimary(event.target.value)}
+                      aria-label="Primary theme color"
+                    />
+                    <input
+                      className="party-theme-hex"
+                      value={partyThemePrimary}
+                      onChange={(event) => setPartyThemePrimary(event.target.value)}
+                      spellCheck={false}
+                      aria-label="Primary theme color hex"
+                    />
+                  </div>
+                </label>
+                <label className="auth-field party-theme-field">
+                  <span>Accent color</span>
+                  <div className="party-theme-swatch-row">
+                    <input
+                      type="color"
+                      value={normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT)}
+                      onChange={(event) => setPartyThemeAccent(event.target.value)}
+                      aria-label="Accent theme color"
+                    />
+                    <input
+                      className="party-theme-hex"
+                      value={partyThemeAccent}
+                      onChange={(event) => setPartyThemeAccent(event.target.value)}
+                      spellCheck={false}
+                      aria-label="Accent theme color hex"
+                    />
+                  </div>
+                </label>
+              </div>
+              <div
+                className="party-theme-preview party-themed"
+                style={partyThemeStyle({ themePrimary: partyThemePrimary, themeAccent: partyThemeAccent, themeFont: partyThemeFont })}
+                aria-hidden="true"
+              >
+                <span className="party-theme-preview-title">Party title</span>
+                <span className="party-theme-preview-meta">Accent labels</span>
+              </div>
+              <div className="party-setup-actions">
+                <button className="auth-secondary" type="button" onClick={closePartySetupModal}>
+                  Cancel
+                </button>
+                <button className="auth-submit" type="button" onClick={continuePartySetup} disabled={!partySummary.trim()}>
+                  Continue
+                </button>
+              </div>
+            </section>
+          </div>
+          ) : null}
+
+          {partyThemeModalOpen ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={closePartyThemeModal}>
+            <section
+              className="upload-modal gothic-card party-setup-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="party-theme-modal-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <h2 className="host-section-title" id="party-theme-modal-title">Edit Theme</h2>
+                <button className="modal-close" type="button" onClick={closePartyThemeModal} aria-label="Close theme editor">
+                  ×
+                </button>
+              </div>
+              <p className="dashboard-copy">Update the title font and theme colors for this party.</p>
+              <label className="auth-field party-theme-font-field">
+                <span>Title font</span>
+                <select
+                  value={normalizePartyThemeFont(partyThemeFont)}
+                  onChange={(event) => setPartyThemeFont(event.target.value)}
+                  aria-label="Party title font"
+                  style={{ fontFamily: partyThemeFontFamily(partyThemeFont) }}
+                >
+                  {PARTY_THEME_FONTS.map((font) => (
+                    <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>
+                      {font.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="party-theme-fields" aria-label="Party theme colors">
+                <label className="auth-field party-theme-field">
+                  <span>Primary color</span>
+                  <div className="party-theme-swatch-row">
+                    <input
+                      type="color"
+                      value={normalizePartyThemeHex(partyThemePrimary, DEFAULT_PARTY_THEME_PRIMARY)}
+                      onChange={(event) => setPartyThemePrimary(event.target.value)}
+                      aria-label="Primary theme color"
+                    />
+                    <input
+                      className="party-theme-hex"
+                      value={partyThemePrimary}
+                      onChange={(event) => setPartyThemePrimary(event.target.value)}
+                      spellCheck={false}
+                      aria-label="Primary theme color hex"
+                    />
+                  </div>
+                </label>
+                <label className="auth-field party-theme-field">
+                  <span>Accent color</span>
+                  <div className="party-theme-swatch-row">
+                    <input
+                      type="color"
+                      value={normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT)}
+                      onChange={(event) => setPartyThemeAccent(event.target.value)}
+                      aria-label="Accent theme color"
+                    />
+                    <input
+                      className="party-theme-hex"
+                      value={partyThemeAccent}
+                      onChange={(event) => setPartyThemeAccent(event.target.value)}
+                      spellCheck={false}
+                      aria-label="Accent theme color hex"
+                    />
+                  </div>
+                </label>
+              </div>
+              <div
+                className="party-theme-preview party-themed"
+                style={partyThemeStyle({ themePrimary: partyThemePrimary, themeAccent: partyThemeAccent, themeFont: partyThemeFont })}
+                aria-hidden="true"
+              >
+                <span className="party-theme-preview-title">Party title</span>
+                <span className="party-theme-preview-meta">Accent labels</span>
+              </div>
+              <div className="party-setup-actions">
+                <button className="auth-submit" type="button" onClick={closePartyThemeModal}>
+                  Done
+                </button>
+              </div>
+            </section>
+          </div>
+          ) : null}
+
+          {partyMediaModalOpen ? (
           <div className="modal-backdrop" role="presentation" onMouseDown={closePartyMediaModal}>
             <section
               className="upload-modal gothic-card party-media-modal"
@@ -3242,7 +3474,11 @@ export default function HostPage() {
               <button className="modal-close party-preview-close" type="button" onClick={() => setPreviewParty(null)} aria-label="Close party preview">
                 x
               </button>
-              <article className="party-accordion-row expanded" aria-labelledby="party-preview-title">
+              <article
+                className="party-accordion-row expanded party-themed"
+                style={partyThemeStyle(previewParty)}
+                aria-labelledby="party-preview-title"
+              >
                 <div className="party-accordion-summary party-preview-summary">
                   <span id="party-preview-title">{previewParty.label}</span>
                   <span>{formatDateTime(previewParty.date)}</span>

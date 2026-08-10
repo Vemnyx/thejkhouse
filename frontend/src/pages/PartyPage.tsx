@@ -10,6 +10,7 @@ import {
   listPartyAttendees,
   listUsers,
   partyRouteIdentifier,
+  partyThemeStyle,
 } from "../lib/api";
 
 const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519";
@@ -122,7 +123,11 @@ export default function PartyPage() {
         ) : error ? (
           <p className="auth-error">{error}</p>
         ) : party ? (
-          <section className="party-detail-view" aria-label={`${party.label} party details`}>
+          <section
+            className="party-detail-view party-themed"
+            style={partyThemeStyle(party)}
+            aria-label={`${party.label} party details`}
+          >
             <header className="party-detail-header">
               <h1>{party.label}</h1>
               <section className="party-detail-meta" aria-label="When and where">
