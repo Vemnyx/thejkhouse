@@ -134,6 +134,21 @@ func (s *apiServer) handlePartyByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Method == http.MethodGet {
+		party, err := s.store.getPartyByID(r.Context(), id)
+		if err != nil {
+			if isNotFound(err) {
+				writeError(w, http.StatusNotFound, "party not found")
+				return
+			}
+			log.Error("party get", "error", err, "party_id", id)
+			writeError(w, http.StatusInternalServerError, "failed to load party")
+			return
+		}
+		writeJSON(w, party)
+		return
+	}
+
 	if r.Method != http.MethodDelete && r.Method != http.MethodPatch {
 		methodNotAllowed(w)
 		return

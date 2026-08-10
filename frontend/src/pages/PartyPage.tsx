@@ -1,0 +1,240 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import {
+  AppUser,
+  PartyAttendeeRecord,
+  PartyRecord,
+  getParty,
+  listParties,
+  listPartyAttendees,
+  listUsers,
+  partyRouteIdentifier,
+} from "../lib/api";
+
+const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519";
+
+export default function PartyPage() {
+  const { partyId } = useParams();
+  const { firebaseUser } = useAuth();
+  const [party, setParty] = useState<PartyRecord | null>(null);
+  const [attendees, setAttendees] = useState<PartyAttendeeRecord[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadParty() {
+      if (!firebaseUser || !partyId) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+      try {
+        const token = await firebaseUser.getIdToken();
+        const numericPartyId = Number(partyId);
+        let resolvedPartyId = Number.isInteger(numericPartyId) && numericPartyId > 0 ? numericPartyId : null;
+
+        if (!resolvedPartyId) {
+          const parties = await listParties(token);
+          const matched = parties.find((item) => partyRouteIdentifier(item) === partyId);
+          if (!matched) {
+            throw new Error("party not found");
+          }
+          resolvedPartyId = matched.id;
+        }
+
+        const [nextParty, nextAttendees, nextUsers] = await Promise.all([
+          getParty(token, resolvedPartyId),
+          listPartyAttendees(token, resolvedPartyId),
+          listUsers(token),
+        ]);
+
+        if (!cancelled) {
+          setParty(nextParty);
+          setAttendees(nextAttendees);
+          setUsers(nextUsers);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : "failed to load party";
+          setError(message);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadParty();
+    return () => {
+      cancelled = true;
+    };
+  }, [firebaseUser, partyId]);
+
+  const usersById = useMemo(() => {
+    const map = new Map<number, AppUser>();
+    for (const user of users) {
+      map.set(user.id, user);
+    }
+    return map;
+  }, [users]);
+
+  const attendeeRows = useMemo(() => {
+    return attendees.map((attendee) => {
+      const linkedUser = attendee.userId != null ? usersById.get(attendee.userId) ?? null : null;
+      const firstName = (linkedUser?.firstName || attendee.firstName || "").trim();
+      const lastName = (linkedUser?.lastName || attendee.lastName || "").trim();
+      const displayName = [firstName, lastName].filter(Boolean).join(" ") || attendee.email || "Guest";
+      const colorId = attendee.userId ?? attendee.id;
+      return {
+        attendee,
+        displayName,
+        firstName,
+        avatarUrl: linkedUser?.avatarUrl ?? null,
+        colorId,
+        isPlusOne: attendee.plusOneOf != null,
+      };
+    });
+  }, [attendees, usersById]);
+
+  return (
+    <main className="page app-shell-page">
+      <div className="page-vignette" aria-hidden="true" />
+      <section className="gothic-card app-shell-card party-detail-card">
+        <div className="card-frame" aria-hidden="true">
+          <span className="corner corner-tl" />
+          <span className="corner corner-tr" />
+          <span className="corner corner-bl" />
+          <span className="corner corner-br" />
+        </div>
+
+        <Link className="auth-secondary back-text-link event-detail-back" to="/parties">
+          Back to Parties
+        </Link>
+
+        {loading ? (
+          <p className="loading-text">Loading party...</p>
+        ) : error ? (
+          <p className="auth-error">{error}</p>
+        ) : party ? (
+          <section className="party-detail-view" aria-label={`${party.label} party details`}>
+            <header className="party-detail-hero">
+              <p className="eyebrow">The JK House</p>
+              <h1>{party.label}</h1>
+              {party.summary ? <p className="party-detail-summary">{party.summary}</p> : null}
+            </header>
+
+            <section className="party-detail-meta" aria-label="When and where">
+              <article>
+                <span>When</span>
+                <strong>{formatPartyDateTime(party.date)}</strong>
+              </article>
+              <article>
+                <span>Where</span>
+                <strong>{partyVenueAddress}</strong>
+              </article>
+              {party.partifulUrl ? (
+                <article>
+                  <span>Partiful</span>
+                  <strong>
+                    <a href={party.partifulUrl} target="_blank" rel="noreferrer">
+                      Open invite
+                    </a>
+                  </strong>
+                </article>
+              ) : null}
+            </section>
+
+            <section className="party-attendee-section" aria-label="Attendees">
+              <div className="party-attendee-header">
+                <h2>Attendees</h2>
+                <span>{attendeeRows.length}</span>
+              </div>
+              {attendeeRows.length === 0 ? (
+                <p className="dashboard-copy">No one has RSVP&apos;d yet.</p>
+              ) : (
+                <ul className="party-attendee-list">
+                  {attendeeRows.map((row) => (
+                    <li className={row.isPlusOne ? "party-attendee-row plus-one" : "party-attendee-row"} key={row.attendee.id}>
+                      <AttendeeAvatar
+                        name={row.displayName}
+                        firstName={row.firstName}
+                        avatarUrl={row.avatarUrl}
+                        colorId={row.colorId}
+                      />
+                      <div className="party-attendee-copy">
+                        <span className="party-attendee-name">{row.displayName}</span>
+                        {row.isPlusOne ? <span className="party-attendee-tag">+1</span> : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </section>
+        ) : (
+          <p className="dashboard-copy">Party not found.</p>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function AttendeeAvatar({
+  name,
+  firstName,
+  avatarUrl,
+  colorId,
+}: {
+  name: string;
+  firstName: string;
+  avatarUrl: string | null;
+  colorId: number;
+}) {
+  const initial = (firstName || name).trim().charAt(0).toUpperCase() || "?";
+
+  if (avatarUrl) {
+    return <img className="party-attendee-avatar" src={avatarUrl} alt="" />;
+  }
+
+  return (
+    <span
+      className="party-attendee-avatar party-attendee-avatar-fallback"
+      style={{ backgroundColor: avatarColorFromUserId(colorId) }}
+      aria-hidden="true"
+    >
+      {initial}
+    </span>
+  );
+}
+
+/** Deterministic hex background from a numeric id (prefer user id). */
+function avatarColorFromUserId(userId: number): string {
+  let n = userId | 0;
+  n = Math.imul(n ^ (n >>> 16), 0x45d9f3b);
+  n = Math.imul(n ^ (n >>> 16), 0x45d9f3b);
+  n = (n ^ (n >>> 16)) >>> 0;
+
+  const r = 72 + (n & 0x7f);
+  const g = 72 + ((n >>> 8) & 0x7f);
+  const b = 72 + ((n >>> 16) & 0x7f);
+
+  return `#${toHexByte(r)}${toHexByte(g)}${toHexByte(b)}`;
+}
+
+function toHexByte(value: number) {
+  return (value & 0xff).toString(16).padStart(2, "0");
+}
+
+function formatPartyDateTime(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(new Date(value));
+}

@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import BirthdaySelect, { ImageDateSelect } from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, EventRecord, HomepageContent, ImageRecord, PartyAttendeeRecord, PartyRecord, addPartyAttendee, eventRouteIdentifier, eventTypeLabels, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, uploadImage } from "../lib/api";
+import { AppUser, EventRecord, HomepageContent, ImageRecord, PartyAttendeeRecord, PartyRecord, addPartyAttendee, eventRouteIdentifier, eventTypeLabels, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, partyRouteIdentifier, uploadImage } from "../lib/api";
 
 type MainTab = "home" | "parties" | "photos" | "events";
 type MainView = MainTab | "settings";
@@ -825,26 +825,50 @@ export default function HomePage() {
                           </button>
                           {expanded ? (
                             <div className="party-accordion-details">
-                              {party.partifulUrl ? (
-                                <p className="party-overview-copy">
-                                  <a href={party.partifulUrl} target="_blank" rel="noreferrer">
-                                    {party.partifulUrl}
-                                  </a>
-                                </p>
-                              ) : (
-                                <>
+                              <div
+                                className="party-summary-card"
+                                role="link"
+                                tabIndex={0}
+                                onClick={() => navigate(`/parties/${partyRouteIdentifier(party)}`)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    navigate(`/parties/${partyRouteIdentifier(party)}`);
+                                  }
+                                }}
+                              >
+                                {party.partifulUrl ? (
+                                  <p className="party-overview-copy">
+                                    <a
+                                      href={party.partifulUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={(event) => event.stopPropagation()}
+                                    >
+                                      {party.partifulUrl}
+                                    </a>
+                                  </p>
+                                ) : (
                                   <p className="party-overview-copy">{party.summary || "No summary yet."}</p>
-                                  {isFutureParty ? (
+                                )}
+                                <div className="party-summary-card-footer">
+                                  {isFutureParty && !party.partifulUrl ? (
                                     <button
                                       className="party-rsvp-button"
                                       type="button"
-                                      onClick={() => void openRsvpModal(party)}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        void openRsvpModal(party);
+                                      }}
                                     >
                                       RSVP
                                     </button>
-                                  ) : null}
-                                </>
-                              )}
+                                  ) : (
+                                    <span />
+                                  )}
+                                  <span className="party-to-page-link">To Party Page...</span>
+                                </div>
+                              </div>
                             </div>
                           ) : null}
                         </article>

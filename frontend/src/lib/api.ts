@@ -64,6 +64,16 @@ export type PartyRecord = {
   partifulUrl: string;
 };
 
+export function partyRouteIdentifier(party: Pick<PartyRecord, "id" | "label">) {
+  const slug = party.label
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || `party-${party.id}`;
+}
+
 export type PartyAttendeeRecord = {
   id: number;
   partyId: number;
@@ -335,6 +345,10 @@ export function listImages(token: string) {
 
 export function listParties(token: string) {
   return apiFetch<PartyRecord[] | null>("/parties", token).then((parties) => parties ?? []);
+}
+
+export function getParty(token: string, id: number) {
+  return apiFetch<PartyRecord>(`/parties/${id}`, token);
 }
 
 export function createParty(token: string, payload: CreatePartyPayload) {

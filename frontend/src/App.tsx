@@ -4,6 +4,7 @@ import EventPage from "./pages/EventPage";
 import HostPage from "./pages/HostPage";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
+import PartyPage from "./pages/PartyPage";
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ function AppRoutes() {
       <Route path="/" element={<HomePage />} />
       <Route path="/home" element={<HomePage />} />
       <Route path="/parties" element={<HomePage />} />
+      <Route path="/parties/:partyId" element={<PartyPage />} />
       <Route path="/photos" element={<HomePage />} />
       <Route path="/events" element={<HomePage />} />
       <Route path="/events/:eventId" element={<EventPage />} />
