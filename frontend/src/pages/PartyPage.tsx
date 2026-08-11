@@ -21,8 +21,8 @@ const paypalUrl = "https://www.paypal.me/JacobLantz271";
 const spotifyPlaylistUrl =
   "https://open.spotify.com/playlist/45BvibK2MJxZbC4OK0d4nH?si=SoQszkZETP6AtgP8y28gZg&utm_source=copy-link&pi=YxIHCyYFRvq9Y";
 
-const venmoLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/venmo.png";
-const paypalLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/paypal.png";
+const venmoLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/venmo.png?v=3";
+const paypalLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/paypal.png?v=2";
 const spotifyLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/spotify.png?v=2";
 const byomYesLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/byom-yes.png";
 const byomNoLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/byom-no.png";

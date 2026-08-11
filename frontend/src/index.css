@@ -2218,6 +2218,8 @@ body {
 }
 
 .party-detail-byom img {
+  width: 2.15rem;
+  height: 2.15rem;
   object-fit: contain;
   border-radius: 0;
   background: transparent;
