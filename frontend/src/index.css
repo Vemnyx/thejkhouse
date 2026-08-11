@@ -3244,6 +3244,7 @@ body {
   padding: 0;
   display: grid;
   gap: 0.85rem;
+  text-align: left;
 }
 
 .party-attendees-host-item {
@@ -3253,14 +3254,62 @@ body {
   background: rgba(0, 0, 0, 0.18);
 }
 
-.party-attendees-host-main {
-  display: grid;
-  gap: 0.35rem;
+.party-attendees-host-person,
+.party-attendees-host-guests li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  text-align: left;
 }
 
-.party-attendees-host-main strong {
+.party-attendees-host-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.party-attendees-host-avatar.compact {
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
+.party-attendees-host-avatar img,
+.party-attendees-host-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.party-attendees-host-avatar-fallback {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.party-attendees-host-avatar.compact .party-attendees-host-avatar-fallback {
+  font-size: 0.75rem;
+}
+
+.party-attendees-host-copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  justify-items: start;
+}
+
+.party-attendees-host-copy strong {
   color: var(--rose-pale);
   font-size: 1rem;
+  font-weight: 700;
 }
 
 .party-attendees-host-note {
@@ -3278,27 +3327,22 @@ body {
 .party-attendees-host-guests {
   list-style: none;
   margin: 0.7rem 0 0;
-  padding: 0.65rem 0 0;
+  padding: 0.65rem 0 0 2.35rem;
   border-top: 1px solid rgba(212, 168, 178, 0.16);
   display: grid;
-  gap: 0.45rem;
-}
-
-.party-attendees-host-guests li {
-  display: flex;
-  align-items: baseline;
   gap: 0.55rem;
 }
 
-.party-attendees-host-guests span {
+.party-attendees-host-plus-label {
   color: var(--ink-muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .party-attendees-host-guests strong {
   color: var(--ink);
+  font-size: 0.95rem;
   font-weight: 600;
 }
 

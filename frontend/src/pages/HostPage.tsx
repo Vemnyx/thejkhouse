@@ -4117,24 +4117,45 @@ export default function HostPage() {
                   <ul className="party-attendees-host-list">
                     {previewPartyPrimaryAttendees.map((attendee) => {
                       const plusOnes = previewPartyAttendees.filter((guest) => guest.plusOneOf === attendee.id);
+                      const primary = partyAttendeeAvatarInfo(attendee, users);
                       return (
                         <li className="party-attendees-host-item" key={attendee.id}>
-                          <div className="party-attendees-host-main">
-                            <strong>{partyAttendeeDisplayName(attendee, users)}</strong>
-                            {attendee.note.trim() ? (
-                              <p className="party-attendees-host-note">{attendee.note.trim()}</p>
-                            ) : (
-                              <p className="party-attendees-host-note muted">No note</p>
-                            )}
+                          <div className="party-attendees-host-person">
+                            <HostAttendeeAvatar
+                              name={primary.name}
+                              firstName={primary.firstName}
+                              avatarUrl={primary.avatarUrl}
+                              colorId={primary.colorId}
+                            />
+                            <div className="party-attendees-host-copy">
+                              <strong>{primary.name}</strong>
+                              {attendee.note.trim() ? (
+                                <p className="party-attendees-host-note">{attendee.note.trim()}</p>
+                              ) : (
+                                <p className="party-attendees-host-note muted">No note</p>
+                              )}
+                            </div>
                           </div>
                           {plusOnes.length > 0 ? (
                             <ul className="party-attendees-host-guests">
-                              {plusOnes.map((guest) => (
-                                <li key={guest.id}>
-                                  <span>+1</span>
-                                  <strong>{partyAttendeeDisplayName(guest, users)}</strong>
-                                </li>
-                              ))}
+                              {plusOnes.map((guest) => {
+                                const guestInfo = partyAttendeeAvatarInfo(guest, users);
+                                return (
+                                  <li key={guest.id}>
+                                    <HostAttendeeAvatar
+                                      name={guestInfo.name}
+                                      firstName={guestInfo.firstName}
+                                      avatarUrl={guestInfo.avatarUrl}
+                                      colorId={guestInfo.colorId}
+                                      compact
+                                    />
+                                    <div className="party-attendees-host-copy">
+                                      <span className="party-attendees-host-plus-label">+1</span>
+                                      <strong>{guestInfo.name}</strong>
+                                    </div>
+                                  </li>
+                                );
+                              })}
                             </ul>
                           ) : null}
                         </li>
@@ -4279,6 +4300,62 @@ function partyAttendeeDisplayName(attendee: PartyAttendeeRecord, users: AppUser[
   }
   const name = [attendee.firstName, attendee.lastName].filter(Boolean).join(" ").trim();
   return name || attendee.email || "Guest";
+}
+
+function partyAttendeeAvatarInfo(attendee: PartyAttendeeRecord, users: AppUser[]) {
+  const linked = attendee.userId != null ? users.find((user) => user.id === attendee.userId) ?? null : null;
+  const firstName = (linked?.firstName || attendee.firstName || "").trim();
+  const name = partyAttendeeDisplayName(attendee, users);
+  return {
+    name,
+    firstName,
+    avatarUrl: linked?.avatarUrl ?? null,
+    colorId: attendee.userId ?? attendee.id,
+  };
+}
+
+function HostAttendeeAvatar({
+  name,
+  firstName,
+  avatarUrl,
+  colorId,
+  compact = false,
+}: {
+  name: string;
+  firstName: string;
+  avatarUrl: string | null;
+  colorId: number;
+  compact?: boolean;
+}) {
+  const initial = (firstName || name).trim().charAt(0).toUpperCase() || "?";
+
+  return (
+    <span
+      className={compact ? "party-attendees-host-avatar compact" : "party-attendees-host-avatar"}
+      aria-hidden="true"
+    >
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="" />
+      ) : (
+        <span className="party-attendees-host-avatar-fallback" style={{ backgroundColor: hostAttendeeAvatarColor(colorId) }}>
+          {initial}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function hostAttendeeAvatarColor(userId: number): string {
+  let n = userId | 0;
+  n = Math.imul(n ^ (n >>> 16), 0x45d9f3b);
+  n = Math.imul(n ^ (n >>> 16), 0x45d9f3b);
+  n = (n ^ (n >>> 16)) >>> 0;
+
+  const r = 72 + (n & 0x7f);
+  const g = 72 + ((n >>> 8) & 0x7f);
+  const b = 72 + ((n >>> 16) & 0x7f);
+
+  return `#${[r, g, b].map((value) => value.toString(16).padStart(2, "0")).join("")}`;
 }
 
 function taggedUserLabels(users: AppUser[], userIds: number[]) {
