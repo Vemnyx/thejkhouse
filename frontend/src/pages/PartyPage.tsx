@@ -103,10 +103,22 @@ export default function PartyPage() {
     });
   }, [attendees, usersById]);
 
+  const themeStyle = party ? partyThemeStyle(party) : undefined;
+
   return (
-    <main className="page app-shell-page">
+    <main
+      className={party ? "page app-shell-page party-detail-page party-themed" : "page app-shell-page party-detail-page"}
+      style={themeStyle}
+    >
       <div className="page-vignette" aria-hidden="true" />
-      <section className="gothic-card app-shell-card party-detail-card">
+      <section
+        className={
+          party
+            ? "gothic-card app-shell-card party-detail-card party-themed"
+            : "gothic-card app-shell-card party-detail-card"
+        }
+        style={themeStyle}
+      >
         <div className="card-frame" aria-hidden="true">
           <span className="corner corner-tl" />
           <span className="corner corner-tr" />
@@ -114,7 +126,7 @@ export default function PartyPage() {
           <span className="corner corner-br" />
         </div>
 
-        <Link className="auth-secondary back-text-link event-detail-back" to="/parties">
+        <Link className="auth-secondary back-text-link event-detail-back party-detail-back" to="/parties">
           Back to Parties
         </Link>
 
@@ -123,11 +135,7 @@ export default function PartyPage() {
         ) : error ? (
           <p className="auth-error">{error}</p>
         ) : party ? (
-          <section
-            className="party-detail-view party-themed"
-            style={partyThemeStyle(party)}
-            aria-label={`${party.label} party details`}
-          >
+          <section className="party-detail-view party-themed" aria-label={`${party.label} party details`}>
             <header className="party-detail-header">
               <h1>{party.label}</h1>
               <section className="party-detail-meta" aria-label="When and where">
@@ -169,7 +177,7 @@ export default function PartyPage() {
                     <h2>Attending</h2>
                   </div>
                   {attendeeRows.length === 0 ? (
-                    <p className="dashboard-copy">No one has RSVP&apos;d yet.</p>
+                    <p className="dashboard-copy party-detail-empty">No one has RSVP&apos;d yet.</p>
                   ) : (
                     <ul className="party-attendee-list">
                       {attendeeRows.map((row) => (

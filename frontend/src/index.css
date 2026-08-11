@@ -1737,7 +1737,7 @@ body {
   width: 100%;
   border: 0;
   background: transparent;
-  color: var(--ink);
+  color: color-mix(in srgb, var(--party-theme-primary, var(--ink)) 40%, #f4f0fa);
   padding: 1rem 1.1rem;
   font: inherit;
   text-align: left;
@@ -1754,7 +1754,7 @@ body {
 }
 
 .party-accordion-summary span:last-child {
-  color: var(--ink-muted);
+  color: color-mix(in srgb, var(--party-theme-accent, var(--ink-muted)) 55%, #f4f0fa);
   font-size: 0.86rem;
 }
 
@@ -1766,7 +1766,10 @@ body {
 
 .party-summary-card {
   display: grid;
-  gap: 1.1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 1rem;
+  min-height: 11rem;
   padding: 1rem 1.05rem 0.9rem;
   border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 18%, transparent);
   border-radius: 0.85rem;
@@ -1776,29 +1779,24 @@ body {
   cursor: pointer;
 }
 
+.party-summary-card.has-media {
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, 12rem) auto;
+}
+
 .party-summary-card:hover,
 .party-summary-card:focus-visible {
   border-color: color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 34%, transparent);
   outline: none;
 }
 
-.party-summary-card-body {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-  align-items: start;
-}
-
-.party-summary-card-body.has-media {
-  grid-template-columns: minmax(0, 1fr) minmax(7rem, 11rem);
-}
-
 .party-summary-card-main {
   min-width: 0;
+  align-self: start;
 }
 
 .party-summary-card-media {
   min-width: 0;
+  align-self: stretch;
   overflow: hidden;
   border-radius: 0.7rem;
 }
@@ -1806,21 +1804,24 @@ body {
 .party-summary-card-media img {
   display: block;
   width: 100%;
-  aspect-ratio: 1;
+  height: 100%;
+  min-height: 100%;
   object-fit: cover;
 }
 
-.party-summary-card-footer {
+.party-summary-card-actions {
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
   justify-content: space-between;
-  gap: 0.75rem;
-  min-height: 3.25rem;
+  align-items: flex-end;
+  gap: 0.85rem;
+  min-width: 8.5rem;
+  align-self: stretch;
 }
 
 .party-overview-copy {
   margin: 0;
-  color: var(--ink);
+  color: color-mix(in srgb, var(--party-theme-primary, var(--ink)) 35%, #f4f0fa);
   line-height: 1.55;
   white-space: pre-wrap;
 }
@@ -1831,8 +1832,8 @@ body {
 }
 
 .party-to-page-link {
-  color: #4ea1ff;
-  font-size: 1.15rem;
+  color: var(--party-theme-accent, #4ea1ff);
+  font-size: 1.05rem;
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 0.15em;
@@ -1981,10 +1982,10 @@ body {
 
 .party-rsvp-button {
   width: fit-content;
-  min-width: 12rem;
+  min-width: 0;
   border: 1px solid color-mix(in srgb, var(--party-theme-accent, var(--gold)) 45%, transparent);
-  border-radius: 0.9rem;
-  padding: 1.05rem 2.75rem;
+  border-radius: 0.75rem;
+  padding: 0.7rem 1.15rem;
   background:
     linear-gradient(
       135deg,
@@ -1993,9 +1994,9 @@ body {
     ),
     rgba(3, 3, 3, 0.35);
   color: var(--gold);
-  font-size: 1.35rem;
+  font-size: 0.92rem;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   cursor: pointer;
 }
@@ -2021,6 +2022,39 @@ body {
   gap: 1.5rem;
 }
 
+.party-detail-page.party-themed {
+  background:
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--party-theme-accent) 16%, transparent), transparent 36%),
+    radial-gradient(circle at 82% 12%, color-mix(in srgb, var(--party-theme-primary) 14%, transparent), transparent 34%),
+    linear-gradient(180deg, color-mix(in srgb, var(--party-theme-background) 88%, #000), var(--party-theme-background));
+}
+
+.party-detail-card.party-themed {
+  border-color: color-mix(in srgb, var(--party-theme-primary) 28%, transparent);
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--party-theme-primary) 10%, transparent), transparent 46%),
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--party-theme-accent) 10%, transparent), transparent 34%),
+    color-mix(in srgb, var(--party-theme-background) 82%, rgba(8, 8, 8, 0.92));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--party-theme-primary) 10%, transparent),
+    0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.party-detail-card.party-themed .corner {
+  border-color: var(--party-theme-accent);
+}
+
+.party-detail-card.party-themed .party-detail-back {
+  border-color: color-mix(in srgb, var(--party-theme-primary) 30%, transparent);
+  color: var(--party-theme-accent);
+}
+
+.party-detail-card.party-themed .party-detail-back:hover,
+.party-detail-card.party-themed .party-detail-back:focus-visible {
+  border-color: color-mix(in srgb, var(--party-theme-accent) 50%, transparent);
+  color: var(--party-theme-primary);
+}
+
 .party-detail-view {
   position: relative;
   z-index: 1;
@@ -2031,9 +2065,10 @@ body {
 .party-detail-view.party-themed {
   padding: 1.25rem;
   border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary) 18%, transparent);
   background:
     linear-gradient(160deg, color-mix(in srgb, var(--party-theme-primary) 8%, transparent), transparent 48%),
-    var(--party-theme-background);
+    color-mix(in srgb, var(--party-theme-background) 72%, transparent);
 }
 
 .party-detail-header {
@@ -2067,7 +2102,7 @@ body {
   padding: 0.8rem 0.95rem;
   border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 16%, transparent);
   border-radius: 0.85rem;
-  background: rgba(3, 3, 3, 0.22);
+  background: color-mix(in srgb, var(--party-theme-background, var(--black)) 55%, rgba(3, 3, 3, 0.5));
   min-width: 0;
 }
 
@@ -2079,7 +2114,7 @@ body {
 }
 
 .party-detail-meta strong {
-  color: var(--ink);
+  color: color-mix(in srgb, var(--party-theme-primary, var(--ink)) 55%, #f4f0fa);
   font-weight: 600;
   line-height: 1.45;
   font-size: 0.95rem;
@@ -2105,7 +2140,7 @@ body {
 .party-detail-summary {
   margin: 0;
   max-width: 42rem;
-  color: var(--ink);
+  color: color-mix(in srgb, var(--party-theme-primary, var(--ink)) 35%, #f4f0fa);
   line-height: 1.6;
   white-space: pre-wrap;
 }
@@ -2129,15 +2164,18 @@ body {
   max-height: 28rem;
   object-fit: contain;
   object-position: top left;
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 20%, transparent);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--party-theme-background, #000) 55%, transparent);
 }
 
 .party-attendee-section {
   display: grid;
   gap: 0.75rem;
   padding: 1rem 1.05rem;
-  border: 1px solid rgba(232, 120, 143, 0.16);
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 18%, transparent);
   border-radius: 0.95rem;
-  background: rgba(3, 3, 3, 0.22);
+  background: color-mix(in srgb, var(--party-theme-background, var(--black)) 58%, rgba(3, 3, 3, 0.45));
 }
 
 .party-attendee-header {
@@ -2153,6 +2191,10 @@ body {
   font-family: var(--party-theme-font, var(--decorative-font));
   font-size: 1.05rem;
   letter-spacing: 0.08em;
+}
+
+.party-detail-empty {
+  color: color-mix(in srgb, var(--party-theme-accent, var(--ink-muted)) 70%, #f4f0fa);
 }
 
 .party-attendee-list {
@@ -2204,10 +2246,10 @@ body {
   transform: translateX(-50%) translateY(0.15rem);
   z-index: 3;
   padding: 0.35rem 0.55rem;
-  border: 1px solid rgba(232, 120, 143, 0.28);
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 32%, transparent);
   border-radius: 0.55rem;
-  background: rgba(20, 4, 8, 0.96);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--party-theme-background, #140408) 88%, #000);
+  color: color-mix(in srgb, var(--party-theme-primary, var(--ink)) 45%, #f4f0fa);
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -3799,13 +3841,22 @@ body {
     gap: 0.35rem;
   }
 
-  .party-summary-card-body,
-  .party-summary-card-body.has-media {
+  .party-summary-card,
+  .party-summary-card.has-media {
     grid-template-columns: 1fr;
+    min-height: 0;
   }
 
-  .party-summary-card-media img {
-    aspect-ratio: 16 / 9;
+  .party-summary-card-media {
+    order: -1;
+    min-height: 10rem;
+  }
+
+  .party-summary-card-actions {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 0;
   }
 
   .party-detail-header {

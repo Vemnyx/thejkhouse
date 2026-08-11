@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -15,6 +16,14 @@ import (
 )
 
 const googleCustomSearchEndpoint = "https://www.googleapis.com/customsearch/v1"
+
+// Google Custom Search JSON API allows at most 10 results per request.
+const mediaSearchPageSize = 10
+
+// Target number of items returned to the client (2 pages).
+const mediaSearchTargetCount = 20
+
+var gifURLPattern = regexp.MustCompile(`(?i)\.gif(\?|$)`)
 
 type mediaSearchClient struct {
 	apiKey     string
@@ -113,22 +122,88 @@ func (c *mediaSearchClient) search(ctx context.Context, query, mediaType string)
 		return nil, fmt.Errorf("query is required")
 	}
 
+	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
+	switch mediaType {
+	case "gif", "image", "":
+		if mediaType == "" {
+			mediaType = "image"
+		}
+	default:
+		return nil, fmt.Errorf("type must be image or gif")
+	}
+
+	primaryQuery := query
+	if mediaType == "gif" && !strings.Contains(strings.ToLower(query), "gif") {
+		primaryQuery = query + " gif"
+	}
+
+	items, err := c.searchPages(ctx, primaryQuery, mediaType, mediaSearchTargetCount)
+	if err != nil {
+		return nil, err
+	}
+
+	// If GIF results are thin (site list skewed toward still stock), try GIF hosts explicitly.
+	if mediaType == "gif" && len(items) < mediaSearchPageSize {
+		boosted := query + " (site:giphy.com OR site:tenor.com)"
+		extra, extraErr := c.searchPages(ctx, boosted, mediaType, mediaSearchTargetCount)
+		if extraErr == nil {
+			items = mergeMediaSearchItems(items, extra, mediaSearchTargetCount)
+		}
+	}
+
+	return items, nil
+}
+
+func (c *mediaSearchClient) searchPages(ctx context.Context, query, mediaType string, target int) ([]mediaSearchItem, error) {
+	out := make([]mediaSearchItem, 0, target)
+	seen := make(map[string]struct{}, target)
+
+	for start := 1; len(out) < target && start <= 91; start += mediaSearchPageSize {
+		page, err := c.searchPage(ctx, query, mediaType, mediaSearchPageSize, start)
+		if err != nil {
+			if len(out) > 0 {
+				return out, nil
+			}
+			return nil, err
+		}
+		if len(page) == 0 {
+			break
+		}
+		for _, item := range page {
+			key := strings.ToLower(strings.TrimSpace(item.Link))
+			if key == "" {
+				continue
+			}
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, item)
+			if len(out) >= target {
+				break
+			}
+		}
+		if len(page) < mediaSearchPageSize {
+			break
+		}
+	}
+
+	return out, nil
+}
+
+func (c *mediaSearchClient) searchPage(ctx context.Context, query, mediaType string, num, start int) ([]mediaSearchItem, error) {
 	params := url.Values{}
 	params.Set("key", c.apiKey)
 	params.Set("cx", c.cx)
 	params.Set("q", query)
 	params.Set("searchType", "image")
-	params.Set("num", "10")
+	params.Set("num", fmt.Sprintf("%d", num))
+	params.Set("start", fmt.Sprintf("%d", start))
 	params.Set("safe", "active")
 
-	switch strings.ToLower(strings.TrimSpace(mediaType)) {
-	case "gif":
+	if mediaType == "gif" {
 		params.Set("fileType", "gif")
 		params.Set("imgType", "animated")
-	case "image", "":
-		// default image search
-	default:
-		return nil, fmt.Errorf("type must be image or gif")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, googleCustomSearchEndpoint+"?"+params.Encode(), nil)
@@ -164,13 +239,46 @@ func (c *mediaSearchClient) search(ctx context.Context, query, mediaType string)
 		if link == "" {
 			continue
 		}
+		mime := strings.TrimSpace(item.Mime)
+		if mediaType == "gif" {
+			// CDN URLs from Giphy/Tenor often omit .gif; treat filetype=gif hits as GIFs.
+			mime = "image/gif"
+		} else if mime == "" && gifURLPattern.MatchString(link) {
+			mime = "image/gif"
+		}
 		items = append(items, mediaSearchItem{
 			Title:     strings.TrimSpace(item.Title),
 			Link:      link,
 			Thumbnail: strings.TrimSpace(item.Image.ThumbnailLink),
 			Context:   strings.TrimSpace(item.Image.ContextLink),
-			Mime:      strings.TrimSpace(item.Mime),
+			Mime:      mime,
 		})
 	}
 	return items, nil
+}
+
+func mergeMediaSearchItems(primary, extra []mediaSearchItem, limit int) []mediaSearchItem {
+	out := make([]mediaSearchItem, 0, limit)
+	seen := make(map[string]struct{}, limit)
+	appendUnique := func(items []mediaSearchItem) {
+		for _, item := range items {
+			key := strings.ToLower(strings.TrimSpace(item.Link))
+			if key == "" {
+				continue
+			}
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, item)
+			if len(out) >= limit {
+				return
+			}
+		}
+	}
+	appendUnique(primary)
+	if len(out) < limit {
+		appendUnique(extra)
+	}
+	return out
 }

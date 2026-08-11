@@ -340,5 +340,21 @@ export async function searchPartyMedia(query: string): Promise<MediaSearchItem[]
 }
 
 export function isGifMediaItem(item: MediaSearchItem) {
-  return item.mime === "image/gif" || /\.gif(\?|$)/i.test(item.link);
+  if (item.mime === "image/gif") {
+    return true;
+  }
+  if (/\.gif(\?|$)/i.test(item.link)) {
+    return true;
+  }
+  try {
+    const host = new URL(item.link).hostname.toLowerCase();
+    return (
+      host === "giphy.com" ||
+      host.endsWith(".giphy.com") ||
+      host === "tenor.com" ||
+      host.endsWith(".tenor.com")
+    );
+  } catch {
+    return false;
+  }
 }

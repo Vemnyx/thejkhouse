@@ -3,8 +3,8 @@ import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, revisePartySummary, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
-import { searchPartyMedia, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, isGifMediaItem } from "../lib/googleCseSearch";
+import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, revisePartySummary, saveMediaFromURL, searchMedia, sendHostEmail, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { isGifMediaItem } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
@@ -415,23 +415,17 @@ export default function HostPage() {
 
   const partyMediaPickerActive = partyMediaModalOpen || (partySetupModalOpen && partySetupStep === "media");
 
-  useEffect(() => {
-    if (partyMediaPickerActive) {
-      return;
-    }
-
-    if (partyMediaSearchTimeoutRef.current != null) {
-      window.clearTimeout(partyMediaSearchTimeoutRef.current);
-      partyMediaSearchTimeoutRef.current = null;
-    }
-    resetPartyMediaSearchElement();
-  }, [partyMediaPickerActive]);
-
-  const runPartyMediaSearch = async (rawQuery: string) => {
+  const runPartyMediaSearch = async (rawQuery: string, type: MediaSearchType = partyMediaType) => {
     const query = rawQuery.trim();
     if (!query) {
       setPartyMediaResults([]);
       setPartyMediaError("");
+      setPartyMediaSearching(false);
+      return;
+    }
+    if (!firebaseUser) {
+      setPartyMediaError("You must be signed in to search media.");
+      setPartyMediaResults([]);
       setPartyMediaSearching(false);
       return;
     }
@@ -440,7 +434,8 @@ export default function HostPage() {
     setPartyMediaError("");
     setPartyMediaSearching(true);
     try {
-      const items = await searchPartyMedia(query);
+      const token = await firebaseUser.getIdToken();
+      const items = await searchMedia(token, query, type);
       if (generation !== partyMediaSearchGenRef.current) {
         return;
       }
@@ -462,6 +457,14 @@ export default function HostPage() {
 
   useEffect(() => {
     if (!partyMediaPickerActive) {
+      if (partyMediaSearchTimeoutRef.current != null) {
+        window.clearTimeout(partyMediaSearchTimeoutRef.current);
+        partyMediaSearchTimeoutRef.current = null;
+      }
+      partyMediaSearchGenRef.current += 1;
+      setPartyMediaResults([]);
+      setPartyMediaError("");
+      setPartyMediaSearching(false);
       return;
     }
 
@@ -481,7 +484,7 @@ export default function HostPage() {
 
     partyMediaSearchTimeoutRef.current = window.setTimeout(() => {
       partyMediaSearchTimeoutRef.current = null;
-      void runPartyMediaSearch(query);
+      void runPartyMediaSearch(query, partyMediaType);
     }, 1500);
 
     return () => {
@@ -490,7 +493,7 @@ export default function HostPage() {
         partyMediaSearchTimeoutRef.current = null;
       }
     };
-  }, [partyMediaPickerActive, partyMediaQuery]);
+  }, [partyMediaPickerActive, partyMediaQuery, partyMediaType, firebaseUser]);
 
   useEffect(() => {
     if (!partyMediaSearching) {
@@ -508,9 +511,11 @@ export default function HostPage() {
   }, [partyMediaSearching]);
 
   const visiblePartyMediaResults = useMemo(() => {
-    return partyMediaResults.filter((item) =>
-      partyMediaType === "gif" ? isGifMediaItem(item) : !isGifMediaItem(item),
-    );
+    // GIF searches already request animated/gif results from Google; keep them all.
+    if (partyMediaType === "gif") {
+      return partyMediaResults;
+    }
+    return partyMediaResults.filter((item) => !isGifMediaItem(item));
   }, [partyMediaResults, partyMediaType]);
 
   if (appUser?.role !== "host") {
@@ -1712,8 +1717,12 @@ export default function HostPage() {
   };
 
   const selectPartyMediaType = (type: MediaSearchType) => {
+    if (type === partyMediaType) {
+      return;
+    }
     setPartyMediaType(type);
     setPartyMediaError("");
+    setPartyMediaResults([]);
   };
 
   const closePartyMediaModal = () => {
@@ -2862,7 +2871,7 @@ export default function HostPage() {
                             window.clearTimeout(partyMediaSearchTimeoutRef.current);
                             partyMediaSearchTimeoutRef.current = null;
                           }
-                          void runPartyMediaSearch(partyMediaQuery);
+                          void runPartyMediaSearch(partyMediaQuery, partyMediaType);
                         }}
                         placeholder="neon house party"
                         aria-label="Search media"
@@ -2903,7 +2912,9 @@ export default function HostPage() {
 
                   {partyMediaResults.length > 0 && visiblePartyMediaResults.length === 0 ? (
                     <p className="dashboard-copy">
-                      {partyMediaType === "gif" ? "No GIFs in these results. Try the Image tab." : "No still images in these results. Try the GIF tab."}
+                      {partyMediaType === "gif"
+                        ? "No GIFs found for this query."
+                        : "No still images in these results. Try the GIF tab."}
                     </p>
                   ) : null}
 
@@ -2926,7 +2937,6 @@ export default function HostPage() {
                     </div>
                   ) : null}
                   {partyMediaSaving ? <p className="dashboard-copy">Saving selected media to storage...</p> : null}
-                  <div id={PARTY_MEDIA_CSE_HOST_ID} className="party-media-cse-host" aria-hidden="true" />
                 </div>
               ) : null}
 
@@ -3263,7 +3273,7 @@ export default function HostPage() {
                         window.clearTimeout(partyMediaSearchTimeoutRef.current);
                         partyMediaSearchTimeoutRef.current = null;
                       }
-                      void runPartyMediaSearch(partyMediaQuery);
+                      void runPartyMediaSearch(partyMediaQuery, partyMediaType);
                     }}
                     placeholder="neon house party"
                     aria-label="Search media"
@@ -3304,7 +3314,9 @@ export default function HostPage() {
 
               {partyMediaResults.length > 0 && visiblePartyMediaResults.length === 0 ? (
                 <p className="dashboard-copy">
-                  {partyMediaType === "gif" ? "No GIFs in these results. Try the Image tab." : "No still images in these results. Try the GIF tab."}
+                  {partyMediaType === "gif"
+                    ? "No GIFs found for this query."
+                    : "No still images in these results. Try the GIF tab."}
                 </p>
               ) : null}
 
@@ -3327,7 +3339,6 @@ export default function HostPage() {
                 </div>
               ) : null}
               {partyMediaSaving ? <p className="dashboard-copy">Saving selected media to storage...</p> : null}
-              <div id={PARTY_MEDIA_CSE_HOST_ID} className="party-media-cse-host" aria-hidden="true" />
             </section>
           </div>
         ) : null}

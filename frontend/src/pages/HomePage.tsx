@@ -829,7 +829,7 @@ export default function HomePage() {
                           {expanded ? (
                             <div className="party-accordion-details">
                               <div
-                                className="party-summary-card"
+                                className={party.mediaUrl ? "party-summary-card has-media" : "party-summary-card"}
                                 role="link"
                                 tabIndex={0}
                                 onClick={() => navigate(`/parties/${partyRouteIdentifier(party)}`)}
@@ -840,30 +840,28 @@ export default function HomePage() {
                                   }
                                 }}
                               >
-                                <div className={party.mediaUrl ? "party-summary-card-body has-media" : "party-summary-card-body"}>
-                                  <div className="party-summary-card-main">
-                                    {party.partifulUrl ? (
-                                      <p className="party-overview-copy">
-                                        <a
-                                          href={party.partifulUrl}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          onClick={(event) => event.stopPropagation()}
-                                        >
-                                          {party.partifulUrl}
-                                        </a>
-                                      </p>
-                                    ) : (
-                                      <p className="party-overview-copy">{party.summary || "No summary yet."}</p>
-                                    )}
-                                  </div>
-                                  {party.mediaUrl ? (
-                                    <div className="party-summary-card-media" aria-hidden="true">
-                                      <img src={party.mediaUrl} alt="" />
-                                    </div>
-                                  ) : null}
+                                <div className="party-summary-card-main">
+                                  {party.partifulUrl ? (
+                                    <p className="party-overview-copy">
+                                      <a
+                                        href={party.partifulUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        onClick={(event) => event.stopPropagation()}
+                                      >
+                                        {party.partifulUrl}
+                                      </a>
+                                    </p>
+                                  ) : (
+                                    <p className="party-overview-copy">{party.summary || "No summary yet."}</p>
+                                  )}
                                 </div>
-                                <div className="party-summary-card-footer">
+                                {party.mediaUrl ? (
+                                  <div className="party-summary-card-media" aria-hidden="true">
+                                    <img src={party.mediaUrl} alt="" />
+                                  </div>
+                                ) : null}
+                                <div className="party-summary-card-actions">
                                   {isFutureParty && !party.partifulUrl ? (
                                     <button
                                       className="party-rsvp-button"
@@ -876,7 +874,7 @@ export default function HomePage() {
                                       RSVP
                                     </button>
                                   ) : (
-                                    <span />
+                                    <span aria-hidden="true" />
                                   )}
                                   <span className="party-to-page-link">To Party Page</span>
                                 </div>
