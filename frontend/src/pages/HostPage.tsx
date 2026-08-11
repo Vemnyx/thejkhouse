@@ -3,8 +3,8 @@ import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, revisePartySummary, saveMediaFromURL, searchMedia, sendHostEmail, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
-import { isGifMediaItem } from "../lib/googleCseSearch";
+import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, revisePartySummary, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { isGifMediaItem, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, searchPartyMedia } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
@@ -423,19 +423,13 @@ export default function HostPage() {
       setPartyMediaSearching(false);
       return;
     }
-    if (!firebaseUser) {
-      setPartyMediaError("You must be signed in to search media.");
-      setPartyMediaResults([]);
-      setPartyMediaSearching(false);
-      return;
-    }
 
+    const searchQuery = type === "gif" && !/\bgif\b/i.test(query) ? `${query} gif` : query;
     const generation = ++partyMediaSearchGenRef.current;
     setPartyMediaError("");
     setPartyMediaSearching(true);
     try {
-      const token = await firebaseUser.getIdToken();
-      const items = await searchMedia(token, query, type);
+      const items = await searchPartyMedia(searchQuery);
       if (generation !== partyMediaSearchGenRef.current) {
         return;
       }
@@ -456,15 +450,23 @@ export default function HostPage() {
   };
 
   useEffect(() => {
+    if (partyMediaPickerActive) {
+      return;
+    }
+
+    if (partyMediaSearchTimeoutRef.current != null) {
+      window.clearTimeout(partyMediaSearchTimeoutRef.current);
+      partyMediaSearchTimeoutRef.current = null;
+    }
+    partyMediaSearchGenRef.current += 1;
+    setPartyMediaResults([]);
+    setPartyMediaError("");
+    setPartyMediaSearching(false);
+    resetPartyMediaSearchElement();
+  }, [partyMediaPickerActive]);
+
+  useEffect(() => {
     if (!partyMediaPickerActive) {
-      if (partyMediaSearchTimeoutRef.current != null) {
-        window.clearTimeout(partyMediaSearchTimeoutRef.current);
-        partyMediaSearchTimeoutRef.current = null;
-      }
-      partyMediaSearchGenRef.current += 1;
-      setPartyMediaResults([]);
-      setPartyMediaError("");
-      setPartyMediaSearching(false);
       return;
     }
 
@@ -493,7 +495,7 @@ export default function HostPage() {
         partyMediaSearchTimeoutRef.current = null;
       }
     };
-  }, [partyMediaPickerActive, partyMediaQuery, partyMediaType, firebaseUser]);
+  }, [partyMediaPickerActive, partyMediaQuery, partyMediaType]);
 
   useEffect(() => {
     if (!partyMediaSearching) {
@@ -3244,6 +3246,10 @@ export default function HostPage() {
               </div>
             </section>
           </div>
+          ) : null}
+
+          {partyMediaPickerActive ? (
+            <div id={PARTY_MEDIA_CSE_HOST_ID} className="party-media-cse-host" aria-hidden="true" />
           ) : null}
 
           {partyMediaModalOpen ? (
