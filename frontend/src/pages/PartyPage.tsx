@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import PartyRsvpModal from "../components/PartyRsvpModal";
 import { useAuth } from "../context/AuthContext";
 import {
   AppUser,
@@ -17,12 +18,13 @@ const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519";
 
 export default function PartyPage() {
   const { partyId } = useParams();
-  const { firebaseUser } = useAuth();
+  const { appUser, firebaseUser } = useAuth();
   const [party, setParty] = useState<PartyRecord | null>(null);
   const [attendees, setAttendees] = useState<PartyAttendeeRecord[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [rsvpModalOpen, setRsvpModalOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +105,14 @@ export default function PartyPage() {
     });
   }, [attendees, usersById]);
 
+  const isAttending = useMemo(() => {
+    if (!appUser) {
+      return false;
+    }
+    return attendees.some((attendee) => attendee.userId === appUser.id);
+  }, [appUser, attendees]);
+
+  const canRsvp = Boolean(party && !party.partifulUrl && !isAttending && new Date(party.date).getTime() > Date.now());
   const themeStyle = party ? partyThemeStyle(party) : undefined;
 
   return (
@@ -126,9 +136,16 @@ export default function PartyPage() {
           <span className="corner corner-br" />
         </div>
 
-        <Link className="auth-secondary back-text-link event-detail-back party-detail-back" to="/parties">
-          Back to Parties
-        </Link>
+        <div className="party-detail-topbar">
+          <Link className="auth-secondary back-text-link event-detail-back party-detail-back" to="/parties">
+            Back to Parties
+          </Link>
+          {canRsvp ? (
+            <button className="party-rsvp-button" type="button" onClick={() => setRsvpModalOpen(true)}>
+              RSVP
+            </button>
+          ) : null}
+        </div>
 
         {loading ? (
           <p className="loading-text">Loading party...</p>
@@ -200,6 +217,15 @@ export default function PartyPage() {
           <p className="dashboard-copy">Party not found.</p>
         )}
       </section>
+
+      {rsvpModalOpen && party ? (
+        <PartyRsvpModal
+          party={party}
+          users={users}
+          onClose={() => setRsvpModalOpen(false)}
+          onAttendeesUpdated={setAttendees}
+        />
+      ) : null}
     </main>
   );
 }
@@ -248,11 +274,7 @@ function avatarColorFromUserId(userId: number): string {
   const g = 72 + ((n >>> 8) & 0x7f);
   const b = 72 + ((n >>> 16) & 0x7f);
 
-  return `#${toHexByte(r)}${toHexByte(g)}${toHexByte(b)}`;
-}
-
-function toHexByte(value: number) {
-  return (value & 0xff).toString(16).padStart(2, "0");
+  return `#${[r, g, b].map((value) => value.toString(16).padStart(2, "0")).join("")}`;
 }
 
 function formatPartyDateTime(value: string) {

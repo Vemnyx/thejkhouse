@@ -57,6 +57,7 @@ type PartyAttendee struct {
 	LastName  string          `json:"lastName"`
 	Email     string          `json:"email"`
 	PlusOneOf *int64          `json:"plusOneOf"`
+	Note      string          `json:"note"`
 	Metadata  json.RawMessage `json:"metadata"`
 	CreatedAt time.Time       `json:"createdAt"`
 }

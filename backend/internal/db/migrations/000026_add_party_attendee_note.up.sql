@@ -1,0 +1,2 @@
+ALTER TABLE party_attendees
+ADD COLUMN IF NOT EXISTS note text NOT NULL DEFAULT '';

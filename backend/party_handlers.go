@@ -114,6 +114,7 @@ type partyAttendeeRequest struct {
 	LastName  string          `json:"lastName"`
 	Email     string          `json:"email"`
 	PlusOneOf *int64          `json:"plusOneOf"`
+	Note      string          `json:"note"`
 	Metadata  json.RawMessage `json:"metadata"`
 }
 
@@ -394,6 +395,11 @@ func (s *apiServer) handleCreatePartyAttendee(w http.ResponseWriter, r *http.Req
 	firstName := strings.TrimSpace(req.FirstName)
 	lastName := strings.TrimSpace(req.LastName)
 	email := strings.TrimSpace(req.Email)
+	note := strings.TrimSpace(req.Note)
+	if len(note) > 2000 {
+		writeError(w, http.StatusBadRequest, "note must be 2000 characters or fewer")
+		return
+	}
 
 	isSelfRSVP := req.UserID == nil && req.PlusOneOf == nil && firstName == "" && lastName == "" && email == ""
 	if isSelfRSVP {
@@ -404,6 +410,7 @@ func (s *apiServer) handleCreatePartyAttendee(w http.ResponseWriter, r *http.Req
 			strings.TrimSpace(user.FirstName),
 			strings.TrimSpace(user.LastName),
 			strings.TrimSpace(user.Email),
+			note,
 			req.Metadata,
 		)
 		if err != nil {
@@ -482,6 +489,7 @@ func (s *apiServer) handleCreatePartyAttendee(w http.ResponseWriter, r *http.Req
 		lastName,
 		email,
 		req.PlusOneOf,
+		"",
 		req.Metadata,
 	)
 	if err != nil {

@@ -149,6 +149,7 @@ export type PartyAttendeeRecord = {
   lastName: string;
   email: string;
   plusOneOf: number | null;
+  note: string;
   metadata: Record<string, unknown>;
   createdAt: string;
 };
@@ -279,6 +280,7 @@ export type CreatePartyAttendeePayload = {
   lastName?: string;
   email?: string;
   plusOneOf?: number;
+  note?: string;
   metadata?: Record<string, unknown>;
 };
 

@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, revisePartySummary, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, revisePartySummary, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 import { isGifMediaItem, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, searchPartyMedia } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
@@ -277,6 +277,9 @@ export default function HostPage() {
   const [qrError, setQrError] = useState("");
   const [previewImage, setPreviewImage] = useState<ImageRecord | null>(null);
   const [previewParty, setPreviewParty] = useState<PartyRecord | null>(null);
+  const [previewPartyAttendees, setPreviewPartyAttendees] = useState<PartyAttendeeRecord[]>([]);
+  const [previewPartyAttendeesLoading, setPreviewPartyAttendeesLoading] = useState(false);
+  const [previewPartyAttendeesError, setPreviewPartyAttendeesError] = useState("");
   const [tagEditImage, setTagEditImage] = useState<ImageRecord | null>(null);
   const [tagEditUserId, setTagEditUserId] = useState("");
   const [tagEditUserIds, setTagEditUserIds] = useState<number[]>([]);
@@ -519,6 +522,11 @@ export default function HostPage() {
     }
     return partyMediaResults.filter((item) => !isGifMediaItem(item));
   }, [partyMediaResults, partyMediaType]);
+
+  const previewPartyPrimaryAttendees = useMemo(
+    () => previewPartyAttendees.filter((attendee) => attendee.plusOneOf == null),
+    [previewPartyAttendees],
+  );
 
   if (appUser?.role !== "host") {
     return <Navigate to="/" replace />;
@@ -1525,6 +1533,8 @@ export default function HostPage() {
       await deleteParty(token, party.id);
       setParties((current) => current.filter((item) => item.id !== party.id));
       setPreviewParty((current) => (current?.id === party.id ? null : current));
+      setPreviewPartyAttendees([]);
+      setPreviewPartyAttendeesError("");
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to delete party";
       setError(message);
@@ -1708,6 +1718,34 @@ export default function HostPage() {
     } finally {
       setSavingParty(false);
     }
+  };
+
+  const openPartyAttendeesModal = async (party: PartyRecord) => {
+    if (!firebaseUser) {
+      return;
+    }
+
+    setPreviewParty(party);
+    setPreviewPartyAttendees([]);
+    setPreviewPartyAttendeesError("");
+    setPreviewPartyAttendeesLoading(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const attendees = await listPartyAttendees(token, party.id);
+      setPreviewPartyAttendees(attendees);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to load attendees";
+      setPreviewPartyAttendeesError(message);
+    } finally {
+      setPreviewPartyAttendeesLoading(false);
+    }
+  };
+
+  const closePartyAttendeesModal = () => {
+    setPreviewParty(null);
+    setPreviewPartyAttendees([]);
+    setPreviewPartyAttendeesError("");
+    setPreviewPartyAttendeesLoading(false);
   };
 
   const openPartyMediaModal = () => {
@@ -2300,7 +2338,7 @@ export default function HostPage() {
                       </thead>
                       <tbody>
                         {parties.map((party) => (
-                          <tr className="clickable-row" key={party.id} onClick={() => setPreviewParty(party)}>
+                          <tr className="clickable-row" key={party.id} onClick={() => void openPartyAttendeesModal(party)}>
                             <td>{party.label}</td>
                             <td>{formatDateTime(party.date)}</td>
                             <td className="party-row-actions">
@@ -4009,45 +4047,61 @@ export default function HostPage() {
           </div>
         ) : null}
         {previewParty ? (
-          <div className="modal-backdrop" role="presentation" onMouseDown={() => setPreviewParty(null)}>
+          <div className="modal-backdrop" role="presentation" onMouseDown={closePartyAttendeesModal}>
             <section
-              className="party-preview-modal gothic-card"
+              className="upload-modal gothic-card party-attendees-modal"
               role="dialog"
               aria-modal="true"
-              aria-labelledby="party-preview-title"
+              aria-labelledby="party-attendees-title"
               onMouseDown={(event) => event.stopPropagation()}
             >
-              <div className="card-frame" aria-hidden="true">
-                <span className="corner corner-tl" />
-                <span className="corner corner-tr" />
-                <span className="corner corner-bl" />
-                <span className="corner corner-br" />
+              <div className="modal-header">
+                <h2 className="host-section-title" id="party-attendees-title">
+                  {previewParty.label}
+                </h2>
+                <button className="modal-close" type="button" onClick={closePartyAttendeesModal} aria-label="Close attendees">
+                  x
+                </button>
               </div>
 
-              <button className="modal-close party-preview-close" type="button" onClick={() => setPreviewParty(null)} aria-label="Close party preview">
-                x
-              </button>
-              <article
-                className="party-accordion-row expanded party-themed"
-                style={partyThemeStyle(previewParty)}
-                aria-labelledby="party-preview-title"
-              >
-                <div className="party-accordion-summary party-preview-summary">
-                  <span id="party-preview-title">{previewParty.label}</span>
-                  <span>{formatDateTime(previewParty.date)}</span>
-                </div>
-                <div className="party-accordion-details">
-                  {previewParty.partifulUrl ? (
-                    <p className="party-overview-copy">
-                      <a href={previewParty.partifulUrl} target="_blank" rel="noreferrer">
-                        {previewParty.partifulUrl}
-                      </a>
-                    </p>
-                  ) : (
-                    <p className="party-overview-copy">{previewParty.summary || "No summary yet."}</p>
-                  )}
-                </div>
-              </article>
+              <p className="dashboard-copy">{formatDateTime(previewParty.date)}</p>
+
+              {previewPartyAttendeesLoading ? <p className="dashboard-copy">Loading attendees...</p> : null}
+              {previewPartyAttendeesError ? <p className="auth-error">{previewPartyAttendeesError}</p> : null}
+
+              {!previewPartyAttendeesLoading && !previewPartyAttendeesError ? (
+                previewPartyPrimaryAttendees.length === 0 ? (
+                  <p className="dashboard-copy">No one has RSVP&apos;d yet.</p>
+                ) : (
+                  <ul className="party-attendees-host-list">
+                    {previewPartyPrimaryAttendees.map((attendee) => {
+                      const plusOnes = previewPartyAttendees.filter((guest) => guest.plusOneOf === attendee.id);
+                      return (
+                        <li className="party-attendees-host-item" key={attendee.id}>
+                          <div className="party-attendees-host-main">
+                            <strong>{partyAttendeeDisplayName(attendee, users)}</strong>
+                            {attendee.note.trim() ? (
+                              <p className="party-attendees-host-note">{attendee.note.trim()}</p>
+                            ) : (
+                              <p className="party-attendees-host-note muted">No note</p>
+                            )}
+                          </div>
+                          {plusOnes.length > 0 ? (
+                            <ul className="party-attendees-host-guests">
+                              {plusOnes.map((guest) => (
+                                <li key={guest.id}>
+                                  <span>+1</span>
+                                  <strong>{partyAttendeeDisplayName(guest, users)}</strong>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )
+              ) : null}
             </section>
           </div>
         ) : null}
@@ -4173,6 +4227,17 @@ function userDisplayName(user: AppUser) {
 function userLabel(users: AppUser[], userId: number) {
   const user = users.find((item) => item.id === userId);
   return user ? userDisplayName(user) : `User #${userId}`;
+}
+
+function partyAttendeeDisplayName(attendee: PartyAttendeeRecord, users: AppUser[]) {
+  if (attendee.userId != null) {
+    const linked = users.find((user) => user.id === attendee.userId);
+    if (linked) {
+      return userDisplayName(linked);
+    }
+  }
+  const name = [attendee.firstName, attendee.lastName].filter(Boolean).join(" ").trim();
+  return name || attendee.email || "Guest";
 }
 
 function taggedUserLabels(users: AppUser[], userIds: number[]) {

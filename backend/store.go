@@ -665,7 +665,7 @@ func (s *userStore) deleteParty(ctx context.Context, id int64) error {
 func (s *userStore) listPartyAttendees(ctx context.Context, partyID int64) ([]PartyAttendee, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, party_id, user_id, first_name, last_name, email, plus_one_of, metadata, created_at
+		`SELECT id, party_id, user_id, first_name, last_name, email, plus_one_of, note, metadata, created_at
 		 FROM party_attendees
 		 WHERE party_id = $1
 		 ORDER BY created_at, id`,
@@ -688,6 +688,7 @@ func (s *userStore) listPartyAttendees(ctx context.Context, partyID int64) ([]Pa
 			&attendee.LastName,
 			&attendee.Email,
 			&attendee.PlusOneOf,
+			&attendee.Note,
 			&metadata,
 			&attendee.CreatedAt,
 		); err != nil {
@@ -707,7 +708,7 @@ func (s *userStore) getPartyAttendeeByID(ctx context.Context, id int64) (PartyAt
 	var metadata []byte
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, party_id, user_id, first_name, last_name, email, plus_one_of, metadata, created_at
+		`SELECT id, party_id, user_id, first_name, last_name, email, plus_one_of, note, metadata, created_at
 		 FROM party_attendees
 		 WHERE id = $1`,
 		id,
@@ -719,6 +720,7 @@ func (s *userStore) getPartyAttendeeByID(ctx context.Context, id int64) (PartyAt
 		&attendee.LastName,
 		&attendee.Email,
 		&attendee.PlusOneOf,
+		&attendee.Note,
 		&metadata,
 		&attendee.CreatedAt,
 	)
@@ -734,7 +736,7 @@ func (s *userStore) getPartyAttendeeByUser(ctx context.Context, partyID, userID 
 	var metadata []byte
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, party_id, user_id, first_name, last_name, email, plus_one_of, metadata, created_at
+		`SELECT id, party_id, user_id, first_name, last_name, email, plus_one_of, note, metadata, created_at
 		 FROM party_attendees
 		 WHERE party_id = $1 AND user_id = $2`,
 		partyID,
@@ -747,6 +749,7 @@ func (s *userStore) getPartyAttendeeByUser(ctx context.Context, partyID, userID 
 		&attendee.LastName,
 		&attendee.Email,
 		&attendee.PlusOneOf,
+		&attendee.Note,
 		&metadata,
 		&attendee.CreatedAt,
 	)
@@ -757,7 +760,7 @@ func (s *userStore) getPartyAttendeeByUser(ctx context.Context, partyID, userID 
 	return attendee, nil
 }
 
-func (s *userStore) createPartyAttendee(ctx context.Context, partyID int64, userID *int64, firstName, lastName, email string, plusOneOf *int64, metadata json.RawMessage) (PartyAttendee, error) {
+func (s *userStore) createPartyAttendee(ctx context.Context, partyID int64, userID *int64, firstName, lastName, email string, plusOneOf *int64, note string, metadata json.RawMessage) (PartyAttendee, error) {
 	if len(metadata) == 0 || !json.Valid(metadata) {
 		metadata = json.RawMessage([]byte("{}"))
 	}
@@ -765,15 +768,16 @@ func (s *userStore) createPartyAttendee(ctx context.Context, partyID int64, user
 	var savedMetadata []byte
 	err := s.pool.QueryRow(
 		ctx,
-		`INSERT INTO party_attendees (party_id, user_id, first_name, last_name, email, plus_one_of, metadata)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, party_id, user_id, first_name, last_name, email, plus_one_of, metadata, created_at`,
+		`INSERT INTO party_attendees (party_id, user_id, first_name, last_name, email, plus_one_of, note, metadata)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		 RETURNING id, party_id, user_id, first_name, last_name, email, plus_one_of, note, metadata, created_at`,
 		partyID,
 		userID,
 		firstName,
 		lastName,
 		email,
 		plusOneOf,
+		note,
 		metadata,
 	).Scan(
 		&attendee.ID,
@@ -783,6 +787,7 @@ func (s *userStore) createPartyAttendee(ctx context.Context, partyID int64, user
 		&attendee.LastName,
 		&attendee.Email,
 		&attendee.PlusOneOf,
+		&attendee.Note,
 		&savedMetadata,
 		&attendee.CreatedAt,
 	)
@@ -793,7 +798,7 @@ func (s *userStore) createPartyAttendee(ctx context.Context, partyID int64, user
 	return attendee, nil
 }
 
-func (s *userStore) upsertPartyAttendeeForUser(ctx context.Context, partyID, userID int64, firstName, lastName, email string, metadata json.RawMessage) (PartyAttendee, error) {
+func (s *userStore) upsertPartyAttendeeForUser(ctx context.Context, partyID, userID int64, firstName, lastName, email, note string, metadata json.RawMessage) (PartyAttendee, error) {
 	if len(metadata) == 0 || !json.Valid(metadata) {
 		metadata = json.RawMessage([]byte("{}"))
 	}
@@ -801,20 +806,22 @@ func (s *userStore) upsertPartyAttendeeForUser(ctx context.Context, partyID, use
 	var savedMetadata []byte
 	err := s.pool.QueryRow(
 		ctx,
-		`INSERT INTO party_attendees (party_id, user_id, first_name, last_name, email, metadata)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		`INSERT INTO party_attendees (party_id, user_id, first_name, last_name, email, note, metadata)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 ON CONFLICT (party_id, user_id) WHERE user_id IS NOT NULL
 		 DO UPDATE SET
 		   first_name = EXCLUDED.first_name,
 		   last_name = EXCLUDED.last_name,
 		   email = EXCLUDED.email,
+		   note = EXCLUDED.note,
 		   metadata = EXCLUDED.metadata
-		 RETURNING id, party_id, user_id, first_name, last_name, email, plus_one_of, metadata, created_at`,
+		 RETURNING id, party_id, user_id, first_name, last_name, email, plus_one_of, note, metadata, created_at`,
 		partyID,
 		userID,
 		firstName,
 		lastName,
 		email,
+		note,
 		metadata,
 	).Scan(
 		&attendee.ID,
@@ -824,6 +831,7 @@ func (s *userStore) upsertPartyAttendeeForUser(ctx context.Context, partyID, use
 		&attendee.LastName,
 		&attendee.Email,
 		&attendee.PlusOneOf,
+		&attendee.Note,
 		&savedMetadata,
 		&attendee.CreatedAt,
 	)
