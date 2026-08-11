@@ -47,6 +47,7 @@ type Party struct {
 	ThemeAccent     string    `json:"themeAccent"`
 	ThemeBackground string    `json:"themeBackground"`
 	ThemeFont       string    `json:"themeFont"`
+	Byom            bool      `json:"byom"`
 }
 
 type PartyAttendee struct {

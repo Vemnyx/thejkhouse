@@ -2207,16 +2207,35 @@ body {
   flex: 0 0 auto;
 }
 
-.party-detail-link-title {
-  font-family: var(--party-theme-font, var(--decorative-font));
-  font-size: clamp(1.05rem, 2.2vw, 1.35rem);
-  letter-spacing: 0.04em;
-  color: color-mix(in srgb, var(--party-theme-accent, var(--gold)) 70%, #fff);
+.party-detail-link-featured img {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 0.75rem;
 }
 
-.party-detail-link-title img {
-  width: 2.15rem;
-  height: 2.15rem;
+.party-detail-byom {
+  cursor: default;
+}
+
+.party-detail-byom img {
+  object-fit: contain;
+  border-radius: 0;
+  background: transparent;
+}
+
+.party-byom-field {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.party-byom-toggle {
+  width: fit-content;
+  min-width: 5.5rem;
+}
+
+.party-byom-toggle.active {
+  border-color: color-mix(in srgb, var(--rose-glow) 55%, transparent);
+  color: var(--ink);
 }
 
 .party-detail-side {

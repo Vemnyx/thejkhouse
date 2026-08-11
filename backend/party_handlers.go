@@ -106,6 +106,7 @@ type createPartyRequest struct {
 	ThemeAccent     string `json:"themeAccent"`
 	ThemeBackground string `json:"themeBackground"`
 	ThemeFont       string `json:"themeFont"`
+	Byom            bool   `json:"byom"`
 }
 
 type partyAttendeeRequest struct {
@@ -188,6 +189,7 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 		normalizePartyThemeColor(req.ThemeAccent, defaultPartyThemeAccent),
 		normalizePartyThemeColor(req.ThemeBackground, defaultPartyThemeBackground),
 		normalizePartyThemeFont(req.ThemeFont),
+		req.Byom,
 	)
 	if err != nil {
 		log.Error("party create", "error", err)
@@ -312,6 +314,7 @@ func (s *apiServer) handlePartyByID(w http.ResponseWriter, r *http.Request) {
 			normalizePartyThemeColor(req.ThemeAccent, defaultPartyThemeAccent),
 			normalizePartyThemeColor(req.ThemeBackground, defaultPartyThemeBackground),
 			normalizePartyThemeFont(req.ThemeFont),
+			req.Byom,
 		)
 		if err != nil {
 			if isNotFound(err) {

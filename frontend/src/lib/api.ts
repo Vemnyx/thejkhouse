@@ -66,6 +66,7 @@ export type PartyRecord = {
   themeAccent: string;
   themeBackground: string;
   themeFont: string;
+  byom: boolean;
 };
 
 export const DEFAULT_PARTY_THEME_PRIMARY = "#f2b8c4";
@@ -262,6 +263,7 @@ export type CreatePartyPayload = {
   themeAccent?: string;
   themeBackground?: string;
   themeFont?: string;
+  byom?: boolean;
 };
 
 export type MediaSearchType = "image" | "gif";

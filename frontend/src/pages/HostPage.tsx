@@ -196,6 +196,7 @@ export default function HostPage() {
   const [partyHour, setPartyHour] = useState("7");
   const [partyMinute, setPartyMinute] = useState("00");
   const [partyPeriod, setPartyPeriod] = useState<(typeof partyPeriods)[number]>("PM");
+  const [partyByom, setPartyByom] = useState(false);
   const [partyDateModalOpen, setPartyDateModalOpen] = useState(false);
   const [partyCalendarDate, setPartyCalendarDate] = useState(() => dateFromInputValue(""));
   const [partySummary, setPartySummary] = useState("");
@@ -557,6 +558,7 @@ export default function HostPage() {
     setPartyHour("7");
     setPartyMinute("00");
     setPartyPeriod("PM");
+    setPartyByom(false);
     setPartySummary("");
     setPartySummaryRevisionBackup(null);
     setRevisingPartySummary(false);
@@ -732,6 +734,7 @@ export default function HostPage() {
     setPartyHour(parts.hour);
     setPartyMinute(parts.minute);
     setPartyPeriod(parts.period);
+    setPartyByom(Boolean(party.byom));
     setPartySummary(party.summary || "");
     setPartyThemePrimary(party.themePrimary || DEFAULT_PARTY_THEME_PRIMARY);
     setPartyThemeAccent(party.themeAccent || DEFAULT_PARTY_THEME_ACCENT);
@@ -779,6 +782,7 @@ export default function HostPage() {
         themeAccent: normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT),
         themeBackground: normalizePartyThemeHex(partyThemeBackground, DEFAULT_PARTY_THEME_BACKGROUND),
         themeFont: normalizePartyThemeFont(partyThemeFont),
+        byom: partyByom,
       });
       setParties((current) => sortPartiesByDate([party, ...current]));
       setPartySetupModalOpen(false);
@@ -1729,6 +1733,7 @@ export default function HostPage() {
         themeAccent: normalizePartyThemeHex(partyThemeAccent, DEFAULT_PARTY_THEME_ACCENT),
         themeBackground: normalizePartyThemeHex(partyThemeBackground, DEFAULT_PARTY_THEME_BACKGROUND),
         themeFont: normalizePartyThemeFont(partyThemeFont),
+        byom: partyByom,
       };
       if (partyView === "edit" && editingParty) {
         const party = await updateParty(token, editingParty.id, payload);
@@ -2925,6 +2930,18 @@ export default function HostPage() {
                       {formatPartyDateTime(partyDate, partyHour, partyMinute, partyPeriod)}
                     </button>
                   </div>
+                  <label className="auth-field party-byom-field">
+                    <span>B.Y.O.M (Bring Your Own Meat)</span>
+                    <button
+                      className={partyByom ? "auth-secondary party-byom-toggle active" : "auth-secondary party-byom-toggle"}
+                      type="button"
+                      role="switch"
+                      aria-checked={partyByom}
+                      onClick={() => setPartyByom((current) => !current)}
+                    >
+                      {partyByom ? "Yes" : "No"}
+                    </button>
+                  </label>
                 </>
               ) : null}
 

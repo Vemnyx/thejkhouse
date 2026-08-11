@@ -1,0 +1,2 @@
+ALTER TABLE parties
+ADD COLUMN IF NOT EXISTS byom boolean NOT NULL DEFAULT false;

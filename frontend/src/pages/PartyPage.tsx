@@ -23,7 +23,9 @@ const spotifyPlaylistUrl =
 
 const venmoLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/venmo.png";
 const paypalLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/paypal.png";
-const spotifyLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/spotify.png";
+const spotifyLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/spotify.png?v=2";
+const byomYesLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/byom-yes.png";
+const byomNoLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/byom-no.png";
 
 export default function PartyPage() {
   const { partyId } = useParams();
@@ -192,6 +194,20 @@ export default function PartyPage() {
 
                 <section className="party-detail-extras" aria-label="Party extras">
                   <div className="party-detail-extra">
+                    <div className="party-detail-link party-detail-link-featured party-detail-byom" role="status">
+                      <img src={party.byom ? byomYesLogoUrl : byomNoLogoUrl} alt="" />
+                      <span>B.Y.O.M (Bring Your Own Meat)</span>
+                    </div>
+                  </div>
+
+                  <div className="party-detail-extra">
+                    <a className="party-detail-link party-detail-link-featured" href={spotifyPlaylistUrl} target="_blank" rel="noreferrer">
+                      <img src={spotifyLogoUrl} alt="" />
+                      <span>Add to the party playlist!</span>
+                    </a>
+                  </div>
+
+                  <div className="party-detail-extra">
                     <h2>Donate to the cause</h2>
                     <div className="party-detail-links">
                       <a className="party-detail-link" href={venmoUrl} target="_blank" rel="noreferrer">
@@ -203,13 +219,6 @@ export default function PartyPage() {
                         <span>Paypal</span>
                       </a>
                     </div>
-                  </div>
-
-                  <div className="party-detail-extra">
-                    <a className="party-detail-link party-detail-link-title" href={spotifyPlaylistUrl} target="_blank" rel="noreferrer">
-                      <img src={spotifyLogoUrl} alt="" />
-                      <span>Add to the party playlist!</span>
-                    </a>
                   </div>
                 </section>
               </div>
