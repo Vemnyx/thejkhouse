@@ -492,6 +492,12 @@ export function deleteParty(token: string, id: number) {
   });
 }
 
+export function sendPartyInvite(token: string, id: number) {
+  return apiFetch<{ sent: number }>(`/parties/${id}/invite`, token, {
+    method: "POST",
+  });
+}
+
 export function listPartyAttendees(token: string, partyId: number) {
   return apiFetch<PartyAttendeeRecord[] | null>(`/parties/${partyId}/attendees`, token).then(
     (attendees) => attendees ?? [],

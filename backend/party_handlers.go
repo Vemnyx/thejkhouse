@@ -195,8 +195,6 @@ func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go s.sendPartyCreatedInvites(party)
-
 	writeJSON(w, party)
 }
 
@@ -228,6 +226,10 @@ func (s *apiServer) handlePartyByID(w http.ResponseWriter, r *http.Request) {
 
 	if len(parts) >= 2 && parts[1] == "attendees" {
 		s.handlePartyAttendees(w, r, id, user, parts[2:])
+		return
+	}
+	if len(parts) >= 2 && parts[1] == "invite" {
+		s.handleSendPartyInvite(w, r, id, user)
 		return
 	}
 	if len(parts) > 1 {
@@ -563,9 +565,46 @@ func (s *apiServer) handleDeletePartyAttendee(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *apiServer) sendPartyCreatedInvites(party Party) {
-	if s.email == nil {
+func (s *apiServer) handleSendPartyInvite(w http.ResponseWriter, r *http.Request, partyID int64, user *User) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
 		return
+	}
+	if user.Role != RoleHost {
+		writeError(w, http.StatusForbidden, "host access is required")
+		return
+	}
+	if s.email == nil {
+		writeError(w, http.StatusServiceUnavailable, "email is not configured")
+		return
+	}
+
+	party, err := s.store.getPartyByID(r.Context(), partyID)
+	if err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusNotFound, "party not found")
+			return
+		}
+		log.Error("party invite load", "error", err, "party_id", partyID)
+		writeError(w, http.StatusInternalServerError, "failed to load party")
+		return
+	}
+
+	sent, err := s.sendPartyInvites(party)
+	if err != nil {
+		log.Error("party invite send", "error", err, "party_id", partyID)
+		writeError(w, http.StatusInternalServerError, "failed to send party invites")
+		return
+	}
+
+	writeJSON(w, map[string]any{
+		"sent": sent,
+	})
+}
+
+func (s *apiServer) sendPartyInvites(party Party) (int, error) {
+	if s.email == nil {
+		return 0, nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -573,8 +612,7 @@ func (s *apiServer) sendPartyCreatedInvites(party Party) {
 
 	users, err := s.store.listUsers(ctx)
 	if err != nil {
-		log.Error("party create invites list users", "error", err, "party_id", party.ID)
-		return
+		return 0, err
 	}
 
 	subject := partyCreatedInviteSubject(party)
@@ -595,13 +633,13 @@ func (s *apiServer) sendPartyCreatedInvites(party Party) {
 		htmlBody, textBody := partyInviteEmail(party, greetingName, cta)
 		emailID, err := s.email.send(ctx, []string{testOnly}, subject, htmlBody, textBody)
 		if err != nil {
-			log.Error("party create invite send", "error", err, "party_id", party.ID, "to", testOnly)
-			return
+			return 0, err
 		}
-		log.Info("party create invite sent (test mode)", "email_id", emailID, "party_id", party.ID, "to", testOnly)
-		return
+		log.Info("party invite sent (test mode)", "email_id", emailID, "party_id", party.ID, "to", testOnly)
+		return 1, nil
 	}
 
+	sent := 0
 	for _, user := range users {
 		to := strings.TrimSpace(user.Email)
 		if to == "" {
@@ -614,11 +652,13 @@ func (s *apiServer) sendPartyCreatedInvites(party Party) {
 		htmlBody, textBody := partyInviteEmail(party, user.FirstName, cta)
 		emailID, err := s.email.send(ctx, []string{to}, subject, htmlBody, textBody)
 		if err != nil {
-			log.Error("party create invite send", "error", err, "party_id", party.ID, "to", to)
+			log.Error("party invite send", "error", err, "party_id", party.ID, "to", to)
 			continue
 		}
-		log.Info("party create invite sent", "email_id", emailID, "party_id", party.ID, "to", to)
+		sent++
+		log.Info("party invite sent", "email_id", emailID, "party_id", party.ID, "to", to)
 	}
+	return sent, nil
 }
 
 func (s *apiServer) sendPartyPlusOneInvite(party Party, firstName, email string) {

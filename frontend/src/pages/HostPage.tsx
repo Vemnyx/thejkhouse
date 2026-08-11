@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, revisePartySummary, saveMediaFromURL, sendHostEmail, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, revisePartySummary, saveMediaFromURL, sendHostEmail, sendPartyInvite, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 import { isGifMediaItem, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, searchPartyMedia } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
@@ -269,6 +269,7 @@ export default function HostPage() {
   const [updatingHomepageId, setUpdatingHomepageId] = useState<number | null>(null);
   const [updatingImageTags, setUpdatingImageTags] = useState(false);
   const [deletingPartyId, setDeletingPartyId] = useState<number | null>(null);
+  const [sendingPartyInviteId, setSendingPartyInviteId] = useState<number | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -1544,6 +1545,35 @@ export default function HostPage() {
     }
   };
 
+  const handleSendPartyInvite = async (party: PartyRecord) => {
+    if (!firebaseUser || sendingPartyInviteId != null) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Send the invite email for "${party.label}" now?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+    setPartySuccess("");
+    setSendingPartyInviteId(party.id);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const result = await sendPartyInvite(token, party.id);
+      setPartySuccess(
+        result.sent === 1
+          ? `Invite sent for ${party.label}.`
+          : `Invite sent to ${result.sent} recipients for ${party.label}.`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to send party invite";
+      setError(message);
+    } finally {
+      setSendingPartyInviteId(null);
+    }
+  };
+
   const handleDeleteEvent = async (event: EventRecord) => {
     if (!firebaseUser) {
       return;
@@ -2342,6 +2372,17 @@ export default function HostPage() {
                             <td>{party.label}</td>
                             <td>{formatDateTime(party.date)}</td>
                             <td className="party-row-actions">
+                              <button
+                                className="auth-secondary table-action-button"
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleSendPartyInvite(party);
+                                }}
+                                disabled={sendingPartyInviteId === party.id}
+                              >
+                                {sendingPartyInviteId === party.id ? "Sending..." : "Send Invite"}
+                              </button>
                               <button
                                 className="auth-secondary table-action-button"
                                 type="button"

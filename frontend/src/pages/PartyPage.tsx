@@ -16,6 +16,15 @@ import {
 
 const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519";
 
+const venmoUrl = "https://venmo.com/u/Jacob-Lantz-5";
+const paypalUrl = "https://www.paypal.me/JacobLantz271";
+const spotifyPlaylistUrl =
+  "https://open.spotify.com/playlist/45BvibK2MJxZbC4OK0d4nH?si=SoQszkZETP6AtgP8y28gZg&utm_source=copy-link&pi=YxIHCyYFRvq9Y";
+
+const venmoLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/venmo.png";
+const paypalLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/paypal.png";
+const spotifyLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/spotify.png";
+
 export default function PartyPage() {
   const { partyId } = useParams();
   const { appUser, firebaseUser } = useAuth();
@@ -180,6 +189,29 @@ export default function PartyPage() {
             <div className="party-detail-body">
               <div className="party-detail-main">
                 {party.summary ? <p className="party-detail-summary">{party.summary}</p> : null}
+
+                <section className="party-detail-extras" aria-label="Party extras">
+                  <div className="party-detail-extra">
+                    <h2>Donate to the cause</h2>
+                    <div className="party-detail-links">
+                      <a className="party-detail-link" href={venmoUrl} target="_blank" rel="noreferrer">
+                        <img src={venmoLogoUrl} alt="" />
+                        <span>Venmo</span>
+                      </a>
+                      <a className="party-detail-link" href={paypalUrl} target="_blank" rel="noreferrer">
+                        <img src={paypalLogoUrl} alt="" />
+                        <span>Paypal</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="party-detail-extra">
+                    <a className="party-detail-link party-detail-link-title" href={spotifyPlaylistUrl} target="_blank" rel="noreferrer">
+                      <img src={spotifyLogoUrl} alt="" />
+                      <span>Add to the party playlist!</span>
+                    </a>
+                  </div>
+                </section>
               </div>
 
               <aside className="party-detail-side">
