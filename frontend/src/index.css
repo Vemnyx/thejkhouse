@@ -1701,10 +1701,7 @@ body {
 }
 
 .party-themed {
-  --party-theme-primary: var(--rose-pale);
-  --party-theme-accent: var(--gold);
-  --party-theme-background: var(--black);
-  --party-theme-font: var(--decorative-font);
+  /* Marker class — theme vars are set via inline style or inherited from a themed ancestor. */
 }
 
 .party-accordion-group {
@@ -1993,7 +1990,7 @@ body {
       color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 18%, transparent)
     ),
     rgba(3, 3, 3, 0.35);
-  color: var(--gold);
+  color: var(--party-theme-accent, var(--gold));
   font-size: 0.92rem;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -2013,9 +2010,9 @@ body {
 }
 
 .party-detail-topbar .party-rsvp-button {
-  padding: 0.7rem 2.3rem;
-  font-size: 0.92rem;
-  border-radius: 0.75rem;
+  padding: 0.85rem 2.65rem;
+  font-size: 1rem;
+  border-radius: 0.8rem;
 }
 
 .party-rsvp-modal {
@@ -2048,7 +2045,7 @@ body {
     linear-gradient(180deg, color-mix(in srgb, var(--party-theme-background) 88%, #000), var(--party-theme-background));
 }
 
-.party-detail-card.party-themed {
+.gothic-card.party-detail-card.party-themed {
   border-color: color-mix(in srgb, var(--party-theme-primary) 28%, transparent);
   background:
     linear-gradient(160deg, color-mix(in srgb, var(--party-theme-primary) 10%, transparent), transparent 46%),
@@ -2057,6 +2054,10 @@ body {
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--party-theme-primary) 10%, transparent),
     0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.party-detail-card.party-themed .card-frame {
+  border-color: color-mix(in srgb, var(--party-theme-accent) 22%, transparent);
 }
 
 .party-detail-card.party-themed .corner {
@@ -2081,38 +2082,42 @@ body {
   gap: 1.75rem;
 }
 
-.party-detail-view.party-themed {
+.party-detail-card.party-themed .party-detail-view,
+.party-form.party-detail-view.party-themed {
   padding: 1.25rem;
   border-radius: 1rem;
   border: 1px solid color-mix(in srgb, var(--party-theme-primary) 18%, transparent);
   background:
     linear-gradient(160deg, color-mix(in srgb, var(--party-theme-primary) 8%, transparent), transparent 48%),
     color-mix(in srgb, var(--party-theme-background) 72%, transparent);
+  color: color-mix(in srgb, var(--party-theme-primary) 35%, #f4f0fa);
 }
 
 .party-detail-header {
   display: flex;
-  flex-wrap: wrap;
-  align-items: start;
-  gap: 1.25rem 2.25rem;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 1rem 1.5rem;
 }
 
 .party-detail-header h1 {
   margin: 0;
-  width: max-content;
+  flex: 1;
+  min-width: 0;
   max-width: 100%;
   color: var(--party-theme-primary, var(--rose-pale));
   font-family: var(--party-theme-font, var(--decorative-font));
-  font-size: clamp(1.5rem, 4vw, 2.6rem);
+  font-size: clamp(1.25rem, 2.8vw, 1.85rem);
   letter-spacing: 0.08em;
 }
 
 .party-detail-meta {
   display: grid;
-  grid-template-columns: repeat(2, minmax(10rem, 13rem));
+  grid-template-columns: repeat(2, minmax(9rem, 12rem));
   gap: 0.65rem;
   width: max-content;
   max-width: 100%;
+  flex-shrink: 0;
 }
 
 .party-detail-meta article {
@@ -2172,7 +2177,7 @@ body {
 
 .party-signup-sheet-button {
   width: 50%;
-  margin-top: 1.35rem;
+  margin-top: 2.25rem;
   margin-bottom: 0.85rem;
   border: 1px solid color-mix(in srgb, var(--party-theme-accent, var(--gold)) 45%, transparent);
   border-radius: 0.9rem;
@@ -2184,7 +2189,7 @@ body {
       color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 18%, transparent)
     ),
     rgba(3, 3, 3, 0.35);
-  color: var(--gold);
+  color: var(--party-theme-accent, var(--gold));
   font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: 0.16em;
@@ -2288,17 +2293,18 @@ body {
 
 .party-detail-media {
   min-width: 0;
-  display: flex;
-  justify-content: flex-start;
+  width: 100%;
+  display: block;
 }
 
 .party-detail-media img {
   display: block;
-  width: auto;
+  width: 100%;
   max-width: 100%;
+  height: auto;
   max-height: 28rem;
-  object-fit: contain;
-  object-position: top left;
+  object-fit: cover;
+  object-position: center;
   border-radius: 0.85rem;
   border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 20%, transparent);
   box-shadow: 0 12px 32px color-mix(in srgb, var(--party-theme-background, #000) 55%, transparent);
@@ -2914,7 +2920,7 @@ body {
   box-shadow: none;
   color: var(--party-theme-primary, var(--rose-pale));
   font-family: var(--party-theme-font, var(--decorative-font));
-  font-size: clamp(1.5rem, 4vw, 2.6rem);
+  font-size: clamp(1.25rem, 2.8vw, 1.85rem);
   font-weight: 400;
   letter-spacing: 0.08em;
   line-height: 1.2;
@@ -4449,7 +4455,7 @@ body {
   }
 
   .party-detail-media img {
-    object-position: top left;
+    object-position: center;
     max-height: 22rem;
   }
 
