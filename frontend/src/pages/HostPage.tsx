@@ -2519,6 +2519,19 @@ export default function HostPage() {
                           required
                         />
                       </label>
+
+                      <label className="auth-field party-byom-field">
+                        <span>B.Y.O.M.O.M.S (Bring Your Own Meat Or Meat Substitute)</span>
+                        <button
+                          className={partyByom ? "auth-secondary party-byom-toggle active" : "auth-secondary party-byom-toggle"}
+                          type="button"
+                          role="switch"
+                          aria-checked={partyByom}
+                          onClick={() => setPartyByom((current) => !current)}
+                        >
+                          {partyByom ? "Yes" : "No"}
+                        </button>
+                      </label>
                     </div>
 
                     <aside className="party-detail-side">

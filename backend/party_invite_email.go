@@ -11,9 +11,6 @@ import (
 
 const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519"
 
-// TODO: remove before launch — party invite emails only go to this address while testing.
-const partyInviteTestOnlyEmail = "programmerjake95@gmail.com"
-
 type partyInviteCTA struct {
 	Label string
 	URL   string
