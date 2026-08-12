@@ -110,13 +110,25 @@ type createPartyRequest struct {
 }
 
 type partyAttendeeRequest struct {
-	UserID    *int64          `json:"userId"`
-	FirstName string          `json:"firstName"`
-	LastName  string          `json:"lastName"`
-	Email     string          `json:"email"`
-	PlusOneOf *int64          `json:"plusOneOf"`
-	Note      string          `json:"note"`
-	Metadata  json.RawMessage `json:"metadata"`
+	UserID     *int64          `json:"userId"`
+	FirstName  string          `json:"firstName"`
+	LastName   string          `json:"lastName"`
+	Email      string          `json:"email"`
+	PlusOneOf  *int64          `json:"plusOneOf"`
+	Note       string          `json:"note"`
+	RsvpStatus PartyRsvpStatus `json:"rsvpStatus"`
+	Metadata   json.RawMessage `json:"metadata"`
+}
+
+func normalizePartyRsvpStatus(status PartyRsvpStatus) PartyRsvpStatus {
+	status = PartyRsvpStatus(strings.TrimSpace(string(status)))
+	if status == "" {
+		return PartyRsvpStatusGoing
+	}
+	if !status.Valid() {
+		return ""
+	}
+	return status
 }
 
 func (s *apiServer) handleParties(w http.ResponseWriter, r *http.Request) {
@@ -228,6 +240,10 @@ func (s *apiServer) handlePartyByID(w http.ResponseWriter, r *http.Request) {
 
 	if len(parts) >= 2 && parts[1] == "attendees" {
 		s.handlePartyAttendees(w, r, id, user, parts[2:])
+		return
+	}
+	if len(parts) >= 2 && parts[1] == "signup-items" {
+		s.handlePartySignupItems(w, r, id, user, parts[2:])
 		return
 	}
 	if len(parts) >= 2 && parts[1] == "invite" {
@@ -408,6 +424,11 @@ func (s *apiServer) handleCreatePartyAttendee(w http.ResponseWriter, r *http.Req
 
 	isSelfRSVP := req.UserID == nil && req.PlusOneOf == nil && firstName == "" && lastName == "" && email == ""
 	if isSelfRSVP {
+		rsvpStatus := normalizePartyRsvpStatus(req.RsvpStatus)
+		if rsvpStatus == "" {
+			writeError(w, http.StatusBadRequest, "invalid rsvpStatus")
+			return
+		}
 		attendee, err := s.store.upsertPartyAttendeeForUser(
 			r.Context(),
 			partyID,
@@ -416,12 +437,18 @@ func (s *apiServer) handleCreatePartyAttendee(w http.ResponseWriter, r *http.Req
 			strings.TrimSpace(user.LastName),
 			strings.TrimSpace(user.Email),
 			note,
+			rsvpStatus,
 			req.Metadata,
 		)
 		if err != nil {
 			log.Error("party self rsvp", "error", err, "party_id", partyID, "user_id", user.ID)
 			writeError(w, http.StatusInternalServerError, "failed to RSVP")
 			return
+		}
+		if rsvpStatus != PartyRsvpStatusGoing {
+			if err := s.store.deletePartyAttendeePlusOnes(r.Context(), attendee.ID); err != nil {
+				log.Error("party self rsvp plus-one cleanup", "error", err, "attendee_id", attendee.ID)
+			}
 		}
 		writeJSONStatus(w, http.StatusCreated, attendee)
 		return
@@ -444,6 +471,10 @@ func (s *apiServer) handleCreatePartyAttendee(w http.ResponseWriter, r *http.Req
 	}
 	if hostAttendee.PartyID != partyID {
 		writeError(w, http.StatusBadRequest, "host attendee is not for this party")
+		return
+	}
+	if hostAttendee.RsvpStatus != PartyRsvpStatusGoing {
+		writeError(w, http.StatusBadRequest, "guest invites are only available when you are going")
 		return
 	}
 	if user.Role != RoleHost {
@@ -568,6 +599,229 @@ func (s *apiServer) handleDeletePartyAttendee(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type partySignupItemRequest struct {
+	Label       *string `json:"label"`
+	Note        *string `json:"note"`
+	HostCreated bool    `json:"hostCreated"`
+	Claim       *bool   `json:"claim"`
+}
+
+func (s *apiServer) handlePartySignupItems(w http.ResponseWriter, r *http.Request, partyID int64, user *User, rest []string) {
+	if _, err := s.store.getPartyByID(r.Context(), partyID); err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusNotFound, "party not found")
+			return
+		}
+		log.Error("party signup items party load", "error", err, "party_id", partyID)
+		writeError(w, http.StatusInternalServerError, "failed to load party")
+		return
+	}
+
+	if len(rest) == 0 {
+		switch r.Method {
+		case http.MethodGet:
+			items, err := s.store.listPartySignupItems(r.Context(), partyID)
+			if err != nil {
+				log.Error("party signup items list", "error", err, "party_id", partyID)
+				writeError(w, http.StatusInternalServerError, "failed to load signup items")
+				return
+			}
+			writeJSON(w, items)
+		case http.MethodPost:
+			s.handleCreatePartySignupItem(w, r, partyID, user)
+		default:
+			methodNotAllowed(w)
+		}
+		return
+	}
+
+	if len(rest) != 1 {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+
+	itemID, err := strconv.ParseInt(rest[0], 10, 64)
+	if err != nil || itemID < 1 {
+		writeError(w, http.StatusBadRequest, "invalid signup item id")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPatch:
+		s.handleUpdatePartySignupItem(w, r, partyID, itemID, user)
+	case http.MethodDelete:
+		s.handleDeletePartySignupItem(w, r, partyID, itemID, user)
+	default:
+		methodNotAllowed(w)
+	}
+}
+
+func (s *apiServer) handleCreatePartySignupItem(w http.ResponseWriter, r *http.Request, partyID int64, user *User) {
+	var req partySignupItemRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		writeError(w, http.StatusBadRequest, "invalid signup item request")
+		return
+	}
+
+	label := ""
+	if req.Label != nil {
+		label = strings.TrimSpace(*req.Label)
+	}
+	note := ""
+	if req.Note != nil {
+		note = strings.TrimSpace(*req.Note)
+	}
+	if len(label) > 120 {
+		writeError(w, http.StatusBadRequest, "item must be 120 characters or fewer")
+		return
+	}
+	if len(note) > 2000 {
+		writeError(w, http.StatusBadRequest, "note must be 2000 characters or fewer")
+		return
+	}
+
+	var userID *int64
+	hostCreated := req.HostCreated
+	if hostCreated {
+		if user.Role != RoleHost {
+			writeError(w, http.StatusForbidden, "host access is required")
+			return
+		}
+	} else {
+		userID = &user.ID
+	}
+
+	item, err := s.store.createPartySignupItem(r.Context(), partyID, userID, label, note, hostCreated)
+	if err != nil {
+		log.Error("party signup item create", "error", err, "party_id", partyID)
+		writeError(w, http.StatusInternalServerError, "failed to add signup item")
+		return
+	}
+
+	writeJSONStatus(w, http.StatusCreated, item)
+}
+
+func (s *apiServer) handleUpdatePartySignupItem(w http.ResponseWriter, r *http.Request, partyID, itemID int64, user *User) {
+	var req partySignupItemRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		writeError(w, http.StatusBadRequest, "invalid signup item request")
+		return
+	}
+
+	item, err := s.store.getPartySignupItemByID(r.Context(), itemID)
+	if err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusNotFound, "signup item not found")
+			return
+		}
+		log.Error("party signup item load", "error", err, "item_id", itemID)
+		writeError(w, http.StatusInternalServerError, "failed to load signup item")
+		return
+	}
+	if item.PartyID != partyID {
+		writeError(w, http.StatusNotFound, "signup item not found")
+		return
+	}
+
+	ownsItem := item.UserID != nil && *item.UserID == user.ID
+	isHost := user.Role == RoleHost
+	nextUserID := item.UserID
+	nextLabel := item.Label
+	nextNote := item.Note
+
+	if req.Claim != nil && *req.Claim {
+		if item.UserID != nil && *item.UserID != user.ID {
+			writeError(w, http.StatusConflict, "that item is already claimed")
+			return
+		}
+		nextUserID = &user.ID
+		ownsItem = true
+	}
+
+	if req.Label != nil {
+		label := strings.TrimSpace(*req.Label)
+		if len(label) > 120 {
+			writeError(w, http.StatusBadRequest, "item must be 120 characters or fewer")
+			return
+		}
+		if item.HostCreated {
+			if !isHost || item.UserID != nil {
+				writeError(w, http.StatusForbidden, "host items cannot be changed")
+				return
+			}
+		}
+		if !ownsItem && !isHost {
+			writeError(w, http.StatusForbidden, "you can only edit your own items")
+			return
+		}
+		nextLabel = label
+	}
+
+	if req.Note != nil {
+		note := strings.TrimSpace(*req.Note)
+		if len(note) > 2000 {
+			writeError(w, http.StatusBadRequest, "note must be 2000 characters or fewer")
+			return
+		}
+		if item.UserID == nil && !isHost && (req.Claim == nil || !*req.Claim) {
+			writeError(w, http.StatusForbidden, "claim this item before adding a note")
+			return
+		}
+		if !ownsItem && !isHost {
+			writeError(w, http.StatusForbidden, "you can only edit your own notes")
+			return
+		}
+		nextNote = note
+	}
+
+	updated, err := s.store.updatePartySignupItem(r.Context(), item.ID, nextUserID, nextLabel, nextNote)
+	if err != nil {
+		log.Error("party signup item update", "error", err, "item_id", itemID)
+		writeError(w, http.StatusInternalServerError, "failed to update signup item")
+		return
+	}
+
+	writeJSON(w, updated)
+}
+
+func (s *apiServer) handleDeletePartySignupItem(w http.ResponseWriter, r *http.Request, partyID, itemID int64, user *User) {
+	item, err := s.store.getPartySignupItemByID(r.Context(), itemID)
+	if err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusNotFound, "signup item not found")
+			return
+		}
+		log.Error("party signup item load", "error", err, "item_id", itemID)
+		writeError(w, http.StatusInternalServerError, "failed to load signup item")
+		return
+	}
+	if item.PartyID != partyID {
+		writeError(w, http.StatusNotFound, "signup item not found")
+		return
+	}
+
+	canDelete := user.Role == RoleHost
+	if !canDelete && !item.HostCreated && item.UserID != nil && *item.UserID == user.ID {
+		canDelete = true
+	}
+	if !canDelete {
+		writeError(w, http.StatusForbidden, "forbidden")
+		return
+	}
+
+	if err := s.store.deletePartySignupItem(r.Context(), itemID); err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusNotFound, "signup item not found")
+			return
+		}
+		log.Error("party signup item delete", "error", err, "item_id", itemID)
+		writeError(w, http.StatusInternalServerError, "failed to delete signup item")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *apiServer) handleSendPartyInvite(w http.ResponseWriter, r *http.Request, partyID int64, user *User) {
 	if r.Method != http.MethodPost {
 		methodNotAllowed(w)
@@ -621,7 +875,7 @@ func (s *apiServer) sendPartyInvites(party Party) (int, error) {
 	subject := partyCreatedInviteSubject(party)
 	cta := partyInviteCTA{
 		Label: "RSVP",
-		URL:   partyDetailURL(party),
+		URL:   partyRsvpURL(party),
 	}
 
 	if testOnly := strings.TrimSpace(partyInviteTestOnlyEmail); testOnly != "" {

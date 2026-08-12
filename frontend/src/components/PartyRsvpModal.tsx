@@ -4,13 +4,14 @@ import {
   AppUser,
   PartyAttendeeRecord,
   PartyRecord,
+  PartyRsvpStatus,
   addPartyAttendee,
   listPartyAttendees,
 } from "../lib/api";
 
 const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519";
 
-type RsvpModalView = "rsvp" | "guest";
+type RsvpModalView = "choice" | "going" | "guest";
 
 type PartyRsvpModalProps = {
   party: PartyRecord;
@@ -21,7 +22,7 @@ type PartyRsvpModalProps = {
 
 export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdated }: PartyRsvpModalProps) {
   const { appUser, firebaseUser } = useAuth();
-  const [rsvpView, setRsvpView] = useState<RsvpModalView>("rsvp");
+  const [rsvpView, setRsvpView] = useState<RsvpModalView>("choice");
   const [rsvpAttendees, setRsvpAttendees] = useState<PartyAttendeeRecord[]>([]);
   const [rsvpMyAttendee, setRsvpMyAttendee] = useState<PartyAttendeeRecord | null>(null);
   const [rsvpLoading, setRsvpLoading] = useState(true);
@@ -44,12 +45,14 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
     [users],
   );
 
+  const isGoing = rsvpMyAttendee?.rsvpStatus === "going";
+
   const myRsvpGuests = useMemo(() => {
-    if (!rsvpMyAttendee) {
+    if (!rsvpMyAttendee || !isGoing) {
       return [];
     }
     return rsvpAttendees.filter((attendee) => attendee.plusOneOf === rsvpMyAttendee.id);
-  }, [rsvpAttendees, rsvpMyAttendee]);
+  }, [rsvpAttendees, rsvpMyAttendee, isGoing]);
 
   const refreshRsvpAttendees = async (token: string) => {
     const attendees = await listPartyAttendees(token, party.id);
@@ -109,7 +112,35 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
     onClose();
   };
 
-  const confirmRsvp = async () => {
+  const submitRsvpStatus = async (status: PartyRsvpStatus) => {
+    if (!firebaseUser || rsvpLoading || rsvpSubmitting) {
+      return;
+    }
+
+    if (status === "going") {
+      setRsvpView("going");
+      setRsvpError("");
+      setRsvpSuccess("");
+      return;
+    }
+
+    setRsvpError("");
+    setRsvpSuccess("");
+    setRsvpSubmitting(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      await addPartyAttendee(token, party.id, { rsvpStatus: status });
+      await refreshRsvpAttendees(token);
+      onClose();
+    } catch (err) {
+      const nextError = err instanceof Error ? err.message : "failed to save RSVP";
+      setRsvpError(nextError);
+    } finally {
+      setRsvpSubmitting(false);
+    }
+  };
+
+  const confirmGoingRsvp = async () => {
     if (!firebaseUser || rsvpLoading || rsvpSubmitting) {
       return;
     }
@@ -119,8 +150,14 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
     setRsvpSubmitting(true);
     try {
       const token = await firebaseUser.getIdToken();
-      await addPartyAttendee(token, party.id, { note: rsvpNote.trim() || undefined });
-      await refreshRsvpAttendees(token);
+      await addPartyAttendee(token, party.id, {
+        rsvpStatus: "going",
+        note: rsvpNote.trim() || undefined,
+      });
+      const { mine } = await refreshRsvpAttendees(token);
+      if (mine?.rsvpStatus === "going") {
+        setRsvpSuccess("You're on the list.");
+      }
     } catch (err) {
       const nextError = err instanceof Error ? err.message : "failed to RSVP";
       setRsvpError(nextError);
@@ -130,7 +167,7 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
   };
 
   const openInviteGuestView = () => {
-    if (!rsvpMyAttendee) {
+    if (!rsvpMyAttendee || !isGoing) {
       setRsvpError("Confirm your RSVP before inviting a guest.");
       return;
     }
@@ -147,7 +184,7 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
     event.preventDefault();
     setRsvpError("");
     setRsvpSuccess("");
-    if (!firebaseUser || !rsvpMyAttendee) {
+    if (!firebaseUser || !rsvpMyAttendee || !isGoing) {
       setRsvpError("RSVP first before inviting a guest.");
       return;
     }
@@ -170,7 +207,7 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
         : { firstName, lastName, email: email || undefined, plusOneOf: rsvpMyAttendee.id };
       await addPartyAttendee(token, party.id, payload);
       await refreshRsvpAttendees(token);
-      setRsvpView("rsvp");
+      setRsvpView("going");
       setRsvpSuccess("Guest invited.");
       setGuestUserId("");
       setGuestFirstName("");
@@ -184,6 +221,9 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
     }
   };
 
+  const modalTitle =
+    rsvpView === "guest" ? "Select Guest" : rsvpView === "going" ? `RSVP to attend ${party.label}` : `RSVP to ${party.label}`;
+
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={closeModal}>
       <section
@@ -195,14 +235,52 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
       >
         <div className="modal-header">
           <h2 className="host-section-title" id="party-rsvp-title">
-            {rsvpView === "guest" ? "Select Guest" : `RSVP to attend ${party.label}`}
+            {modalTitle}
           </h2>
           <button className="modal-close" type="button" onClick={closeModal} aria-label="Close RSVP modal">
             x
           </button>
         </div>
 
-        {rsvpView === "rsvp" ? (
+        {rsvpView === "choice" ? (
+          <div className="party-rsvp-body">
+            {rsvpLoading ? <p className="dashboard-copy">Loading RSVP details...</p> : null}
+            <p className="party-overview-copy">
+              <strong>When:</strong> {formatDateTime(party.date)}
+            </p>
+            <p className="party-overview-copy">
+              <strong>Where:</strong> {partyVenueAddress}
+            </p>
+            {!rsvpLoading ? <p className="dashboard-copy">How are you feeling about this one?</p> : null}
+            {rsvpError ? <p className="auth-error">{rsvpError}</p> : null}
+            <div className="party-rsvp-choice-buttons">
+              <button
+                className="auth-submit"
+                type="button"
+                onClick={() => void submitRsvpStatus("going")}
+                disabled={rsvpLoading || rsvpSubmitting}
+              >
+                Going
+              </button>
+              <button
+                className="auth-secondary"
+                type="button"
+                onClick={() => void submitRsvpStatus("maybe")}
+                disabled={rsvpLoading || rsvpSubmitting}
+              >
+                {rsvpSubmitting ? "Saving..." : "Maybe"}
+              </button>
+              <button
+                className="auth-secondary"
+                type="button"
+                onClick={() => void submitRsvpStatus("not_going")}
+                disabled={rsvpLoading || rsvpSubmitting}
+              >
+                {rsvpSubmitting ? "Saving..." : "Not This Time"}
+              </button>
+            </div>
+          </div>
+        ) : rsvpView === "going" ? (
           <div className="party-rsvp-body">
             {rsvpLoading ? <p className="dashboard-copy">Loading RSVP details...</p> : null}
             {rsvpSubmitting && !rsvpMyAttendee ? <p className="dashboard-copy">Saving your RSVP...</p> : null}
@@ -212,23 +290,21 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
             <p className="party-overview-copy">
               <strong>Where:</strong> {partyVenueAddress}
             </p>
-            {!rsvpLoading && !rsvpSubmitting && !rsvpMyAttendee ? (
-              <p className="dashboard-copy">Confirm your RSVP below. You can invite guests after you&apos;re on the list.</p>
+            {!rsvpLoading && !isGoing ? (
+              <p className="dashboard-copy">Confirm below and invite guests if you&apos;d like.</p>
             ) : null}
-            {rsvpMyAttendee && !rsvpLoading ? <p className="host-success">You&apos;re on the list.</p> : null}
-            {!rsvpMyAttendee ? (
-              <label className="auth-field">
-                <span>Note (optional)</span>
-                <textarea
-                  value={rsvpNote}
-                  onChange={(event) => setRsvpNote(event.target.value)}
-                  placeholder="Anything the hosts should know?"
-                  rows={3}
-                  maxLength={2000}
-                  disabled={rsvpLoading || rsvpSubmitting}
-                />
-              </label>
-            ) : null}
+            {isGoing && !rsvpLoading ? <p className="host-success">You&apos;re on the list.</p> : null}
+            <label className="auth-field">
+              <span>Note (optional)</span>
+              <textarea
+                value={rsvpNote}
+                onChange={(event) => setRsvpNote(event.target.value)}
+                placeholder="Anything the hosts should know?"
+                rows={3}
+                maxLength={2000}
+                disabled={rsvpLoading || rsvpSubmitting}
+              />
+            </label>
             {myRsvpGuests.length > 0 ? (
               <div className="party-rsvp-guests">
                 <p className="host-section-title">Your guests</p>
@@ -244,21 +320,31 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
             {rsvpError ? <p className="auth-error">{rsvpError}</p> : null}
             {rsvpSuccess ? <p className="host-success">{rsvpSuccess}</p> : null}
             <div className="party-rsvp-actions">
-              {!rsvpMyAttendee ? (
-                <button
-                  className="auth-submit"
-                  type="button"
-                  onClick={() => void confirmRsvp()}
-                  disabled={rsvpLoading || rsvpSubmitting}
-                >
-                  {rsvpSubmitting ? "Confirming..." : "Confirm RSVP"}
-                </button>
-              ) : null}
               <button
-                className={rsvpMyAttendee ? "auth-submit" : "auth-secondary"}
+                className="auth-secondary"
+                type="button"
+                onClick={() => {
+                  setRsvpView("choice");
+                  setRsvpError("");
+                  setRsvpSuccess("");
+                }}
+                disabled={rsvpSubmitting}
+              >
+                Back
+              </button>
+              <button
+                className="auth-submit"
+                type="button"
+                onClick={() => void confirmGoingRsvp()}
+                disabled={rsvpLoading || rsvpSubmitting}
+              >
+                {rsvpSubmitting ? "Confirming..." : isGoing ? "Update RSVP" : "Confirm RSVP"}
+              </button>
+              <button
+                className="auth-secondary"
                 type="button"
                 onClick={openInviteGuestView}
-                disabled={rsvpLoading || rsvpSubmitting || !rsvpMyAttendee}
+                disabled={rsvpLoading || rsvpSubmitting || !isGoing}
               >
                 Invite Guest
               </button>
@@ -342,7 +428,7 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
                 className="auth-secondary"
                 type="button"
                 onClick={() => {
-                  setRsvpView("rsvp");
+                  setRsvpView("going");
                   setRsvpError("");
                 }}
                 disabled={rsvpSubmitting}

@@ -2164,6 +2164,38 @@ body {
   max-width: 42rem;
 }
 
+.party-signup-sheet-button {
+  width: 100%;
+  margin-top: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--party-theme-accent, var(--gold)) 45%, transparent);
+  border-radius: 0.9rem;
+  padding: 1.05rem 1.25rem;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--party-theme-accent, var(--gold)) 22%, transparent),
+      color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 18%, transparent)
+    ),
+    rgba(3, 3, 3, 0.35);
+  color: var(--gold);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.party-signup-sheet-button:hover {
+  border-color: color-mix(in srgb, var(--party-theme-accent, var(--gold)) 70%, transparent);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--party-theme-accent, var(--gold)) 30%, transparent),
+      color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 24%, transparent)
+    ),
+    rgba(3, 3, 3, 0.42);
+}
+
 .party-detail-extra {
   display: grid;
   gap: 0.7rem;
@@ -2215,6 +2247,7 @@ body {
 
 .party-detail-byom {
   cursor: default;
+  padding-left: 1.1rem;
 }
 
 .party-detail-byom img {
@@ -2363,6 +2396,16 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+.party-rsvp-choice-buttons {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.party-rsvp-choice-buttons .auth-submit,
+.party-rsvp-choice-buttons .auth-secondary {
+  width: 100%;
+}
+
 .party-rsvp-body {
   display: grid;
   gap: 0.85rem;
@@ -2382,6 +2425,202 @@ body {
 .party-rsvp-actions .auth-submit,
 .party-rsvp-actions .auth-secondary {
   flex: 1;
+}
+
+.party-signup-modal {
+  width: min(calc(100% - 2rem), 52rem);
+  max-width: 52rem;
+  max-height: none;
+  overflow: visible;
+  display: grid;
+  gap: 1rem;
+}
+
+.party-setup-signup {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.party-signup-table-wrap {
+  width: 100%;
+  overflow: visible;
+}
+
+.party-signup-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 32rem;
+}
+
+.party-signup-table th,
+.party-signup-table td {
+  border-bottom: 1px solid rgba(232, 120, 143, 0.16);
+  padding: 0.75rem 0.65rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.party-signup-table th {
+  color: var(--gold);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.party-signup-table td {
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+.party-signup-table input {
+  width: 100%;
+  min-width: 8rem;
+  border: 1px solid rgba(232, 120, 143, 0.28);
+  border-radius: 0.6rem;
+  background: rgba(3, 3, 3, 0.55);
+  color: var(--ink);
+  padding: 0.65rem 0.75rem;
+  font: inherit;
+}
+
+.party-signup-person {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.party-signup-avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+}
+
+.party-signup-claim-button {
+  width: auto;
+  min-width: 7.5rem;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.78rem;
+}
+
+.party-signup-unclaimed {
+  color: var(--ink-muted);
+  font-style: italic;
+  font-weight: 650;
+}
+
+.party-signup-item-locked {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.party-signup-note-cell {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.party-signup-note-readonly {
+  color: var(--ink-muted);
+}
+
+.party-signup-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.party-signup-picker {
+  position: relative;
+  min-width: 10rem;
+}
+
+.party-signup-picker-trigger {
+  width: 100%;
+  border: 1px solid rgba(232, 120, 143, 0.28);
+  border-radius: 0.6rem;
+  background: rgba(3, 3, 3, 0.55);
+  color: var(--ink);
+  padding: 0.65rem 0.75rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.party-signup-picker-trigger.placeholder {
+  color: var(--ink-muted);
+}
+
+.party-signup-picker-trigger:hover,
+.party-signup-picker-trigger[aria-expanded="true"] {
+  border-color: var(--rose-glow);
+}
+
+.party-signup-picker-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 5;
+  width: min(22rem, 70vw);
+  max-height: 18rem;
+  overflow-y: auto;
+  border: 1px solid rgba(232, 120, 143, 0.28);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--party-theme-background, #140408) 92%, #000);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+  padding: 0.65rem;
+}
+
+.party-signup-picker-custom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+}
+
+.party-signup-picker-custom input {
+  min-width: 0;
+}
+
+.party-signup-picker-custom .auth-secondary {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+.party-signup-picker-empty {
+  margin: 0.35rem 0 0;
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+}
+
+.party-signup-picker-group + .party-signup-picker-group {
+  margin-top: 0.55rem;
+}
+
+.party-signup-picker-group-label {
+  margin: 0 0 0.25rem;
+  color: var(--gold);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.party-signup-picker-option {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--ink);
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.party-signup-picker-option:hover {
+  background: rgba(232, 120, 143, 0.12);
 }
 
 .party-or-divider {
@@ -2552,6 +2791,13 @@ body {
   flex-wrap: wrap;
 }
 
+.party-form-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
 .party-form-header {
   align-items: center;
 }
@@ -2641,6 +2887,12 @@ body {
 .party-setup-modal-media {
   width: min(calc(100% - 2rem), 72rem);
   max-width: 72rem;
+}
+
+.party-setup-modal-signup {
+  width: min(calc(100% - 2rem), 46rem);
+  max-width: 46rem;
+  overflow: visible;
 }
 
 .party-setup-date-button {
@@ -3331,6 +3583,13 @@ body {
   color: var(--rose-pale);
   font-size: 1rem;
   font-weight: 700;
+}
+
+.party-attendees-host-status {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted-text, #9a9588);
+  font-style: italic;
 }
 
 .party-attendees-host-note {

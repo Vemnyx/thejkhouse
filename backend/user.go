@@ -50,17 +50,41 @@ type Party struct {
 	Byom            bool      `json:"byom"`
 }
 
+type PartyRsvpStatus string
+
+const (
+	PartyRsvpStatusGoing    PartyRsvpStatus = "going"
+	PartyRsvpStatusMaybe    PartyRsvpStatus = "maybe"
+	PartyRsvpStatusNotGoing PartyRsvpStatus = "not_going"
+)
+
+func (s PartyRsvpStatus) Valid() bool {
+	return s == PartyRsvpStatusGoing || s == PartyRsvpStatusMaybe || s == PartyRsvpStatusNotGoing
+}
+
+type PartySignupItem struct {
+	ID          int64     `json:"id"`
+	PartyID     int64     `json:"partyId"`
+	UserID      *int64    `json:"userId"`
+	Label       string    `json:"label"`
+	Note        string    `json:"note"`
+	HostCreated bool      `json:"hostCreated"`
+	SortOrder   int       `json:"sortOrder"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
 type PartyAttendee struct {
-	ID        int64           `json:"id"`
-	PartyID   int64           `json:"partyId"`
-	UserID    *int64          `json:"userId"`
-	FirstName string          `json:"firstName"`
-	LastName  string          `json:"lastName"`
-	Email     string          `json:"email"`
-	PlusOneOf *int64          `json:"plusOneOf"`
-	Note      string          `json:"note"`
-	Metadata  json.RawMessage `json:"metadata"`
-	CreatedAt time.Time       `json:"createdAt"`
+	ID         int64           `json:"id"`
+	PartyID    int64           `json:"partyId"`
+	UserID     *int64          `json:"userId"`
+	FirstName  string          `json:"firstName"`
+	LastName   string          `json:"lastName"`
+	Email      string          `json:"email"`
+	PlusOneOf  *int64          `json:"plusOneOf"`
+	Note       string          `json:"note"`
+	RsvpStatus PartyRsvpStatus `json:"rsvpStatus"`
+	Metadata   json.RawMessage `json:"metadata"`
+	CreatedAt  time.Time       `json:"createdAt"`
 }
 
 type EventType string

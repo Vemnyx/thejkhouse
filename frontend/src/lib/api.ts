@@ -142,6 +142,8 @@ export function partyRouteIdentifier(party: Pick<PartyRecord, "id" | "label">) {
   return slug || `party-${party.id}`;
 }
 
+export type PartyRsvpStatus = "going" | "maybe" | "not_going";
+
 export type PartyAttendeeRecord = {
   id: number;
   partyId: number;
@@ -151,8 +153,32 @@ export type PartyAttendeeRecord = {
   email: string;
   plusOneOf: number | null;
   note: string;
+  rsvpStatus: PartyRsvpStatus;
   metadata: Record<string, unknown>;
   createdAt: string;
+};
+
+export type PartySignupItemRecord = {
+  id: number;
+  partyId: number;
+  userId: number | null;
+  label: string;
+  note: string;
+  hostCreated: boolean;
+  sortOrder: number;
+  createdAt: string;
+};
+
+export type CreatePartySignupItemPayload = {
+  label?: string;
+  note?: string;
+  hostCreated?: boolean;
+};
+
+export type UpdatePartySignupItemPayload = {
+  label?: string;
+  note?: string;
+  claim?: boolean;
 };
 
 export type EventType = "0" | "1";
@@ -283,6 +309,7 @@ export type CreatePartyAttendeePayload = {
   email?: string;
   plusOneOf?: number;
   note?: string;
+  rsvpStatus?: PartyRsvpStatus;
   metadata?: Record<string, unknown>;
 };
 
@@ -515,6 +542,37 @@ export function addPartyAttendee(token: string, partyId: number, payload: Create
 
 export function removePartyAttendee(token: string, partyId: number, attendeeId: number) {
   return apiFetch<Record<string, never>>(`/parties/${partyId}/attendees/${attendeeId}`, token, {
+    method: "DELETE",
+  });
+}
+
+export function listPartySignupItems(token: string, partyId: number) {
+  return apiFetch<PartySignupItemRecord[] | null>(`/parties/${partyId}/signup-items`, token).then(
+    (items) => items ?? [],
+  );
+}
+
+export function createPartySignupItem(token: string, partyId: number, payload: CreatePartySignupItemPayload = {}) {
+  return apiFetch<PartySignupItemRecord>(`/parties/${partyId}/signup-items`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updatePartySignupItem(
+  token: string,
+  partyId: number,
+  itemId: number,
+  payload: UpdatePartySignupItemPayload,
+) {
+  return apiFetch<PartySignupItemRecord>(`/parties/${partyId}/signup-items/${itemId}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deletePartySignupItem(token: string, partyId: number, itemId: number) {
+  return apiFetch<Record<string, never>>(`/parties/${partyId}/signup-items/${itemId}`, token, {
     method: "DELETE",
   });
 }

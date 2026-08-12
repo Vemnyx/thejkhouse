@@ -671,7 +671,7 @@ func (s *userStore) deleteParty(ctx context.Context, id int64) error {
 func (s *userStore) listPartyAttendees(ctx context.Context, partyID int64) ([]PartyAttendee, error) {
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, party_id, user_id, first_name, last_name, email, plus_one_of, note, metadata, created_at
+		`SELECT id, party_id, user_id, first_name, last_name, email, plus_one_of, note, rsvp_status, metadata, created_at
 		 FROM party_attendees
 		 WHERE party_id = $1
 		 ORDER BY created_at, id`,
@@ -695,6 +695,7 @@ func (s *userStore) listPartyAttendees(ctx context.Context, partyID int64) ([]Pa
 			&attendee.Email,
 			&attendee.PlusOneOf,
 			&attendee.Note,
+			&attendee.RsvpStatus,
 			&metadata,
 			&attendee.CreatedAt,
 		); err != nil {
@@ -714,7 +715,7 @@ func (s *userStore) getPartyAttendeeByID(ctx context.Context, id int64) (PartyAt
 	var metadata []byte
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, party_id, user_id, first_name, last_name, email, plus_one_of, note, metadata, created_at
+		`SELECT id, party_id, user_id, first_name, last_name, email, plus_one_of, note, rsvp_status, metadata, created_at
 		 FROM party_attendees
 		 WHERE id = $1`,
 		id,
@@ -727,6 +728,7 @@ func (s *userStore) getPartyAttendeeByID(ctx context.Context, id int64) (PartyAt
 		&attendee.Email,
 		&attendee.PlusOneOf,
 		&attendee.Note,
+		&attendee.RsvpStatus,
 		&metadata,
 		&attendee.CreatedAt,
 	)
@@ -742,7 +744,7 @@ func (s *userStore) getPartyAttendeeByUser(ctx context.Context, partyID, userID 
 	var metadata []byte
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, party_id, user_id, first_name, last_name, email, plus_one_of, note, metadata, created_at
+		`SELECT id, party_id, user_id, first_name, last_name, email, plus_one_of, note, rsvp_status, metadata, created_at
 		 FROM party_attendees
 		 WHERE party_id = $1 AND user_id = $2`,
 		partyID,
@@ -756,6 +758,7 @@ func (s *userStore) getPartyAttendeeByUser(ctx context.Context, partyID, userID 
 		&attendee.Email,
 		&attendee.PlusOneOf,
 		&attendee.Note,
+		&attendee.RsvpStatus,
 		&metadata,
 		&attendee.CreatedAt,
 	)
@@ -774,9 +777,9 @@ func (s *userStore) createPartyAttendee(ctx context.Context, partyID int64, user
 	var savedMetadata []byte
 	err := s.pool.QueryRow(
 		ctx,
-		`INSERT INTO party_attendees (party_id, user_id, first_name, last_name, email, plus_one_of, note, metadata)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		 RETURNING id, party_id, user_id, first_name, last_name, email, plus_one_of, note, metadata, created_at`,
+		`INSERT INTO party_attendees (party_id, user_id, first_name, last_name, email, plus_one_of, note, rsvp_status, metadata)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 RETURNING id, party_id, user_id, first_name, last_name, email, plus_one_of, note, rsvp_status, metadata, created_at`,
 		partyID,
 		userID,
 		firstName,
@@ -784,6 +787,7 @@ func (s *userStore) createPartyAttendee(ctx context.Context, partyID int64, user
 		email,
 		plusOneOf,
 		note,
+		PartyRsvpStatusGoing,
 		metadata,
 	).Scan(
 		&attendee.ID,
@@ -794,6 +798,7 @@ func (s *userStore) createPartyAttendee(ctx context.Context, partyID int64, user
 		&attendee.Email,
 		&attendee.PlusOneOf,
 		&attendee.Note,
+		&attendee.RsvpStatus,
 		&savedMetadata,
 		&attendee.CreatedAt,
 	)
@@ -804,7 +809,7 @@ func (s *userStore) createPartyAttendee(ctx context.Context, partyID int64, user
 	return attendee, nil
 }
 
-func (s *userStore) upsertPartyAttendeeForUser(ctx context.Context, partyID, userID int64, firstName, lastName, email, note string, metadata json.RawMessage) (PartyAttendee, error) {
+func (s *userStore) upsertPartyAttendeeForUser(ctx context.Context, partyID, userID int64, firstName, lastName, email, note string, rsvpStatus PartyRsvpStatus, metadata json.RawMessage) (PartyAttendee, error) {
 	if len(metadata) == 0 || !json.Valid(metadata) {
 		metadata = json.RawMessage([]byte("{}"))
 	}
@@ -812,22 +817,24 @@ func (s *userStore) upsertPartyAttendeeForUser(ctx context.Context, partyID, use
 	var savedMetadata []byte
 	err := s.pool.QueryRow(
 		ctx,
-		`INSERT INTO party_attendees (party_id, user_id, first_name, last_name, email, note, metadata)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`INSERT INTO party_attendees (party_id, user_id, first_name, last_name, email, note, rsvp_status, metadata)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		 ON CONFLICT (party_id, user_id) WHERE user_id IS NOT NULL
 		 DO UPDATE SET
 		   first_name = EXCLUDED.first_name,
 		   last_name = EXCLUDED.last_name,
 		   email = EXCLUDED.email,
 		   note = EXCLUDED.note,
+		   rsvp_status = EXCLUDED.rsvp_status,
 		   metadata = EXCLUDED.metadata
-		 RETURNING id, party_id, user_id, first_name, last_name, email, plus_one_of, note, metadata, created_at`,
+		 RETURNING id, party_id, user_id, first_name, last_name, email, plus_one_of, note, rsvp_status, metadata, created_at`,
 		partyID,
 		userID,
 		firstName,
 		lastName,
 		email,
 		note,
+		rsvpStatus,
 		metadata,
 	).Scan(
 		&attendee.ID,
@@ -838,6 +845,7 @@ func (s *userStore) upsertPartyAttendeeForUser(ctx context.Context, partyID, use
 		&attendee.Email,
 		&attendee.PlusOneOf,
 		&attendee.Note,
+		&attendee.RsvpStatus,
 		&savedMetadata,
 		&attendee.CreatedAt,
 	)
@@ -848,8 +856,114 @@ func (s *userStore) upsertPartyAttendeeForUser(ctx context.Context, partyID, use
 	return attendee, nil
 }
 
+func (s *userStore) deletePartyAttendeePlusOnes(ctx context.Context, attendeeID int64) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM party_attendees WHERE plus_one_of = $1`, attendeeID)
+	return err
+}
+
 func (s *userStore) deletePartyAttendee(ctx context.Context, id int64) error {
 	tag, err := s.pool.Exec(ctx, `DELETE FROM party_attendees WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
+func scanPartySignupItem(row interface {
+	Scan(dest ...any) error
+}) (PartySignupItem, error) {
+	var item PartySignupItem
+	err := row.Scan(
+		&item.ID,
+		&item.PartyID,
+		&item.UserID,
+		&item.Label,
+		&item.Note,
+		&item.HostCreated,
+		&item.SortOrder,
+		&item.CreatedAt,
+	)
+	return item, err
+}
+
+func (s *userStore) listPartySignupItems(ctx context.Context, partyID int64) ([]PartySignupItem, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT id, party_id, user_id, label, note, host_created, sort_order, created_at
+		 FROM party_signup_items
+		 WHERE party_id = $1
+		 ORDER BY sort_order, id`,
+		partyID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]PartySignupItem, 0)
+	for rows.Next() {
+		item, err := scanPartySignupItem(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (s *userStore) getPartySignupItemByID(ctx context.Context, id int64) (PartySignupItem, error) {
+	return scanPartySignupItem(s.pool.QueryRow(
+		ctx,
+		`SELECT id, party_id, user_id, label, note, host_created, sort_order, created_at
+		 FROM party_signup_items
+		 WHERE id = $1`,
+		id,
+	))
+}
+
+func (s *userStore) createPartySignupItem(ctx context.Context, partyID int64, userID *int64, label, note string, hostCreated bool) (PartySignupItem, error) {
+	return scanPartySignupItem(s.pool.QueryRow(
+		ctx,
+		`INSERT INTO party_signup_items (party_id, user_id, label, note, host_created, sort_order)
+		 VALUES (
+		   $1, $2, $3, $4, $5,
+		   (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM party_signup_items WHERE party_id = $1)
+		 )
+		 RETURNING id, party_id, user_id, label, note, host_created, sort_order, created_at`,
+		partyID,
+		userID,
+		label,
+		note,
+		hostCreated,
+	))
+}
+
+func (s *userStore) updatePartySignupItem(ctx context.Context, id int64, userID *int64, label, note string) (PartySignupItem, error) {
+	item, err := scanPartySignupItem(s.pool.QueryRow(
+		ctx,
+		`UPDATE party_signup_items
+		 SET user_id = $2, label = $3, note = $4
+		 WHERE id = $1
+		 RETURNING id, party_id, user_id, label, note, host_created, sort_order, created_at`,
+		id,
+		userID,
+		label,
+		note,
+	))
+	if err != nil {
+		return PartySignupItem{}, err
+	}
+	return item, nil
+}
+
+func (s *userStore) deletePartySignupItem(ctx context.Context, id int64) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM party_signup_items WHERE id = $1`, id)
 	if err != nil {
 		return err
 	}

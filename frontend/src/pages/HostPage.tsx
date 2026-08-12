@@ -2,13 +2,15 @@ import { type Dispatch, type DragEvent, type FormEvent, type PointerEvent, type 
 import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
+import PartySignupDraftEditor, { type PartySignupDraftItem } from "../components/PartySignupDraftEditor";
+import PartySignupModal from "../components/PartySignupModal";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, revisePartySummary, saveMediaFromURL, sendHostEmail, sendPartyInvite, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, createPartySignupItem, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, revisePartySummary, saveMediaFromURL, sendHostEmail, sendPartyInvite, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 import { isGifMediaItem, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, searchPartyMedia } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
-type PartySetupStep = "details" | "media" | "summary" | "theme";
+type PartySetupStep = "details" | "media" | "summary" | "signup" | "theme";
 type EventView = "list" | "setup";
 type ImageFilter = "all" | "homepage";
 type AIDraftType = "homepage";
@@ -210,6 +212,8 @@ export default function HostPage() {
   const [suggestingPartyTheme, setSuggestingPartyTheme] = useState(false);
   const [partySetupModalOpen, setPartySetupModalOpen] = useState(false);
   const [partySetupStep, setPartySetupStep] = useState<PartySetupStep>("details");
+  const [partySignupDrafts, setPartySignupDrafts] = useState<PartySignupDraftItem[]>([]);
+  const [partySignupModalOpen, setPartySignupModalOpen] = useState(false);
   const [partyThemeModalOpen, setPartyThemeModalOpen] = useState(false);
   const [partyMediaUrl, setPartyMediaUrl] = useState("");
   const [partyMediaModalOpen, setPartyMediaModalOpen] = useState(false);
@@ -570,6 +574,8 @@ export default function HostPage() {
     setSuggestingPartyTheme(false);
     setPartySetupModalOpen(false);
     setPartySetupStep("details");
+    setPartySignupDrafts([]);
+    setPartySignupModalOpen(false);
     setPartyThemeModalOpen(false);
     setPartyMediaUrl("");
     setPartyMediaModalOpen(false);
@@ -784,15 +790,33 @@ export default function HostPage() {
         themeFont: normalizePartyThemeFont(partyThemeFont),
         byom: partyByom,
       });
+      let signupError = "";
+      try {
+        const hostSignupItems = partySignupDrafts.filter((item) => item.label.trim());
+        for (const item of hostSignupItems) {
+          await createPartySignupItem(token, party.id, {
+            label: item.label.trim(),
+            note: item.note.trim() || undefined,
+            hostCreated: true,
+          });
+        }
+      } catch (err) {
+        signupError = err instanceof Error ? err.message : "failed to save signup items";
+      }
       setParties((current) => sortPartiesByDate([party, ...current]));
       setPartySetupModalOpen(false);
       setPartySetupStep("details");
+      setPartySignupDrafts([]);
       setPartySummaryRevisionBackup(null);
       setRevisingPartySummary(false);
       setPartyThemeSuggestionBackup(null);
       setSuggestingPartyTheme(false);
       openEditPartyForm(party);
-      setPartySuccess("Party created.");
+      if (signupError) {
+        setError(`Party created, but the sign up sheet could not be saved: ${signupError}`);
+      } else {
+        setPartySuccess("Party created.");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to create party";
       setError(message);
@@ -827,6 +851,10 @@ export default function HostPage() {
         setError("party summary is required");
         return;
       }
+      goToPartySetupStep("signup");
+      return;
+    }
+    if (partySetupStep === "signup") {
       goToPartySetupStep("theme");
       return;
     }
@@ -846,8 +874,12 @@ export default function HostPage() {
       goToPartySetupStep("media");
       return;
     }
-    if (partySetupStep === "theme") {
+    if (partySetupStep === "signup") {
       goToPartySetupStep("summary");
+      return;
+    }
+    if (partySetupStep === "theme") {
+      goToPartySetupStep("signup");
     }
   };
 
@@ -2440,10 +2472,15 @@ export default function HostPage() {
                     }}>
                       Back to Parties
                     </button>
-                    {partyView === "edit" ? (
-                      <button className="auth-secondary" type="button" onClick={openPartyThemeModal}>
-                        Edit Theme
-                      </button>
+                    {partyView === "edit" && editingParty ? (
+                      <div className="party-form-toolbar-actions">
+                        <button className="auth-secondary" type="button" onClick={() => setPartySignupModalOpen(true)}>
+                          Edit Sign Up Sheet
+                        </button>
+                        <button className="auth-secondary" type="button" onClick={openPartyThemeModal}>
+                          Edit Theme
+                        </button>
+                      </div>
                     ) : null}
                   </div>
 
@@ -2891,7 +2928,9 @@ export default function HostPage() {
               className={
                 partySetupStep === "media"
                   ? "upload-modal gothic-card party-setup-modal party-setup-modal-media"
-                  : "upload-modal gothic-card party-setup-modal"
+                  : partySetupStep === "signup"
+                    ? "upload-modal gothic-card party-setup-modal party-setup-modal-signup"
+                    : "upload-modal gothic-card party-setup-modal"
               }
               role="dialog"
               aria-modal="true"
@@ -2906,7 +2945,9 @@ export default function HostPage() {
                       ? "Party Media"
                       : partySetupStep === "summary"
                         ? "Party Summary"
-                        : "Party Theme"}
+                        : partySetupStep === "signup"
+                          ? "Sign Up Sheet"
+                          : "Party Theme"}
                 </h2>
                 <button className="modal-close" type="button" onClick={closePartySetupModal} aria-label="Close party setup">
                   ×
@@ -3081,6 +3122,10 @@ export default function HostPage() {
                 </div>
               ) : null}
 
+              {partySetupStep === "signup" ? (
+                <PartySignupDraftEditor items={partySignupDrafts} onChange={setPartySignupDrafts} />
+              ) : null}
+
               {partySetupStep === "theme" ? (
                 <div className="party-setup-theme">
                   <div className="party-setup-theme-header">
@@ -3239,6 +3284,15 @@ export default function HostPage() {
               </div>
             </section>
           </div>
+          ) : null}
+
+          {partySignupModalOpen && editingParty ? (
+            <PartySignupModal
+              party={editingParty}
+              users={users}
+              hostEdit
+              onClose={() => setPartySignupModalOpen(false)}
+            />
           ) : null}
 
           {partyThemeModalOpen ? (
@@ -4146,6 +4200,9 @@ export default function HostPage() {
                             />
                             <div className="party-attendees-host-copy">
                               <strong>{primary.name}</strong>
+                              {attendee.rsvpStatus !== "going" ? (
+                                <p className="party-attendees-host-status">{partyRsvpStatusLabel(attendee.rsvpStatus)}</p>
+                              ) : null}
                               {attendee.note.trim() ? (
                                 <p className="party-attendees-host-note">{attendee.note.trim()}</p>
                               ) : (
@@ -4317,6 +4374,16 @@ function partyAttendeeDisplayName(attendee: PartyAttendeeRecord, users: AppUser[
   }
   const name = [attendee.firstName, attendee.lastName].filter(Boolean).join(" ").trim();
   return name || attendee.email || "Guest";
+}
+
+function partyRsvpStatusLabel(status: PartyAttendeeRecord["rsvpStatus"]) {
+  if (status === "maybe") {
+    return "Maybe";
+  }
+  if (status === "not_going") {
+    return "Not this time";
+  }
+  return "Going";
 }
 
 function partyAttendeeAvatarInfo(attendee: PartyAttendeeRecord, users: AppUser[]) {

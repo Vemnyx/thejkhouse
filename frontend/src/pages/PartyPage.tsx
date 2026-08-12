@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import PartyRsvpModal from "../components/PartyRsvpModal";
+import PartySignupModal from "../components/PartySignupModal";
 import { useAuth } from "../context/AuthContext";
 import {
   AppUser,
@@ -29,6 +30,7 @@ const byomNoLogoUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/byo
 
 export default function PartyPage() {
   const { partyId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { appUser, firebaseUser } = useAuth();
   const [party, setParty] = useState<PartyRecord | null>(null);
   const [attendees, setAttendees] = useState<PartyAttendeeRecord[]>([]);
@@ -36,6 +38,7 @@ export default function PartyPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [rsvpModalOpen, setRsvpModalOpen] = useState(false);
+  const [signupModalOpen, setSignupModalOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +94,17 @@ export default function PartyPage() {
     };
   }, [firebaseUser, partyId]);
 
+  useEffect(() => {
+    if (searchParams.get("rsvp") !== "1" || loading || !party || !firebaseUser) {
+      return;
+    }
+
+    setRsvpModalOpen(true);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("rsvp");
+    setSearchParams(nextParams, { replace: true });
+  }, [firebaseUser, loading, party, searchParams, setSearchParams]);
+
   const usersById = useMemo(() => {
     const map = new Map<number, AppUser>();
     for (const user of users) {
@@ -100,7 +114,18 @@ export default function PartyPage() {
   }, [users]);
 
   const attendeeRows = useMemo(() => {
-    return attendees.map((attendee) => {
+    const goingHostIds = new Set(
+      attendees.filter((attendee) => attendee.plusOneOf == null && attendee.rsvpStatus === "going").map((attendee) => attendee.id),
+    );
+
+    return attendees
+      .filter((attendee) => {
+        if (attendee.plusOneOf != null) {
+          return goingHostIds.has(attendee.plusOneOf);
+        }
+        return attendee.rsvpStatus === "going";
+      })
+      .map((attendee) => {
       const linkedUser = attendee.userId != null ? usersById.get(attendee.userId) ?? null : null;
       const firstName = (linkedUser?.firstName || attendee.firstName || "").trim();
       const lastName = (linkedUser?.lastName || attendee.lastName || "").trim();
@@ -116,14 +141,15 @@ export default function PartyPage() {
     });
   }, [attendees, usersById]);
 
-  const isAttending = useMemo(() => {
+  const isGoing = useMemo(() => {
     if (!appUser) {
       return false;
     }
-    return attendees.some((attendee) => attendee.userId === appUser.id);
+    const mine = attendees.find((attendee) => attendee.userId === appUser.id);
+    return mine?.rsvpStatus === "going";
   }, [appUser, attendees]);
 
-  const canRsvp = Boolean(party && !party.partifulUrl && !isAttending && new Date(party.date).getTime() > Date.now());
+  const canRsvp = Boolean(party && !party.partifulUrl && !isGoing && new Date(party.date).getTime() > Date.now());
   const themeStyle = party ? partyThemeStyle(party) : undefined;
 
   return (
@@ -193,6 +219,15 @@ export default function PartyPage() {
                 {party.summary ? <p className="party-detail-summary">{party.summary}</p> : null}
 
                 <section className="party-detail-extras" aria-label="Party extras">
+                  <div className="party-detail-extra">
+                    <button
+                      className="party-signup-sheet-button"
+                      type="button"
+                      onClick={() => setSignupModalOpen(true)}
+                    >
+                      Sign Up Sheet
+                    </button>
+                  </div>
                   <div className="party-detail-extra">
                     <div className="party-detail-link party-detail-link-featured party-detail-byom" role="status">
                       <img src={party.byom ? byomYesLogoUrl : byomNoLogoUrl} alt="" />
@@ -266,6 +301,10 @@ export default function PartyPage() {
           onClose={() => setRsvpModalOpen(false)}
           onAttendeesUpdated={setAttendees}
         />
+      ) : null}
+
+      {signupModalOpen && party ? (
+        <PartySignupModal party={party} users={users} onClose={() => setSignupModalOpen(false)} />
       ) : null}
     </main>
   );

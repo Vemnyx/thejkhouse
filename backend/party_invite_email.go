@@ -35,6 +35,12 @@ func partyDetailURL(party Party) string {
 	return appBaseURL() + "/parties/" + url.PathEscape(partyRouteSlug(party))
 }
 
+func partyRsvpURL(party Party) string {
+	values := url.Values{}
+	values.Set("rsvp", "1")
+	return partyDetailURL(party) + "?" + values.Encode()
+}
+
 func partySignupURL(email string) string {
 	values := url.Values{}
 	values.Set("mode", "signup")
