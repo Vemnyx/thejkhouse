@@ -231,7 +231,7 @@ export default function PartyPage() {
                   <div className="party-detail-extra">
                     <div className="party-detail-link party-detail-link-featured party-detail-byom" role="status">
                       <img src={party.byom ? byomYesLogoUrl : byomNoLogoUrl} alt="" />
-                      <span>B.Y.O.M (Bring Your Own Meat)</span>
+                      <span>B.Y.O.M.O.M.S (Bring Your Own Meat Or Meat Substitute)</span>
                     </div>
                   </div>
 

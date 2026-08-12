@@ -2972,7 +2972,7 @@ export default function HostPage() {
                     </button>
                   </div>
                   <label className="auth-field party-byom-field">
-                    <span>B.Y.O.M (Bring Your Own Meat)</span>
+                    <span>B.Y.O.M.O.M.S (Bring Your Own Meat Or Meat Substitute)</span>
                     <button
                       className={partyByom ? "auth-secondary party-byom-toggle active" : "auth-secondary party-byom-toggle"}
                       type="button"
