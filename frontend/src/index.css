@@ -2435,9 +2435,40 @@ body {
   flex-wrap: wrap;
 }
 
+.party-rsvp-actions-stacked {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .party-rsvp-actions .auth-submit,
 .party-rsvp-actions .auth-secondary {
   flex: 1;
+}
+
+.party-rsvp-actions-stacked .auth-submit,
+.party-rsvp-actions-stacked .auth-secondary {
+  width: 100%;
+}
+
+.party-rsvp-guest-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.party-rsvp-add-guest {
+  width: fit-content;
+}
+
+.party-rsvp-guest-pending {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.party-rsvp-remove-guest {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
 }
 
 .upload-modal.party-signup-modal {
