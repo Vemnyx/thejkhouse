@@ -91,6 +91,9 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
         setRsvpAttendees(attendees);
         const mine = attendees.find((attendee) => attendee.userId === appUser.id) ?? null;
         setRsvpMyAttendee(mine);
+        if (mine?.rsvpStatus === "going") {
+          setRsvpView("going");
+        }
         if (mine?.note) {
           setRsvpNote(mine.note);
         }

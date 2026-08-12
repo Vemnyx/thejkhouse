@@ -141,15 +141,14 @@ export default function PartyPage() {
     });
   }, [attendees, usersById]);
 
-  const isGoing = useMemo(() => {
+  const myAttendee = useMemo(() => {
     if (!appUser) {
-      return false;
+      return null;
     }
-    const mine = attendees.find((attendee) => attendee.userId === appUser.id);
-    return mine?.rsvpStatus === "going";
+    return attendees.find((attendee) => attendee.userId === appUser.id) ?? null;
   }, [appUser, attendees]);
 
-  const canRsvp = Boolean(party && !party.partifulUrl && !isGoing && new Date(party.date).getTime() > Date.now());
+  const canShowRsvpButton = Boolean(party && !party.partifulUrl && new Date(party.date).getTime() > Date.now());
   const themeStyle = party ? partyThemeStyle(party) : undefined;
 
   return (
@@ -177,9 +176,9 @@ export default function PartyPage() {
           <Link className="auth-secondary back-text-link event-detail-back party-detail-back" to="/parties">
             Back to Parties
           </Link>
-          {canRsvp ? (
+          {canShowRsvpButton ? (
             <button className="party-rsvp-button" type="button" onClick={() => setRsvpModalOpen(true)}>
-              RSVP
+              {myAttendee ? "Update RSVP" : "RSVP"}
             </button>
           ) : null}
         </div>
