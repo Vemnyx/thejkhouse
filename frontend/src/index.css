@@ -2013,9 +2013,9 @@ body {
 }
 
 .party-detail-topbar .party-rsvp-button {
-  padding: 1.4rem 2.3rem;
-  font-size: 1.84rem;
-  border-radius: 1rem;
+  padding: 0.7rem 2.3rem;
+  font-size: 0.92rem;
+  border-radius: 0.75rem;
 }
 
 .party-rsvp-modal {
