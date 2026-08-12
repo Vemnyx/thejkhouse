@@ -2012,6 +2012,12 @@ body {
     rgba(3, 3, 3, 0.42);
 }
 
+.party-detail-topbar .party-rsvp-button {
+  padding: 1.4rem 2.3rem;
+  font-size: 1.84rem;
+  border-radius: 1rem;
+}
+
 .party-rsvp-modal {
   max-width: 32rem;
 }
