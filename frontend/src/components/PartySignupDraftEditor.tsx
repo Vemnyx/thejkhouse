@@ -41,7 +41,7 @@ export default function PartySignupDraftEditor({ items, onChange }: PartySignupD
           <tbody>
             {items.map((item, index) => (
               <tr key={item.key}>
-                <td>
+                <td className="party-signup-table-item">
                   <SignupItemPicker
                     value={item.label}
                     usedLabels={usedLabels}
@@ -71,8 +71,9 @@ export default function PartySignupDraftEditor({ items, onChange }: PartySignupD
             ))}
             <tr className="party-signup-add-row">
               <td colSpan={3}>
-                <button className="party-signup-add-button" type="button" onClick={addItem} aria-label="Add item">
+                <button className="party-signup-add-button" type="button" onClick={addItem}>
                   <img src={addItemIconUrl} alt="" />
+                  <span>Add item</span>
                 </button>
               </td>
             </tr>

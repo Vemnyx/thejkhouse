@@ -241,7 +241,7 @@ export default function PartySignupModal({ party, users, hostEdit = false, onClo
                           <SignupPersonCell user={linkedUser} fallbackName="Guest" />
                         )}
                       </td>
-                      <td>
+                      <td className="party-signup-table-item">
                         {canEditItem ? (
                           <SignupItemPicker
                             value={item.label}
@@ -292,9 +292,9 @@ export default function PartySignupModal({ party, users, hostEdit = false, onClo
                       type="button"
                       onClick={() => void handleAddItem()}
                       disabled={saving}
-                      aria-label="Add item"
                     >
                       <img src={addItemIconUrl} alt="" />
+                      <span>Add item</span>
                     </button>
                   </td>
                 </tr>

@@ -2441,6 +2441,9 @@ body {
   margin: -0.35rem 0 0.15rem;
   color: var(--ink-muted);
   line-height: 1.45;
+  text-align: left;
+  justify-self: start;
+  width: 100%;
 }
 
 .party-setup-signup {
@@ -2478,7 +2481,7 @@ body {
   width: 100%;
   border-collapse: collapse;
   min-width: 44rem;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 .party-signup-table th,
@@ -2500,9 +2503,14 @@ body {
 
 .party-signup-table td.party-signup-table-person {
   width: 1%;
-  max-width: 14rem;
-  padding-right: 0.65rem;
   white-space: nowrap;
+  padding-right: 0.55rem;
+}
+
+.party-signup-table td.party-signup-table-item {
+  padding-left: 0.35rem;
+  padding-right: 0.65rem;
+  min-width: 11rem;
 }
 
 .party-signup-table th {
@@ -2535,10 +2543,10 @@ body {
   gap: 0.7rem;
   color: var(--ink);
   font-weight: 650;
-  max-width: 14rem;
 }
 
 .party-signup-person span:last-child {
+  max-width: 12rem;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -2579,27 +2587,40 @@ body {
 .party-signup-add-button {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.55rem;
   border: 0;
   background: transparent;
   padding: 0.15rem;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 650;
   cursor: pointer;
 }
 
 .party-signup-add-button img {
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 1.85rem;
+  height: 1.85rem;
   display: block;
+  flex: 0 0 auto;
 }
 
-.party-signup-add-button:hover {
-  transform: scale(1.06);
+.party-signup-add-button span {
+  line-height: 1.2;
+}
+
+.party-signup-add-button:hover span {
+  font-weight: 800;
+  text-decoration: underline;
 }
 
 .party-signup-add-button:disabled {
   opacity: 0.55;
   cursor: default;
-  transform: none;
+}
+
+.party-signup-add-button:disabled:hover span {
+  font-weight: 650;
+  text-decoration: none;
 }
 
 .party-signup-picker {
