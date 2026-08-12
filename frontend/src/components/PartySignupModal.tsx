@@ -203,18 +203,11 @@ export default function PartySignupModal({ party, users, hostEdit = false, onClo
 
         {!loading ? (
           <div className="party-signup-table-wrap">
-            <table className="party-signup-table">
-              <thead>
-                <tr>
-                  <th>Who</th>
-                  <th>Bringing</th>
-                  <th>Note</th>
-                </tr>
-              </thead>
+            <table className="party-signup-table" aria-label="Sign up sheet">
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={3}>
+                    <td colSpan={4}>
                       <p className="dashboard-copy">
                         {hostEdit
                           ? "No items yet. Add food or drinks guests can claim."
@@ -267,33 +260,33 @@ export default function PartySignupModal({ party, users, hostEdit = false, onClo
                           )}
                         </td>
                         <td>
-                          <div className="party-signup-note-cell">
-                            {canEditNote ? (
-                              <input
-                                value={noteDrafts[item.id] ?? item.note}
-                                onChange={(event) =>
-                                  setNoteDrafts((current) => ({ ...current, [item.id]: event.target.value }))
-                                }
-                                onBlur={() => void handleSaveNote(item)}
-                                placeholder="Optional note"
-                                maxLength={2000}
-                                disabled={saving}
-                                aria-label="Optional note"
-                              />
-                            ) : (
-                              <span className="party-signup-note-readonly">{item.note || "—"}</span>
-                            )}
-                            {canRemove ? (
-                              <button
-                                className="auth-secondary table-action-button"
-                                type="button"
-                                onClick={() => void handleRemove(item)}
-                                disabled={saving}
-                              >
-                                Remove
-                              </button>
-                            ) : null}
-                          </div>
+                          {canEditNote ? (
+                            <input
+                              value={noteDrafts[item.id] ?? item.note}
+                              onChange={(event) =>
+                                setNoteDrafts((current) => ({ ...current, [item.id]: event.target.value }))
+                              }
+                              onBlur={() => void handleSaveNote(item)}
+                              placeholder="Optional note"
+                              maxLength={2000}
+                              disabled={saving}
+                              aria-label="Optional note"
+                            />
+                          ) : (
+                            <span className="party-signup-note-readonly">{item.note || "—"}</span>
+                          )}
+                        </td>
+                        <td className="party-signup-table-actions">
+                          {canRemove ? (
+                            <button
+                              className="auth-secondary table-action-button"
+                              type="button"
+                              onClick={() => void handleRemove(item)}
+                              disabled={saving}
+                            >
+                              Remove
+                            </button>
+                          ) : null}
                         </td>
                       </tr>
                     );

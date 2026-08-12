@@ -35,14 +35,7 @@ export default function PartySignupDraftEditor({ items, onChange }: PartySignupD
         Add food or drinks guests can claim. You can skip this and let people add their own items later.
       </p>
       <div className="party-signup-table-wrap">
-        <table className="party-signup-table">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Note</th>
-              <th />
-            </tr>
-          </thead>
+        <table className="party-signup-table" aria-label="Sign up sheet">
           <tbody>
             {items.length === 0 ? (
               <tr>
@@ -70,7 +63,7 @@ export default function PartySignupDraftEditor({ items, onChange }: PartySignupD
                       aria-label="Optional note"
                     />
                   </td>
-                  <td>
+                  <td className="party-signup-table-actions">
                     <button
                       className="auth-secondary table-action-button"
                       type="button"

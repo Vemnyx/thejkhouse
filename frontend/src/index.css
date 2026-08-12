@@ -2165,7 +2165,7 @@ body {
 }
 
 .party-signup-sheet-button {
-  width: 100%;
+  width: 50%;
   margin-top: 0.85rem;
   border: 1px solid color-mix(in srgb, var(--party-theme-accent, var(--gold)) 45%, transparent);
   border-radius: 0.9rem;
@@ -2427,11 +2427,12 @@ body {
   flex: 1;
 }
 
-.party-signup-modal {
-  width: min(calc(100% - 2rem), 52rem);
-  max-width: 52rem;
-  max-height: none;
-  overflow: visible;
+.upload-modal.party-signup-modal {
+  width: min(calc(100vw - 3rem), 72rem);
+  max-width: 72rem;
+  max-height: calc(100dvh - 3rem);
+  overflow-x: hidden;
+  overflow-y: auto;
   display: grid;
   gap: 1rem;
 }
@@ -2439,25 +2440,56 @@ body {
 .party-setup-signup {
   display: grid;
   gap: 0.9rem;
+  min-width: 0;
 }
 
 .party-signup-table-wrap {
   width: 100%;
-  overflow: visible;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  padding-bottom: 0.55rem;
+}
+
+.party-signup-table-wrap::-webkit-scrollbar {
+  height: 0.7rem;
+}
+
+.party-signup-table-wrap::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(232, 120, 143, 0.12);
+}
+
+.party-signup-table-wrap::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(232, 120, 143, 0.5);
 }
 
 .party-signup-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 32rem;
+  min-width: 44rem;
+  table-layout: fixed;
 }
 
 .party-signup-table th,
 .party-signup-table td {
   border-bottom: 1px solid rgba(232, 120, 143, 0.16);
-  padding: 0.75rem 0.65rem;
+  padding: 0.75rem 0.8rem;
   text-align: left;
   vertical-align: middle;
+}
+
+.party-signup-table th.party-signup-table-actions,
+.party-signup-table td.party-signup-table-actions {
+  width: 6.75rem;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .party-signup-table th {
@@ -2516,18 +2548,13 @@ body {
   font-weight: 650;
 }
 
-.party-signup-note-cell {
-  display: grid;
-  gap: 0.45rem;
-}
-
 .party-signup-note-readonly {
   color: var(--ink-muted);
 }
 
 .party-signup-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .party-signup-picker {
@@ -2890,9 +2917,40 @@ body {
 }
 
 .party-setup-modal-signup {
-  width: min(calc(100% - 2rem), 46rem);
-  max-width: 46rem;
-  overflow: visible;
+  width: min(calc(100vw - 3rem), 64rem);
+  max-width: 64rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+@media (min-width: 900px) {
+  .upload-modal.party-signup-modal,
+  .party-setup-modal-signup {
+    overflow: visible;
+    max-height: none;
+  }
+
+  .party-signup-table-wrap {
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .party-signup-table {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 899px) {
+  .upload-modal.party-signup-modal,
+  .party-setup-modal-signup {
+    width: min(100%, calc(100vw - 1.25rem));
+    max-width: none;
+  }
+
+  .party-signup-table-wrap {
+    scrollbar-width: auto;
+    scrollbar-color: rgba(232, 120, 143, 0.55) rgba(232, 120, 143, 0.14);
+  }
 }
 
 .party-setup-date-button {
