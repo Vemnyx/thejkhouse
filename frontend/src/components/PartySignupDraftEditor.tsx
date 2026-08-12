@@ -1,5 +1,7 @@
 import SignupItemPicker from "./SignupItemPicker";
 
+const addItemIconUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/add-item.png";
+
 export type PartySignupDraftItem = {
   key: string;
   label: string;
@@ -37,51 +39,45 @@ export default function PartySignupDraftEditor({ items, onChange }: PartySignupD
       <div className="party-signup-table-wrap">
         <table className="party-signup-table" aria-label="Sign up sheet">
           <tbody>
-            {items.length === 0 ? (
-              <tr>
-                <td colSpan={3}>
-                  <p className="dashboard-copy">No unclaimed items yet.</p>
+            {items.map((item, index) => (
+              <tr key={item.key}>
+                <td>
+                  <SignupItemPicker
+                    value={item.label}
+                    usedLabels={usedLabels}
+                    autoOpen={!item.label && index === items.length - 1}
+                    onChange={(label) => updateItem(item.key, { label })}
+                  />
+                </td>
+                <td>
+                  <input
+                    value={item.note}
+                    onChange={(event) => updateItem(item.key, { note: event.target.value })}
+                    placeholder="Optional note"
+                    maxLength={2000}
+                    aria-label="Optional note"
+                  />
+                </td>
+                <td className="party-signup-table-actions">
+                  <button
+                    className="auth-secondary table-action-button"
+                    type="button"
+                    onClick={() => onChange(items.filter((row) => row.key !== item.key))}
+                  >
+                    Remove
+                  </button>
                 </td>
               </tr>
-            ) : (
-              items.map((item, index) => (
-                <tr key={item.key}>
-                  <td>
-                    <SignupItemPicker
-                      value={item.label}
-                      usedLabels={usedLabels}
-                      autoOpen={!item.label && index === items.length - 1}
-                      onChange={(label) => updateItem(item.key, { label })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      value={item.note}
-                      onChange={(event) => updateItem(item.key, { note: event.target.value })}
-                      placeholder="Optional note"
-                      maxLength={2000}
-                      aria-label="Optional note"
-                    />
-                  </td>
-                  <td className="party-signup-table-actions">
-                    <button
-                      className="auth-secondary table-action-button"
-                      type="button"
-                      onClick={() => onChange(items.filter((row) => row.key !== item.key))}
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
+            ))}
+            <tr className="party-signup-add-row">
+              <td colSpan={3}>
+                <button className="party-signup-add-button" type="button" onClick={addItem} aria-label="Add item">
+                  <img src={addItemIconUrl} alt="" />
+                </button>
+              </td>
+            </tr>
           </tbody>
         </table>
-      </div>
-      <div className="party-signup-actions">
-        <button className="auth-submit" type="button" onClick={addItem}>
-          Add Item
-        </button>
       </div>
     </div>
   );

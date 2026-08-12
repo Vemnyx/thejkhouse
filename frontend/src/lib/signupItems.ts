@@ -7,6 +7,10 @@ export const SIGNUP_ITEM_SUGGESTIONS: SignupItemSuggestionGroup[] = [
   {
     label: "Food",
     items: [
+      "Cheeseburgers",
+      "Hot Dogs",
+      "Hamburger Buns",
+      "Hot Dog Buns",
       "Chips & Dip",
       "Guacamole",
       "Salsa",
@@ -32,6 +36,7 @@ export const SIGNUP_ITEM_SUGGESTIONS: SignupItemSuggestionGroup[] = [
       "Wine",
       "Champagne",
       "Hard Seltzer",
+      "Jell-O Shots",
       "Tequila",
       "Vodka",
       "Whiskey",

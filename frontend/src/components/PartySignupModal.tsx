@@ -11,6 +11,8 @@ import {
 } from "../lib/api";
 import SignupItemPicker from "./SignupItemPicker";
 
+const addItemIconUrl = "https://storage.googleapis.com/thejkhouse-assets/logo/add-item.png";
+
 type PartySignupModalProps = {
   party: PartyRecord;
   users: AppUser[];
@@ -197,6 +199,9 @@ export default function PartySignupModal({ party, users, hostEdit = false, onClo
             x
           </button>
         </div>
+        <p className="party-signup-intro">
+          Claim an item we need for this party, or add something you just want to bring
+        </p>
 
         {loading ? <p className="dashboard-copy">Loading sign up sheet...</p> : null}
         {error ? <p className="auth-error">{error}</p> : null}
@@ -205,103 +210,98 @@ export default function PartySignupModal({ party, users, hostEdit = false, onClo
           <div className="party-signup-table-wrap">
             <table className="party-signup-table" aria-label="Sign up sheet">
               <tbody>
-                {items.length === 0 ? (
-                  <tr>
-                    <td colSpan={4}>
-                      <p className="dashboard-copy">
-                        {hostEdit
-                          ? "No items yet. Add food or drinks guests can claim."
-                          : "No items yet. Add something you're bringing."}
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  items.map((item) => {
-                    const linkedUser =
-                      item.userId != null
-                        ? usersById.get(item.userId) ?? (appUser?.id === item.userId ? appUser : null)
-                        : null;
-                    const isOwnRow = Boolean(appUser && item.userId === appUser.id);
-                    const unclaimed = item.userId == null;
-                    const canEditItem = (isOwnRow && !item.hostCreated) || (hostEdit && item.hostCreated && unclaimed);
-                    const canEditNote = isOwnRow || (hostEdit && (unclaimed || item.hostCreated));
-                    const canRemove = (isOwnRow && !item.hostCreated) || (hostEdit && item.hostCreated);
+                {items.map((item) => {
+                  const linkedUser =
+                    item.userId != null
+                      ? usersById.get(item.userId) ?? (appUser?.id === item.userId ? appUser : null)
+                      : null;
+                  const isOwnRow = Boolean(appUser && item.userId === appUser.id);
+                  const unclaimed = item.userId == null;
+                  const canEditItem = (isOwnRow && !item.hostCreated) || (hostEdit && item.hostCreated && unclaimed);
+                  const canEditNote = isOwnRow || (hostEdit && (unclaimed || item.hostCreated));
+                  const canRemove = (isOwnRow && !item.hostCreated) || (hostEdit && item.hostCreated);
 
-                    return (
-                      <tr key={item.id}>
-                        <td>
-                          {unclaimed ? (
-                            hostEdit ? (
-                              <span className="party-signup-unclaimed">Unclaimed</span>
-                            ) : (
-                              <button
-                                className="auth-submit party-signup-claim-button"
-                                type="button"
-                                onClick={() => void handleClaim(item)}
-                                disabled={saving}
-                              >
-                                Claim Me
-                              </button>
-                            )
+                  return (
+                    <tr key={item.id}>
+                      <td className="party-signup-table-person">
+                        {unclaimed ? (
+                          hostEdit ? (
+                            <span className="party-signup-unclaimed">Unclaimed</span>
                           ) : (
-                            <SignupPersonCell user={linkedUser} fallbackName="Guest" />
-                          )}
-                        </td>
-                        <td>
-                          {canEditItem ? (
-                            <SignupItemPicker
-                              value={item.label}
-                              usedLabels={usedLabels}
-                              autoOpen={openPickerId === item.id}
-                              onChange={(label) => void handleSelectLabel(item, label)}
-                            />
-                          ) : (
-                            <span className="party-signup-item-locked">{item.label || "—"}</span>
-                          )}
-                        </td>
-                        <td>
-                          {canEditNote ? (
-                            <input
-                              value={noteDrafts[item.id] ?? item.note}
-                              onChange={(event) =>
-                                setNoteDrafts((current) => ({ ...current, [item.id]: event.target.value }))
-                              }
-                              onBlur={() => void handleSaveNote(item)}
-                              placeholder="Optional note"
-                              maxLength={2000}
-                              disabled={saving}
-                              aria-label="Optional note"
-                            />
-                          ) : (
-                            <span className="party-signup-note-readonly">{item.note || "—"}</span>
-                          )}
-                        </td>
-                        <td className="party-signup-table-actions">
-                          {canRemove ? (
                             <button
-                              className="auth-secondary table-action-button"
+                              className="auth-submit party-signup-claim-button"
                               type="button"
-                              onClick={() => void handleRemove(item)}
+                              onClick={() => void handleClaim(item)}
                               disabled={saving}
                             >
-                              Remove
+                              Claim Me
                             </button>
-                          ) : null}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                          )
+                        ) : (
+                          <SignupPersonCell user={linkedUser} fallbackName="Guest" />
+                        )}
+                      </td>
+                      <td>
+                        {canEditItem ? (
+                          <SignupItemPicker
+                            value={item.label}
+                            usedLabels={usedLabels}
+                            autoOpen={openPickerId === item.id}
+                            onChange={(label) => void handleSelectLabel(item, label)}
+                          />
+                        ) : (
+                          <span className="party-signup-item-locked">{item.label || "—"}</span>
+                        )}
+                      </td>
+                      <td>
+                        {canEditNote ? (
+                          <input
+                            value={noteDrafts[item.id] ?? item.note}
+                            onChange={(event) =>
+                              setNoteDrafts((current) => ({ ...current, [item.id]: event.target.value }))
+                            }
+                            onBlur={() => void handleSaveNote(item)}
+                            placeholder="Optional note"
+                            maxLength={2000}
+                            disabled={saving}
+                            aria-label="Optional note"
+                          />
+                        ) : (
+                          <span className="party-signup-note-readonly">{item.note || "—"}</span>
+                        )}
+                      </td>
+                      <td className="party-signup-table-actions">
+                        {canRemove ? (
+                          <button
+                            className="auth-secondary table-action-button"
+                            type="button"
+                            onClick={() => void handleRemove(item)}
+                            disabled={saving}
+                          >
+                            Remove
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="party-signup-add-row">
+                  <td colSpan={4}>
+                    <button
+                      className="party-signup-add-button"
+                      type="button"
+                      onClick={() => void handleAddItem()}
+                      disabled={saving}
+                      aria-label="Add item"
+                    >
+                      <img src={addItemIconUrl} alt="" />
+                    </button>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
         ) : null}
-
-        <div className="party-signup-actions">
-          <button className="auth-submit" type="button" onClick={() => void handleAddItem()} disabled={loading || saving}>
-            {saving ? "Saving..." : "Add Item"}
-          </button>
-        </div>
       </section>
     </div>
   );
