@@ -114,31 +114,46 @@ export default function PartyPage() {
   }, [users]);
 
   const attendeeRows = useMemo(() => {
-    const goingHostIds = new Set(
-      attendees.filter((attendee) => attendee.plusOneOf == null && attendee.rsvpStatus === "going").map((attendee) => attendee.id),
+    const visibleHostIds = new Set(
+      attendees
+        .filter(
+          (attendee) =>
+            attendee.plusOneOf == null && (attendee.rsvpStatus === "going" || attendee.rsvpStatus === "maybe"),
+        )
+        .map((attendee) => attendee.id),
+    );
+    const hostStatusById = new Map(
+      attendees
+        .filter((attendee) => attendee.plusOneOf == null)
+        .map((attendee) => [attendee.id, attendee.rsvpStatus] as const),
     );
 
     return attendees
       .filter((attendee) => {
         if (attendee.plusOneOf != null) {
-          return goingHostIds.has(attendee.plusOneOf);
+          return visibleHostIds.has(attendee.plusOneOf);
         }
-        return attendee.rsvpStatus === "going";
+        return attendee.rsvpStatus === "going" || attendee.rsvpStatus === "maybe";
       })
       .map((attendee) => {
-      const linkedUser = attendee.userId != null ? usersById.get(attendee.userId) ?? null : null;
-      const firstName = (linkedUser?.firstName || attendee.firstName || "").trim();
-      const lastName = (linkedUser?.lastName || attendee.lastName || "").trim();
-      const displayName = [firstName, lastName].filter(Boolean).join(" ") || attendee.email || "Guest";
-      const colorId = attendee.userId ?? attendee.id;
-      return {
-        attendee,
-        displayName,
-        firstName,
-        avatarUrl: linkedUser?.avatarUrl ?? null,
-        colorId,
-      };
-    });
+        const linkedUser = attendee.userId != null ? usersById.get(attendee.userId) ?? null : null;
+        const firstName = (linkedUser?.firstName || attendee.firstName || "").trim();
+        const lastName = (linkedUser?.lastName || attendee.lastName || "").trim();
+        const displayName = [firstName, lastName].filter(Boolean).join(" ") || attendee.email || "Guest";
+        const colorId = attendee.userId ?? attendee.id;
+        const hostStatus =
+          attendee.plusOneOf != null ? hostStatusById.get(attendee.plusOneOf) ?? "going" : attendee.rsvpStatus;
+        const isMaybe = hostStatus === "maybe";
+        return {
+          attendee,
+          displayName,
+          firstName,
+          avatarUrl: linkedUser?.avatarUrl ?? null,
+          colorId,
+          isMaybe,
+        };
+      })
+      .sort((a, b) => Number(a.isMaybe) - Number(b.isMaybe));
   }, [attendees, usersById]);
 
   const myAttendee = useMemo(() => {
@@ -279,6 +294,7 @@ export default function PartyPage() {
                             firstName={row.firstName}
                             avatarUrl={row.avatarUrl}
                             colorId={row.colorId}
+                            isMaybe={row.isMaybe}
                           />
                         </li>
                       ))}
@@ -314,16 +330,23 @@ function AttendeeAvatar({
   firstName,
   avatarUrl,
   colorId,
+  isMaybe = false,
 }: {
   name: string;
   firstName: string;
   avatarUrl: string | null;
   colorId: number;
+  isMaybe?: boolean;
 }) {
   const initial = (firstName || name).trim().charAt(0).toUpperCase() || "?";
+  const label = isMaybe ? `${name} · Maybe` : name;
 
   return (
-    <span className="party-attendee-avatar-wrap" tabIndex={0} aria-label={name}>
+    <span
+      className={isMaybe ? "party-attendee-avatar-wrap party-attendee-avatar-maybe" : "party-attendee-avatar-wrap"}
+      tabIndex={0}
+      aria-label={label}
+    >
       {avatarUrl ? (
         <img className="party-attendee-avatar" src={avatarUrl} alt="" />
       ) : (
@@ -335,8 +358,13 @@ function AttendeeAvatar({
           {initial}
         </span>
       )}
+      {isMaybe ? (
+        <span className="party-attendee-maybe-badge" aria-hidden="true">
+          ?
+        </span>
+      ) : null}
       <span className="party-attendee-tooltip" role="tooltip">
-        {name}
+        {label}
       </span>
     </span>
   );
