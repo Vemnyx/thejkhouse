@@ -10,6 +10,7 @@ import (
 )
 
 const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519"
+const partyInviteTimeLocation = "America/New_York"
 
 type partyInviteCTA struct {
 	Label string
@@ -47,8 +48,16 @@ func partySignupURL(email string) string {
 	return appBaseURL() + "/?" + values.Encode()
 }
 
+func partyInviteLocation() *time.Location {
+	location, err := time.LoadLocation(partyInviteTimeLocation)
+	if err != nil {
+		return time.FixedZone("EST", -5*60*60)
+	}
+	return location
+}
+
 func formatPartyInviteWhen(date time.Time) string {
-	return date.In(time.Local).Format("Monday, January 2, 2006 at 3:04 PM")
+	return date.In(partyInviteLocation()).Format("Monday, January 2, 2006 at 3:04 PM")
 }
 
 func partyInviteEmail(party Party, greetingName string, cta partyInviteCTA) (string, string) {

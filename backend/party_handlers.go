@@ -445,7 +445,7 @@ func (s *apiServer) handleCreatePartyAttendee(w http.ResponseWriter, r *http.Req
 			writeError(w, http.StatusInternalServerError, "failed to RSVP")
 			return
 		}
-		if rsvpStatus != PartyRsvpStatusGoing {
+		if rsvpStatus == PartyRsvpStatusNotGoing {
 			if err := s.store.deletePartyAttendeePlusOnes(r.Context(), attendee.ID); err != nil {
 				log.Error("party self rsvp plus-one cleanup", "error", err, "attendee_id", attendee.ID)
 			}
@@ -473,8 +473,8 @@ func (s *apiServer) handleCreatePartyAttendee(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusBadRequest, "host attendee is not for this party")
 		return
 	}
-	if hostAttendee.RsvpStatus != PartyRsvpStatusGoing {
-		writeError(w, http.StatusBadRequest, "guest invites are only available when you are going")
+	if hostAttendee.RsvpStatus != PartyRsvpStatusGoing && hostAttendee.RsvpStatus != PartyRsvpStatusMaybe {
+		writeError(w, http.StatusBadRequest, "guest invites are only available when you are going or maybe")
 		return
 	}
 	if user.Role != RoleHost {

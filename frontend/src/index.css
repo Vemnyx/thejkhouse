@@ -2471,6 +2471,15 @@ body {
   font-size: 0.78rem;
 }
 
+.party-rsvp-confirmed {
+  text-align: left;
+}
+
+.party-rsvp-confirmed-title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
 .upload-modal.party-signup-modal {
   width: min(calc(100vw - 3rem), 72rem);
   max-width: 72rem;
