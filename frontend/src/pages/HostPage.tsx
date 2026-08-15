@@ -278,6 +278,8 @@ export default function HostPage() {
   const [sendingPartyInviteId, setSendingPartyInviteId] = useState<number | null>(null);
   const [inviteTarget, setInviteTarget] = useState<PartyRecord | null>(null);
   const [inviteSentCount, setInviteSentCount] = useState<number | null>(null);
+  const [inviteSentTest, setInviteSentTest] = useState(false);
+  const [sendingInviteMode, setSendingInviteMode] = useState<"all" | "test" | null>(null);
   const [inviteError, setInviteError] = useState("");
   const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
@@ -1596,6 +1598,7 @@ export default function HostPage() {
     }
     setInviteTarget(party);
     setInviteSentCount(null);
+    setInviteSentTest(false);
     setInviteError("");
   };
 
@@ -1605,10 +1608,12 @@ export default function HostPage() {
     }
     setInviteTarget(null);
     setInviteSentCount(null);
+    setInviteSentTest(false);
+    setSendingInviteMode(null);
     setInviteError("");
   };
 
-  const handleSendPartyInvite = async (party: PartyRecord) => {
+  const handleSendPartyInvite = async (party: PartyRecord, test = false) => {
     if (!firebaseUser || sendingPartyInviteId != null) {
       return;
     }
@@ -1617,14 +1622,18 @@ export default function HostPage() {
     setPartySuccess("");
     setInviteError("");
     setSendingPartyInviteId(party.id);
+    setSendingInviteMode(test ? "test" : "all");
     try {
       const token = await firebaseUser.getIdToken();
-      const result = await sendPartyInvite(token, party.id);
+      const result = await sendPartyInvite(token, party.id, { test });
       setInviteSentCount(result.sent);
+      setInviteSentTest(test);
       setPartySuccess(
-        result.sent === 1
-          ? `Invite sent for ${party.label}.`
-          : `Invite sent to ${result.sent} recipients for ${party.label}.`,
+        test
+          ? `Test invite sent for ${party.label}.`
+          : result.sent === 1
+            ? `Invite sent for ${party.label}.`
+            : `Invite sent to ${result.sent} recipients for ${party.label}.`,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to send party invite";
@@ -1632,6 +1641,7 @@ export default function HostPage() {
       setError(message);
     } finally {
       setSendingPartyInviteId(null);
+      setSendingInviteMode(null);
     }
   };
 
@@ -4395,15 +4405,17 @@ export default function HostPage() {
 
               {inviteSentCount != null ? (
                 <>
-                  <p className="party-invite-confirm-eyebrow">Invitations sent</p>
+                  <p className="party-invite-confirm-eyebrow">{inviteSentTest ? "Test sent" : "Invitations sent"}</p>
                   <h2 className="host-section-title" id="party-invite-confirm-title">
                     You&apos;re all set
                   </h2>
                   <p className="party-invite-confirm-title">{inviteTarget.label}</p>
                   <p>
-                    {inviteSentCount === 1
-                      ? "The invite is on its way to 1 guest."
-                      : `Invites are on their way to ${inviteSentCount} guests.`}
+                    {inviteSentTest
+                      ? "A test invite was sent to programmerjake95@gmail.com."
+                      : inviteSentCount === 1
+                        ? "The invite is on its way to 1 guest."
+                        : `Invites are on their way to ${inviteSentCount} guests.`}
                   </p>
                   <div className="confirmation-actions">
                     <button className="auth-submit" type="button" onClick={closeSendPartyInvite}>
@@ -4445,12 +4457,20 @@ export default function HostPage() {
                       Cancel
                     </button>
                     <button
+                      className="auth-secondary"
+                      type="button"
+                      onClick={() => void handleSendPartyInvite(inviteTarget, true)}
+                      disabled={sendingPartyInviteId === inviteTarget.id}
+                    >
+                      {sendingInviteMode === "test" ? "Sending..." : "Send Test"}
+                    </button>
+                    <button
                       className="auth-submit"
                       type="button"
                       onClick={() => void handleSendPartyInvite(inviteTarget)}
                       disabled={sendingPartyInviteId === inviteTarget.id}
                     >
-                      {sendingPartyInviteId === inviteTarget.id ? "Sending..." : "Send Invitation"}
+                      {sendingInviteMode === "all" ? "Sending..." : "Send Invitation"}
                     </button>
                   </div>
                 </>

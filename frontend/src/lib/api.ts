@@ -521,9 +521,10 @@ export function deleteParty(token: string, id: number) {
   });
 }
 
-export function sendPartyInvite(token: string, id: number) {
-  return apiFetch<{ sent: number }>(`/parties/${id}/invite`, token, {
+export function sendPartyInvite(token: string, id: number, options?: { test?: boolean }) {
+  return apiFetch<{ sent: number; test?: boolean }>(`/parties/${id}/invite`, token, {
     method: "POST",
+    body: JSON.stringify(options?.test ? { test: true } : {}),
   });
 }
 

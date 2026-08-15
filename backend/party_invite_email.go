@@ -11,6 +11,7 @@ import (
 
 const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519"
 const partyInviteTimeLocation = "America/New_York"
+const partyInviteTestEmail = "programmerjake95@gmail.com"
 
 type partyInviteCTA struct {
 	Label string

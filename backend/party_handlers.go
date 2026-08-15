@@ -836,6 +836,14 @@ func (s *apiServer) handleSendPartyInvite(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	var req struct {
+		Test bool `json:"test"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		writeError(w, http.StatusBadRequest, "invalid invite request")
+		return
+	}
+
 	party, err := s.store.getPartyByID(r.Context(), partyID)
 	if err != nil {
 		if isNotFound(err) {
@@ -847,16 +855,56 @@ func (s *apiServer) handleSendPartyInvite(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	sent, err := s.sendPartyInvites(party)
+	var sent int
+	if req.Test {
+		sent, err = s.sendPartyInviteTest(party)
+	} else {
+		sent, err = s.sendPartyInvites(party)
+	}
 	if err != nil {
-		log.Error("party invite send", "error", err, "party_id", partyID)
+		log.Error("party invite send", "error", err, "party_id", partyID, "test", req.Test)
 		writeError(w, http.StatusInternalServerError, "failed to send party invites")
 		return
 	}
 
 	writeJSON(w, map[string]any{
 		"sent": sent,
+		"test": req.Test,
 	})
+}
+
+func (s *apiServer) sendPartyInviteTest(party Party) (int, error) {
+	if s.email == nil {
+		return 0, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	greetingName := "Jake"
+	users, err := s.store.listUsers(ctx)
+	if err == nil {
+		for _, user := range users {
+			if strings.EqualFold(strings.TrimSpace(user.Email), partyInviteTestEmail) {
+				if name := strings.TrimSpace(user.FirstName); name != "" {
+					greetingName = name
+				}
+				break
+			}
+		}
+	}
+
+	subject := partyCreatedInviteSubject(party)
+	htmlBody, textBody := partyInviteEmail(party, greetingName, partyInviteCTA{
+		Label: "RSVP",
+		URL:   partyRsvpURL(party),
+	})
+	emailID, err := s.email.send(ctx, []string{partyInviteTestEmail}, subject, htmlBody, textBody)
+	if err != nil {
+		return 0, err
+	}
+	log.Info("party invite test sent", "email_id", emailID, "party_id", party.ID, "to", partyInviteTestEmail)
+	return 1, nil
 }
 
 func (s *apiServer) sendPartyInvites(party Party) (int, error) {
