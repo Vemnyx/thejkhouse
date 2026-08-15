@@ -586,7 +586,7 @@ func (s *apiServer) handleDeletePartyAttendee(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := s.store.deletePartyAttendee(r.Context(), attendeeID); err != nil {
+	if err := s.store.deletePartyAttendeeAndSignup(r.Context(), partyID, attendeeID); err != nil {
 		if isNotFound(err) {
 			writeError(w, http.StatusNotFound, "attendee not found")
 			return

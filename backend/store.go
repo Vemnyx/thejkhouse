@@ -872,6 +872,75 @@ func (s *userStore) deletePartyAttendee(ctx context.Context, id int64) error {
 	return nil
 }
 
+func (s *userStore) deletePartyAttendeeAndSignup(ctx context.Context, partyID, attendeeID int64) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	rows, err := tx.Query(
+		ctx,
+		`SELECT user_id
+		 FROM party_attendees
+		 WHERE party_id = $1 AND (id = $2 OR plus_one_of = $2)`,
+		partyID,
+		attendeeID,
+	)
+	if err != nil {
+		return err
+	}
+
+	userIDs := make([]int64, 0)
+	for rows.Next() {
+		var userID *int64
+		if err := rows.Scan(&userID); err != nil {
+			rows.Close()
+			return err
+		}
+		if userID != nil && *userID > 0 {
+			userIDs = append(userIDs, *userID)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	if len(userIDs) > 0 {
+		if _, err := tx.Exec(
+			ctx,
+			`DELETE FROM party_signup_items
+			 WHERE party_id = $1 AND host_created = false AND user_id = ANY($2)`,
+			partyID,
+			userIDs,
+		); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(
+			ctx,
+			`UPDATE party_signup_items
+			 SET user_id = NULL, note = ''
+			 WHERE party_id = $1 AND host_created = true AND user_id = ANY($2)`,
+			partyID,
+			userIDs,
+		); err != nil {
+			return err
+		}
+	}
+
+	tag, err := tx.Exec(ctx, `DELETE FROM party_attendees WHERE id = $1 AND party_id = $2`, attendeeID, partyID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return tx.Commit(ctx)
+}
+
 func scanPartySignupItem(row interface {
 	Scan(dest ...any) error
 }) (PartySignupItem, error) {

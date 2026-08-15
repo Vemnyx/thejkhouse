@@ -3733,9 +3733,22 @@ body {
 .party-attendees-host-guests li {
   display: flex;
   align-items: flex-start;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 0.75rem;
   text-align: left;
+}
+
+.party-attendees-host-person-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.party-attendees-host-remove {
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .party-attendees-host-avatar {

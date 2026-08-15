@@ -5,7 +5,7 @@ import { ImageDateSelect } from "../components/BirthdaySelect";
 import PartySignupDraftEditor, { type PartySignupDraftItem } from "../components/PartySignupDraftEditor";
 import PartySignupModal from "../components/PartySignupModal";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, createPartySignupItem, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, revisePartySummary, saveMediaFromURL, sendHostEmail, sendPartyInvite, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, createPartySignupItem, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, removePartyAttendee, revisePartySummary, saveMediaFromURL, sendHostEmail, sendPartyInvite, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 import { isGifMediaItem, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, searchPartyMedia } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
@@ -28,7 +28,8 @@ type DeleteTarget =
   | { type: "image"; image: ImageRecord }
   | { type: "party"; party: PartyRecord }
   | { type: "event"; event: EventRecord }
-  | { type: "user"; user: AppUser };
+  | { type: "user"; user: AppUser }
+  | { type: "attendee"; party: PartyRecord; attendee: PartyAttendeeRecord };
 
 type CropBox = {
   x: number;
@@ -277,6 +278,7 @@ export default function HostPage() {
   const [sendingPartyInviteId, setSendingPartyInviteId] = useState<number | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [deletingAttendeeId, setDeletingAttendeeId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [qrEvent, setQrEvent] = useState<EventRecord | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState("");
@@ -1652,6 +1654,11 @@ export default function HostPage() {
       return;
     }
 
+    if (deleteTarget.type === "attendee") {
+      void handleDeletePartyAttendee(deleteTarget.party, deleteTarget.attendee);
+      return;
+    }
+
     void handleDeleteUser(deleteTarget.user);
   };
 
@@ -1664,6 +1671,8 @@ export default function HostPage() {
         ? deletingEventId === deleteTarget.event.id
       : deleteTarget?.type === "user"
         ? deletingUserId === deleteTarget.user.id
+      : deleteTarget?.type === "attendee"
+        ? deletingAttendeeId === deleteTarget.attendee.id
         : false;
   const generatingHTMLDraft = generatingHomepageDraft;
   const eventAllowsDates = eventType !== "0" && eventType !== "1";
@@ -1813,6 +1822,29 @@ export default function HostPage() {
     setPreviewPartyAttendees([]);
     setPreviewPartyAttendeesError("");
     setPreviewPartyAttendeesLoading(false);
+    setDeletingAttendeeId(null);
+  };
+
+  const handleDeletePartyAttendee = async (party: PartyRecord, attendee: PartyAttendeeRecord) => {
+    if (!firebaseUser) {
+      return;
+    }
+
+    setDeletingAttendeeId(attendee.id);
+    setPreviewPartyAttendeesError("");
+    try {
+      const token = await firebaseUser.getIdToken();
+      await removePartyAttendee(token, party.id, attendee.id);
+      setPreviewPartyAttendees((current) =>
+        current.filter((item) => item.id !== attendee.id && item.plusOneOf !== attendee.id),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to remove attendee";
+      setPreviewPartyAttendeesError(message);
+    } finally {
+      setDeletingAttendeeId(null);
+      setDeleteTarget(null);
+    }
   };
 
   const openPartyMediaModal = () => {
@@ -4205,23 +4237,33 @@ export default function HostPage() {
                       return (
                         <li className="party-attendees-host-item" key={attendee.id}>
                           <div className="party-attendees-host-person">
-                            <HostAttendeeAvatar
-                              name={primary.name}
-                              firstName={primary.firstName}
-                              avatarUrl={primary.avatarUrl}
-                              colorId={primary.colorId}
-                            />
-                            <div className="party-attendees-host-copy">
-                              <strong>{primary.name}</strong>
-                              {attendee.rsvpStatus !== "going" ? (
-                                <p className="party-attendees-host-status">{partyRsvpStatusLabel(attendee.rsvpStatus)}</p>
-                              ) : null}
-                              {attendee.note.trim() ? (
-                                <p className="party-attendees-host-note">{attendee.note.trim()}</p>
-                              ) : (
-                                <p className="party-attendees-host-note muted">No note</p>
-                              )}
+                            <div className="party-attendees-host-person-main">
+                              <HostAttendeeAvatar
+                                name={primary.name}
+                                firstName={primary.firstName}
+                                avatarUrl={primary.avatarUrl}
+                                colorId={primary.colorId}
+                              />
+                              <div className="party-attendees-host-copy">
+                                <strong>{primary.name}</strong>
+                                {attendee.rsvpStatus !== "going" ? (
+                                  <p className="party-attendees-host-status">{partyRsvpStatusLabel(attendee.rsvpStatus)}</p>
+                                ) : null}
+                                {attendee.note.trim() ? (
+                                  <p className="party-attendees-host-note">{attendee.note.trim()}</p>
+                                ) : (
+                                  <p className="party-attendees-host-note muted">No note</p>
+                                )}
+                              </div>
                             </div>
+                            <button
+                              className="auth-secondary table-action-button party-attendees-host-remove"
+                              type="button"
+                              onClick={() => setDeleteTarget({ type: "attendee", party: previewParty, attendee })}
+                              disabled={deletingAttendeeId === attendee.id}
+                            >
+                              {deletingAttendeeId === attendee.id ? "Removing..." : "Remove"}
+                            </button>
                           </div>
                           {plusOnes.length > 0 ? (
                             <ul className="party-attendees-host-guests">
@@ -4229,17 +4271,27 @@ export default function HostPage() {
                                 const guestInfo = partyAttendeeAvatarInfo(guest, users);
                                 return (
                                   <li key={guest.id}>
-                                    <HostAttendeeAvatar
-                                      name={guestInfo.name}
-                                      firstName={guestInfo.firstName}
-                                      avatarUrl={guestInfo.avatarUrl}
-                                      colorId={guestInfo.colorId}
-                                      compact
-                                    />
-                                    <div className="party-attendees-host-copy">
-                                      <span className="party-attendees-host-plus-label">+1</span>
-                                      <strong>{guestInfo.name}</strong>
+                                    <div className="party-attendees-host-person-main">
+                                      <HostAttendeeAvatar
+                                        name={guestInfo.name}
+                                        firstName={guestInfo.firstName}
+                                        avatarUrl={guestInfo.avatarUrl}
+                                        colorId={guestInfo.colorId}
+                                        compact
+                                      />
+                                      <div className="party-attendees-host-copy">
+                                        <span className="party-attendees-host-plus-label">+1</span>
+                                        <strong>{guestInfo.name}</strong>
+                                      </div>
                                     </div>
+                                    <button
+                                      className="auth-secondary table-action-button party-attendees-host-remove"
+                                      type="button"
+                                      onClick={() => setDeleteTarget({ type: "attendee", party: previewParty, attendee: guest })}
+                                      disabled={deletingAttendeeId === guest.id}
+                                    >
+                                      {deletingAttendeeId === guest.id ? "Removing..." : "Remove"}
+                                    </button>
                                   </li>
                                 );
                               })}
@@ -4317,7 +4369,9 @@ export default function HostPage() {
                 <span className="corner corner-br" />
               </div>
 
-              <h2 className="host-section-title" id="delete-confirm-title">Confirm Delete</h2>
+              <h2 className="host-section-title" id="delete-confirm-title">
+                {deleteTarget.type === "attendee" ? "Confirm Remove" : "Confirm Delete"}
+              </h2>
               <p>
                 {deleteTarget.type === "image"
                   ? "Delete this image from the library and storage?"
@@ -4325,6 +4379,10 @@ export default function HostPage() {
                     ? `Delete ${deleteTarget.party.label}?`
                   : deleteTarget.type === "event"
                     ? `Delete ${deleteTarget.event.label}? This will remove the event setup, contestants, teams, and votes.`
+                  : deleteTarget.type === "attendee"
+                    ? deleteTarget.attendee.plusOneOf == null
+                      ? `Remove ${partyAttendeeDisplayName(deleteTarget.attendee, users)} from this party? Their guests will be removed too, and they will be taken off the sign up sheet.`
+                      : `Remove ${partyAttendeeDisplayName(deleteTarget.attendee, users)} from this party? They will also be taken off the sign up sheet.`
                     : `Delete ${deleteTarget.user.firstName} ${deleteTarget.user.lastName}? This will remove their account access.`}
               </p>
               <div className="confirmation-actions">
@@ -4332,7 +4390,13 @@ export default function HostPage() {
                   Cancel
                 </button>
                 <button className="auth-submit" type="button" onClick={handleConfirmDelete} disabled={deletingTarget}>
-                  {deletingTarget ? "Deleting..." : "Delete"}
+                  {deletingTarget
+                    ? deleteTarget.type === "attendee"
+                      ? "Removing..."
+                      : "Deleting..."
+                    : deleteTarget.type === "attendee"
+                      ? "Remove"
+                      : "Delete"}
                 </button>
               </div>
             </section>
