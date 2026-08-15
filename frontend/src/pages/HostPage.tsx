@@ -276,6 +276,9 @@ export default function HostPage() {
   const [updatingImageTags, setUpdatingImageTags] = useState(false);
   const [deletingPartyId, setDeletingPartyId] = useState<number | null>(null);
   const [sendingPartyInviteId, setSendingPartyInviteId] = useState<number | null>(null);
+  const [inviteTarget, setInviteTarget] = useState<PartyRecord | null>(null);
+  const [inviteSentCount, setInviteSentCount] = useState<number | null>(null);
+  const [inviteError, setInviteError] = useState("");
   const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [deletingAttendeeId, setDeletingAttendeeId] = useState<number | null>(null);
@@ -534,6 +537,10 @@ export default function HostPage() {
   const previewPartyPrimaryAttendees = useMemo(
     () => previewPartyAttendees.filter((attendee) => attendee.plusOneOf == null),
     [previewPartyAttendees],
+  );
+  const inviteRecipientCount = useMemo(
+    () => users.filter((user) => user.email.trim()).length,
+    [users],
   );
 
   if (appUser?.role !== "host") {
@@ -1583,22 +1590,37 @@ export default function HostPage() {
     }
   };
 
+  const openSendPartyInvite = (party: PartyRecord) => {
+    if (sendingPartyInviteId != null) {
+      return;
+    }
+    setInviteTarget(party);
+    setInviteSentCount(null);
+    setInviteError("");
+  };
+
+  const closeSendPartyInvite = () => {
+    if (sendingPartyInviteId != null) {
+      return;
+    }
+    setInviteTarget(null);
+    setInviteSentCount(null);
+    setInviteError("");
+  };
+
   const handleSendPartyInvite = async (party: PartyRecord) => {
     if (!firebaseUser || sendingPartyInviteId != null) {
       return;
     }
 
-    const confirmed = window.confirm(`Send the invite email for "${party.label}" now?`);
-    if (!confirmed) {
-      return;
-    }
-
     setError("");
     setPartySuccess("");
+    setInviteError("");
     setSendingPartyInviteId(party.id);
     try {
       const token = await firebaseUser.getIdToken();
       const result = await sendPartyInvite(token, party.id);
+      setInviteSentCount(result.sent);
       setPartySuccess(
         result.sent === 1
           ? `Invite sent for ${party.label}.`
@@ -1606,6 +1628,7 @@ export default function HostPage() {
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to send party invite";
+      setInviteError(message);
       setError(message);
     } finally {
       setSendingPartyInviteId(null);
@@ -2446,7 +2469,7 @@ export default function HostPage() {
                                 type="button"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  void handleSendPartyInvite(party);
+                                  void openSendPartyInvite(party);
                                 }}
                                 disabled={sendingPartyInviteId === party.id}
                               >
@@ -4350,6 +4373,88 @@ export default function HostPage() {
                 <h2 className="host-section-title">Writing HTML</h2>
                 <p>The Cursor agent is reading the site style and drafting your block.</p>
               </div>
+            </section>
+          </div>
+        ) : null}
+        {inviteTarget ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={closeSendPartyInvite}>
+            <section
+              className="gothic-card party-invite-confirm party-themed"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="party-invite-confirm-title"
+              style={partyThemeStyle(inviteTarget)}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="card-frame" aria-hidden="true">
+                <span className="corner corner-tl" />
+                <span className="corner corner-tr" />
+                <span className="corner corner-bl" />
+                <span className="corner corner-br" />
+              </div>
+
+              {inviteSentCount != null ? (
+                <>
+                  <p className="party-invite-confirm-eyebrow">Invitations sent</p>
+                  <h2 className="host-section-title" id="party-invite-confirm-title">
+                    You&apos;re all set
+                  </h2>
+                  <p className="party-invite-confirm-title">{inviteTarget.label}</p>
+                  <p>
+                    {inviteSentCount === 1
+                      ? "The invite is on its way to 1 guest."
+                      : `Invites are on their way to ${inviteSentCount} guests.`}
+                  </p>
+                  <div className="confirmation-actions">
+                    <button className="auth-submit" type="button" onClick={closeSendPartyInvite}>
+                      Done
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="party-invite-confirm-eyebrow">Send invitation</p>
+                  <h2 className="host-section-title" id="party-invite-confirm-title">
+                    Ready to send?
+                  </h2>
+                  <p className="party-invite-confirm-title">{inviteTarget.label}</p>
+                  <div className="party-invite-confirm-meta">
+                    <article>
+                      <span>When</span>
+                      <strong>{formatDateTime(inviteTarget.date)}</strong>
+                    </article>
+                    <article>
+                      <span>Where</span>
+                      <strong>1116 Rosepine Dr, Cary, NC 27519</strong>
+                    </article>
+                  </div>
+                  <p>
+                    This emails every registered guest from host@thejkhouse.com with an RSVP link
+                    {inviteRecipientCount > 0
+                      ? ` (${inviteRecipientCount} ${inviteRecipientCount === 1 ? "person" : "people"}).`
+                      : "."}
+                  </p>
+                  {inviteError ? <p className="auth-error">{inviteError}</p> : null}
+                  <div className="confirmation-actions">
+                    <button
+                      className="auth-secondary"
+                      type="button"
+                      onClick={closeSendPartyInvite}
+                      disabled={sendingPartyInviteId === inviteTarget.id}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="auth-submit"
+                      type="button"
+                      onClick={() => void handleSendPartyInvite(inviteTarget)}
+                      disabled={sendingPartyInviteId === inviteTarget.id}
+                    >
+                      {sendingPartyInviteId === inviteTarget.id ? "Sending..." : "Send Invitation"}
+                    </button>
+                  </div>
+                </>
+              )}
             </section>
           </div>
         ) : null}

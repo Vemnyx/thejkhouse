@@ -4143,6 +4143,85 @@ body {
   flex-wrap: wrap;
 }
 
+.party-invite-confirm {
+  position: relative;
+  width: min(100%, 32rem);
+  display: grid;
+  gap: 0.9rem;
+  text-align: center;
+  border-color: color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 28%, transparent);
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 12%, transparent), transparent 48%),
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--party-theme-accent, var(--gold)) 12%, transparent), transparent 34%),
+    color-mix(in srgb, var(--party-theme-background, var(--black)) 82%, rgba(8, 8, 8, 0.92));
+}
+
+.party-invite-confirm .card-frame {
+  border-color: color-mix(in srgb, var(--party-theme-accent, var(--gold)) 22%, transparent);
+}
+
+.party-invite-confirm .corner {
+  border-color: var(--party-theme-accent, var(--gold));
+}
+
+.party-invite-confirm-eyebrow {
+  margin: 0;
+  color: var(--party-theme-accent, var(--gold));
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.party-invite-confirm .host-section-title {
+  margin: 0;
+  color: var(--party-theme-primary, var(--rose-pale));
+}
+
+.party-invite-confirm-title {
+  margin: 0;
+  color: var(--party-theme-primary, var(--rose-pale));
+  font-family: var(--party-theme-font, var(--decorative-font));
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+}
+
+.party-invite-confirm p {
+  margin: 0;
+  color: color-mix(in srgb, var(--party-theme-primary, var(--ink)) 40%, #f4f0fa);
+  line-height: 1.65;
+}
+
+.party-invite-confirm-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  text-align: left;
+}
+
+.party-invite-confirm-meta article {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 18%, transparent);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--party-theme-background, var(--black)) 55%, rgba(3, 3, 3, 0.5));
+}
+
+.party-invite-confirm-meta span {
+  color: var(--party-theme-accent, var(--gold));
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.party-invite-confirm-meta strong {
+  color: color-mix(in srgb, var(--party-theme-primary, var(--ink)) 55%, #f4f0fa);
+  font-weight: 600;
+  line-height: 1.4;
+  font-size: 0.92rem;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -4401,6 +4480,10 @@ body {
   }
 
   .auth-row {
+    grid-template-columns: 1fr;
+  }
+
+  .party-invite-confirm-meta {
     grid-template-columns: 1fr;
   }
 
