@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type BouncingImage = {
   imageUrl: string;
@@ -12,6 +12,17 @@ type BouncingImagesProps = {
   mobileSpeed?: number;
 };
 
+function shuffleImages<T extends BouncingImage>(items: T[]): T[] {
+  const next = [...items];
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const current = next[i];
+    next[i] = next[j];
+    next[j] = current;
+  }
+  return next;
+}
+
 export default function BouncingImages({ images, alt, className = "", speed = 78, mobileSpeed = 56 }: BouncingImagesProps) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -22,6 +33,16 @@ export default function BouncingImages({ images, alt, className = "", speed = 78
   const [isMobile, setIsMobile] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
   const effectiveSpeed = isMobile ? mobileSpeed : speed;
+
+  const imageKey = useMemo(() => images.map((image) => image.imageUrl).join("|"), [images]);
+  const imagesRef = useRef(images);
+  imagesRef.current = images;
+  const [orderedImages, setOrderedImages] = useState(() => shuffleImages(images));
+
+  useEffect(() => {
+    setOrderedImages(shuffleImages(imagesRef.current));
+    setImageIndex(0);
+  }, [imageKey]);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 480px)");
@@ -38,7 +59,7 @@ export default function BouncingImages({ images, alt, className = "", speed = 78
   useEffect(() => {
     const stage = stageRef.current;
     const image = imageRef.current;
-    if (!stage || !image || images.length === 0) {
+    if (!stage || !image || orderedImages.length === 0) {
       return undefined;
     }
 
@@ -104,8 +125,8 @@ export default function BouncingImages({ images, alt, className = "", speed = 78
       positionRef.current = next;
       image.style.transform = `translate3d(${next.x}px, ${next.y}px, 0)`;
 
-      if (bounced && images.length > 1) {
-        setImageIndex((current) => (current + 1) % images.length);
+      if (bounced && orderedImages.length > 1) {
+        setImageIndex((current) => (current + 1) % orderedImages.length);
       }
 
       frameRef.current = window.requestAnimationFrame(animate);
@@ -126,9 +147,9 @@ export default function BouncingImages({ images, alt, className = "", speed = 78
       }
       lastTimeRef.current = null;
     };
-  }, [effectiveSpeed, images.length]);
+  }, [effectiveSpeed, orderedImages.length]);
 
-  if (images.length === 0) {
+  if (orderedImages.length === 0) {
     return null;
   }
 
@@ -137,7 +158,7 @@ export default function BouncingImages({ images, alt, className = "", speed = 78
       <img
         ref={imageRef}
         className="bouncing-image"
-        src={images[imageIndex]?.imageUrl}
+        src={orderedImages[imageIndex]?.imageUrl}
         alt={alt}
         onLoad={() => {
           lastTimeRef.current = null;
