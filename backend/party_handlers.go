@@ -512,6 +512,15 @@ func (s *apiServer) handleCreatePartyAttendee(w http.ResponseWriter, r *http.Req
 		}
 	}
 
+	if guestUserID != nil && hostAttendee.UserID != nil && *guestUserID == *hostAttendee.UserID {
+		writeError(w, http.StatusBadRequest, "you cannot invite yourself as a guest")
+		return
+	}
+	if email != "" && strings.EqualFold(email, strings.TrimSpace(hostAttendee.Email)) {
+		writeError(w, http.StatusBadRequest, "you cannot invite yourself as a guest")
+		return
+	}
+
 	if firstName == "" || lastName == "" {
 		writeError(w, http.StatusBadRequest, "firstName and lastName are required for guest invites")
 		return

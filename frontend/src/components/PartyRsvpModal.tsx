@@ -8,6 +8,7 @@ import {
   addPartyAttendee,
   listPartyAttendees,
 } from "../lib/api";
+import PartyCalendarButton from "./PartyCalendarButton";
 
 const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519";
 
@@ -157,6 +158,23 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
     if (!selectedUserId && (!firstName || !lastName)) {
       setRsvpError("Select a user or enter a first and last name.");
       return;
+    }
+
+    if (appUser) {
+      const myEmail = appUser.email.trim().toLowerCase();
+      const myFirst = appUser.firstName.trim().toLowerCase();
+      const myLast = appUser.lastName.trim().toLowerCase();
+      const invitedSelf =
+        selectedUserId === appUser.id ||
+        (email !== "" && email.toLowerCase() === myEmail) ||
+        (myFirst !== "" &&
+          myLast !== "" &&
+          firstName.toLowerCase() === myFirst &&
+          lastName.toLowerCase() === myLast);
+      if (invitedSelf) {
+        setRsvpError("You cannot invite yourself as a +1.");
+        return;
+      }
     }
 
     const selectedUser = selectedUserId ? userOptions.find((user) => user.id === selectedUserId) ?? null : null;
@@ -334,6 +352,7 @@ export default function PartyRsvpModal({ party, users, onClose, onAttendeesUpdat
               </div>
             ) : null}
             <div className="party-rsvp-actions party-rsvp-actions-stacked">
+              <PartyCalendarButton party={party} variant="modal" />
               <button className="auth-submit" type="button" onClick={onClose}>
                 Done
               </button>
