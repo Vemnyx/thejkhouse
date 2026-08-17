@@ -2027,7 +2027,8 @@ body {
 
 .party-detail-topbar {
   position: relative;
-  z-index: 1;
+  z-index: 8;
+  overflow: visible;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2035,6 +2036,8 @@ body {
 }
 
 .party-detail-topbar-actions {
+  position: relative;
+  z-index: 8;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -2064,6 +2067,11 @@ body {
 
 .party-calendar-add {
   position: relative;
+  z-index: 8;
+}
+
+.party-calendar-add.is-open {
+  z-index: 12;
 }
 
 .party-calendar-add-modal {
@@ -2076,25 +2084,17 @@ body {
 }
 
 .party-calendar-add-menu {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  right: 0;
-  z-index: 4;
+  position: fixed;
+  z-index: 80;
   min-width: 14.5rem;
   display: grid;
   overflow: hidden;
+  pointer-events: auto;
+  isolation: isolate;
   border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 28%, transparent);
   border-radius: 0.75rem;
-  background: color-mix(in srgb, var(--party-theme-background, #140408) 92%, #000);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
-}
-
-.party-calendar-add-modal .party-calendar-add-menu {
-  position: static;
-  left: auto;
-  right: auto;
-  min-width: 0;
-  margin-top: 0.35rem;
+  background: color-mix(in srgb, var(--party-theme-background, #140408) 96%, #0a0304);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.48);
 }
 
 .party-calendar-add-option {
