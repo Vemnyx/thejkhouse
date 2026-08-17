@@ -3798,6 +3798,25 @@ body {
   flex-wrap: wrap;
 }
 
+.host-user-profile-modal {
+  width: min(100%, 34rem);
+}
+
+.host-user-profile {
+  justify-self: stretch;
+  width: 100%;
+  text-align: left;
+}
+
+.host-user-profile-avatar {
+  cursor: default;
+}
+
+.host-user-profile-modal input[readonly] {
+  cursor: default;
+  color: color-mix(in srgb, var(--ink) 88%, transparent);
+}
+
 .party-attendees-modal {
   width: min(100%, 36rem);
   max-height: calc(100dvh - 3rem);

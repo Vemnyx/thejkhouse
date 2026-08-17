@@ -293,6 +293,7 @@ export default function HostPage() {
   const [previewPartyAttendees, setPreviewPartyAttendees] = useState<PartyAttendeeRecord[]>([]);
   const [previewPartyAttendeesLoading, setPreviewPartyAttendeesLoading] = useState(false);
   const [previewPartyAttendeesError, setPreviewPartyAttendeesError] = useState("");
+  const [previewUser, setPreviewUser] = useState<AppUser | null>(null);
   const [tagEditImage, setTagEditImage] = useState<ImageRecord | null>(null);
   const [tagEditUserId, setTagEditUserId] = useState("");
   const [tagEditUserIds, setTagEditUserIds] = useState<number[]>([]);
@@ -1560,6 +1561,7 @@ export default function HostPage() {
       const token = await firebaseUser.getIdToken();
       await deleteUser(token, user.id);
       setUsers((current) => current.filter((item) => item.id !== user.id));
+      setPreviewUser((current) => (current?.id === user.id ? null : current));
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to delete user";
       setError(message);
@@ -2923,7 +2925,11 @@ export default function HostPage() {
                 </thead>
                 <tbody>
                   {users.map((user) => (
-                    <tr key={user.id}>
+                    <tr
+                      className="clickable-row"
+                      key={user.id}
+                      onClick={() => setPreviewUser(user)}
+                    >
                       <td>{user.firstName} {user.lastName}</td>
                       <td>{user.email}</td>
                       <td>{user.birthday ? formatDate(user.birthday) : "Not set"}</td>
@@ -2931,9 +2937,12 @@ export default function HostPage() {
                       <td>{formatDateTime(user.createdAt)}</td>
                       <td>
                         <button
-                          className="auth-secondary"
+                          className="auth-secondary table-action-button"
                           type="button"
-                          onClick={() => setDeleteTarget({ type: "user", user })}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setDeleteTarget({ type: "user", user });
+                          }}
                           disabled={deletingUserId === user.id || user.id === appUser?.id}
                         >
                           {deletingUserId === user.id ? "Deleting..." : "Delete"}
@@ -4475,6 +4484,76 @@ export default function HostPage() {
                   </div>
                 </>
               )}
+            </section>
+          </div>
+        ) : null}
+        {previewUser ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={() => setPreviewUser(null)}>
+            <section
+              className="upload-modal gothic-card host-user-profile-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="host-user-profile-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <h2 className="host-section-title" id="host-user-profile-title">
+                  Profile
+                </h2>
+                <button className="modal-close" type="button" onClick={() => setPreviewUser(null)} aria-label="Close profile">
+                  x
+                </button>
+              </div>
+
+              <div className="settings-panel host-user-profile">
+                <div className="settings-avatar-block">
+                  <div
+                    className={previewUser.avatarUrl ? "settings-avatar has-image host-user-profile-avatar" : "settings-avatar host-user-profile-avatar"}
+                    aria-hidden={!previewUser.avatarUrl}
+                  >
+                    {previewUser.avatarUrl ? (
+                      <img
+                        src={previewUser.avatarUrl}
+                        alt={`${userDisplayName(previewUser)} profile picture`}
+                        className="settings-avatar-image"
+                      />
+                    ) : (
+                      <span className="settings-avatar-placeholder" aria-hidden="true" />
+                    )}
+                  </div>
+                </div>
+
+                <div className="auth-form">
+                  <div className="auth-row">
+                    <label className="auth-field">
+                      <span>First name</span>
+                      <input value={previewUser.firstName} readOnly />
+                    </label>
+                    <label className="auth-field">
+                      <span>Last name</span>
+                      <input value={previewUser.lastName} readOnly />
+                    </label>
+                  </div>
+                  <label className="auth-field">
+                    <span>Email</span>
+                    <input value={previewUser.email} readOnly />
+                  </label>
+                  <label className="auth-field">
+                    <span>Birthday</span>
+                    <input value={previewUser.birthday ? formatDate(previewUser.birthday) : "Not set"} readOnly />
+                  </label>
+                  <div className="auth-row">
+                    <label className="auth-field">
+                      <span>Role</span>
+                      <input value={previewUser.role} readOnly />
+                    </label>
+                    <label className="auth-field">
+                      <span>Added</span>
+                      <input value={formatDateTime(previewUser.createdAt)} readOnly />
+                    </label>
+                  </div>
+                </div>
+              </div>
             </section>
           </div>
         ) : null}
