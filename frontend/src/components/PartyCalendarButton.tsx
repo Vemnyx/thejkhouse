@@ -80,6 +80,11 @@ export default function PartyCalendarButton({ party, className = "", variant = "
     };
   }, [open]);
 
+  const addIcsCalendar = () => {
+    downloadPartyCalendar(party);
+    setOpen(false);
+  };
+
   const menu = open
     ? createPortal(
         <div
@@ -89,17 +94,17 @@ export default function PartyCalendarButton({ party, className = "", variant = "
           ref={menuRef}
           style={menuStyle}
         >
-          <button
-            className="party-calendar-add-option"
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              downloadPartyCalendar(party);
-              setOpen(false);
-            }}
-          >
-            Apple, Outlook, or other
-          </button>
+          {["Apple Calendar", "Outlook", "Other"].map((label) => (
+            <button
+              className="party-calendar-add-option"
+              key={label}
+              type="button"
+              role="menuitem"
+              onClick={addIcsCalendar}
+            >
+              {label}
+            </button>
+          ))}
           <a
             className="party-calendar-add-option"
             href={googleCalendarUrl(party)}
