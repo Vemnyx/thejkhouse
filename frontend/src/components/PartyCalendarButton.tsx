@@ -1,7 +1,7 @@
 import { CSSProperties, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PartyRecord } from "../lib/api";
-import { downloadPartyCalendar, googleCalendarUrl } from "../lib/partyCalendar";
+import { downloadPartyCalendar, googleCalendarUrl, openAppleCalendar } from "../lib/partyCalendar";
 
 type PartyCalendarButtonProps = {
   party: PartyRecord;
@@ -80,8 +80,8 @@ export default function PartyCalendarButton({ party, className = "", variant = "
     };
   }, [open]);
 
-  const addIcsCalendar = () => {
-    downloadPartyCalendar(party);
+  const closeAnd = (action: () => void) => {
+    action();
     setOpen(false);
   };
 
@@ -94,17 +94,30 @@ export default function PartyCalendarButton({ party, className = "", variant = "
           ref={menuRef}
           style={menuStyle}
         >
-          {["Apple Calendar", "Outlook", "Other"].map((label) => (
-            <button
-              className="party-calendar-add-option"
-              key={label}
-              type="button"
-              role="menuitem"
-              onClick={addIcsCalendar}
-            >
-              {label}
-            </button>
-          ))}
+          <button
+            className="party-calendar-add-option"
+            type="button"
+            role="menuitem"
+            onClick={() => closeAnd(() => openAppleCalendar(party))}
+          >
+            Apple Calendar
+          </button>
+          <button
+            className="party-calendar-add-option"
+            type="button"
+            role="menuitem"
+            onClick={() => closeAnd(() => downloadPartyCalendar(party))}
+          >
+            Outlook
+          </button>
+          <button
+            className="party-calendar-add-option"
+            type="button"
+            role="menuitem"
+            onClick={() => closeAnd(() => downloadPartyCalendar(party))}
+          >
+            Other
+          </button>
           <a
             className="party-calendar-add-option"
             href={googleCalendarUrl(party)}

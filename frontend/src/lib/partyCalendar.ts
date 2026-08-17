@@ -72,21 +72,65 @@ export function buildPartyIcs(party: PartyRecord) {
     foldIcsLine(`DESCRIPTION:${description}`),
     foldIcsLine(`LOCATION:${escapeIcsText(PARTY_VENUE_ADDRESS)}`),
     foldIcsLine(`URL:${escapeIcsText(url)}`),
+    "STATUS:CONFIRMED",
+    "SEQUENCE:0",
     "END:VEVENT",
     "END:VCALENDAR",
   ];
   return `${lines.join("\r\n")}\r\n`;
 }
 
-export function downloadPartyCalendar(party: PartyRecord) {
-  const blob = new Blob([buildPartyIcs(party)], { type: "text/calendar;charset=utf-8" });
-  const objectUrl = URL.createObjectURL(blob);
-  const slug = partyRouteIdentifier(party);
+function isAppleMobile() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+function isSafari() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  return /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|Edg|Firefox|FxiOS/.test(navigator.userAgent);
+}
+
+function clickCalendarLink(href: string, options: { download?: string; target?: string }) {
   const link = document.createElement("a");
-  link.href = objectUrl;
-  link.download = `${slug}.ics`;
+  link.href = href;
+  link.rel = "noopener";
+  if (options.target) {
+    link.target = options.target;
+  }
+  if (options.download) {
+    link.download = options.download;
+  }
   document.body.append(link);
-  link.click();
+  link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
   link.remove();
+}
+
+export function openAppleCalendar(party: PartyRecord) {
+  const ics = buildPartyIcs(party);
+  // Safari (iPhone, iPad, and Mac) opens Calendar when it navigates to the ICS.
+  // Setting download would save a file instead of adding the event.
+  if (isAppleMobile() || isSafari()) {
+    window.location.assign(`data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`);
+    return;
+  }
+
+  const objectUrl = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+  clickCalendarLink(objectUrl, { target: "_blank" });
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 2500);
+}
+
+export function downloadPartyCalendar(party: PartyRecord) {
+  const blob = new Blob([buildPartyIcs(party)], { type: "text/calendar" });
+  const objectUrl = URL.createObjectURL(blob);
+  clickCalendarLink(objectUrl, { download: `${partyRouteIdentifier(party)}.ics` });
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
 }
