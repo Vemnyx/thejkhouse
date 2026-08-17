@@ -2034,6 +2034,97 @@ body {
   gap: 1rem;
 }
 
+.party-detail-topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.party-calendar-button {
+  width: fit-content;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 34%, transparent);
+  border-radius: 0.8rem;
+  padding: 0.85rem 1.35rem;
+  background: color-mix(in srgb, var(--party-theme-background, #000) 35%, rgba(3, 3, 3, 0.42));
+  color: var(--party-theme-primary, var(--rose-pale));
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.party-calendar-button:hover {
+  border-color: color-mix(in srgb, var(--party-theme-accent, var(--gold)) 55%, transparent);
+  color: var(--party-theme-accent, var(--gold));
+}
+
+.party-calendar-add {
+  position: relative;
+}
+
+.party-calendar-add-modal {
+  width: 100%;
+  display: grid;
+}
+
+.party-calendar-add-modal .party-calendar-add-trigger {
+  width: 100%;
+}
+
+.party-calendar-add-menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 4;
+  min-width: 14.5rem;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 28%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--party-theme-background, #140408) 92%, #000);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.party-calendar-add-modal .party-calendar-add-menu {
+  position: static;
+  left: auto;
+  right: auto;
+  min-width: 0;
+  margin-top: 0.35rem;
+}
+
+.party-calendar-add-option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 16%, transparent);
+  background: transparent;
+  color: color-mix(in srgb, var(--party-theme-primary, var(--ink)) 45%, #f4f0fa);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.party-calendar-add-option:last-child {
+  border-bottom: 0;
+}
+
+.party-calendar-add-option:hover,
+.party-calendar-add-option:focus-visible {
+  background: color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 12%, transparent);
+  color: var(--party-theme-accent, var(--gold));
+  outline: none;
+}
+
 .party-detail-topbar .party-detail-back {
   margin: 0;
 }

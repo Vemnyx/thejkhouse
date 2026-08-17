@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import PartyCalendarButton from "../components/PartyCalendarButton";
 import PartyRsvpModal from "../components/PartyRsvpModal";
 import PartySignupModal from "../components/PartySignupModal";
 import { useAuth } from "../context/AuthContext";
@@ -191,11 +192,14 @@ export default function PartyPage() {
           <Link className="auth-secondary back-text-link event-detail-back party-detail-back" to="/parties">
             Back to Parties
           </Link>
-          {canShowRsvpButton ? (
-            <button className="party-rsvp-button" type="button" onClick={() => setRsvpModalOpen(true)}>
-              {myAttendee ? "Update RSVP" : "RSVP"}
-            </button>
-          ) : null}
+          <div className="party-detail-topbar-actions">
+            {party ? <PartyCalendarButton party={party} /> : null}
+            {canShowRsvpButton ? (
+              <button className="party-rsvp-button" type="button" onClick={() => setRsvpModalOpen(true)}>
+                {myAttendee ? "Update RSVP" : "RSVP"}
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {loading ? (
