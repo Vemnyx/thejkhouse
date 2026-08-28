@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import BirthdaySelect from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
-import { ApiError, ImageRecord, getHomepageImages } from "../lib/api";
+import { ApiError, ImageRecord, getHomepageImages, resetPasswordWithToken } from "../lib/api";
 import { confirmPasswordResetWithCode } from "../lib/firebaseApp";
 
 type AuthMode = "login" | "signup";
@@ -31,6 +31,7 @@ export default function LoginPage() {
   const [introDismissed, setIntroDismissed] = useState(() =>
     Boolean(
       searchParams.get("confirm_signup_token") ||
+      searchParams.get("reset_password_token") ||
       searchParams.get("mode") === "signup" ||
       searchParams.get("mode") === "resetPassword" ||
       searchParams.get("oobCode"),
@@ -39,8 +40,9 @@ export default function LoginPage() {
   const confirmationToken = searchParams.get("confirm_signup_token");
   const inviteMode = searchParams.get("mode");
   const inviteEmail = searchParams.get("email");
+  const resetPasswordToken = searchParams.get("reset_password_token");
   const resetOobCode = searchParams.get("oobCode");
-  const isResetPassword = searchParams.get("mode") === "resetPassword" && Boolean(resetOobCode);
+  const isResetPassword = Boolean(resetPasswordToken) || (searchParams.get("mode") === "resetPassword" && Boolean(resetOobCode));
 
   useEffect(() => {
     if (inviteMode === "signup") {
@@ -118,7 +120,7 @@ export default function LoginPage() {
     setError("");
     setSuccess("");
 
-    if (!resetOobCode) {
+    if (!resetPasswordToken && !resetOobCode) {
       setError("This reset link is invalid or has expired.");
       return;
     }
@@ -129,7 +131,11 @@ export default function LoginPage() {
 
     setSubmitting(true);
     try {
-      await confirmPasswordResetWithCode(resetOobCode, password);
+      if (resetPasswordToken) {
+        await resetPasswordWithToken(resetPasswordToken, password);
+      } else if (resetOobCode) {
+        await confirmPasswordResetWithCode(resetOobCode, password);
+      }
       setPassword("");
       setConfirmPassword("");
       setShowPassword(false);

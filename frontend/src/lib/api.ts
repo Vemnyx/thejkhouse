@@ -452,6 +452,13 @@ export function resendSignupConfirmation(email: string) {
   });
 }
 
+export function resetPasswordWithToken(token: string, password: string) {
+  return publicFetch<{ message: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+}
+
 export function getSession(token: string) {
   return apiFetch<AppUser>("/auth/session", token);
 }

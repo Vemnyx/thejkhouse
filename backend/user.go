@@ -176,3 +176,11 @@ type PendingSignup struct {
 	ExpiresAt   time.Time
 	CreatedAt   time.Time
 }
+
+type PendingPasswordReset struct {
+	ID        int64
+	UserID    int64
+	TokenHash []byte
+	ExpiresAt time.Time
+	CreatedAt time.Time
+}

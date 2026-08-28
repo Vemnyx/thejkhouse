@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Vemnyx/thejkhouse/backend/log"
 )
@@ -146,14 +147,14 @@ func (s *apiServer) handleUserPasswordReset(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	delivery, err := s.sendUserPasswordResetEmail(r.Context(), targetUser)
+	delivery, emailID, err := s.sendUserPasswordResetEmail(r.Context(), targetUser)
 	if err != nil {
 		log.Error("user password reset send", "error", err, "user_id", id, "email", targetUser.Email)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	log.Info("password reset email sent", "user_id", id, "email", targetUser.Email, "host_id", currentUser.ID, "delivery", delivery)
+	log.Info("password reset email sent", "user_id", id, "email", targetUser.Email, "host_id", currentUser.ID, "delivery", delivery, "email_id", emailID)
 	writeJSON(w, map[string]string{
 		"message":  "password reset email sent",
 		"delivery": delivery,
@@ -161,31 +162,30 @@ func (s *apiServer) handleUserPasswordReset(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-func (s *apiServer) sendUserPasswordResetEmail(ctx context.Context, user *User) (string, error) {
+func (s *apiServer) sendUserPasswordResetEmail(ctx context.Context, user *User) (string, string, error) {
 	email := strings.TrimSpace(user.Email)
 	if email == "" {
-		return "", fmt.Errorf("user does not have an email address")
+		return "", "", fmt.Errorf("user does not have an email address")
 	}
 
-	continueURL := passwordResetContinueURL()
-	resetURL, linkErr := s.auth.passwordResetLink(ctx, email)
-	if linkErr == nil {
-		htmlBody, textBody := passwordResetEmail(user.FirstName, resetURL)
-		if _, err := s.email.send(ctx, []string{email}, "Reset your The JK House password", htmlBody, textBody); err == nil {
-			return "branded", nil
-		} else {
-			log.Error("branded password reset email", "error", err, "email", email)
-		}
-	} else {
-		log.Error("password reset link", "error", linkErr, "email", email)
+	token, tokenHash, err := newPendingSignupToken()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create password reset link")
 	}
 
-	if err := s.auth.identity.SendPasswordResetOobCode(ctx, email, continueURL); err != nil {
-		if linkErr != nil {
-			return "", fmt.Errorf("failed to create password reset link")
-		}
-		return "", fmt.Errorf("failed to send password reset email")
+	expiresAt := time.Now().UTC().Add(24 * time.Hour)
+	if _, err := s.store.upsertPendingPasswordReset(ctx, user.ID, tokenHash, expiresAt); err != nil {
+		log.Error("password reset pending", "error", err, "user_id", user.ID, "email", email)
+		return "", "", fmt.Errorf("failed to create password reset link")
 	}
 
-	return "firebase", nil
+	resetURL := passwordResetURL(token)
+	htmlBody, textBody := passwordResetEmail(user.FirstName, resetURL)
+	emailID, err := s.email.send(ctx, []string{email}, "Reset your The JK House password", htmlBody, textBody)
+	if err != nil {
+		log.Error("password reset email", "error", err, "user_id", user.ID, "email", email)
+		return "", "", fmt.Errorf("failed to send password reset email")
+	}
+
+	return "branded", emailID, nil
 }

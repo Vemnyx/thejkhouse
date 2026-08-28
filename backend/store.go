@@ -382,6 +382,60 @@ func (s *userStore) deletePendingSignup(ctx context.Context, id int64) error {
 	return err
 }
 
+func (s *userStore) upsertPendingPasswordReset(ctx context.Context, userID int64, tokenHash []byte, expiresAt time.Time) (*PendingPasswordReset, error) {
+	var pending PendingPasswordReset
+	err := s.pool.QueryRow(
+		ctx,
+		`INSERT INTO pending_password_resets (user_id, token_hash, expires_at)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (user_id) DO UPDATE SET
+		   token_hash = EXCLUDED.token_hash,
+		   expires_at = EXCLUDED.expires_at,
+		   created_at = now()
+		 RETURNING id, user_id, token_hash, expires_at, created_at`,
+		userID,
+		tokenHash,
+		expiresAt,
+	).Scan(
+		&pending.ID,
+		&pending.UserID,
+		&pending.TokenHash,
+		&pending.ExpiresAt,
+		&pending.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pending, nil
+}
+
+func (s *userStore) getPendingPasswordResetByTokenHash(ctx context.Context, tokenHash []byte) (*PendingPasswordReset, error) {
+	var pending PendingPasswordReset
+	err := s.pool.QueryRow(
+		ctx,
+		`SELECT id, user_id, token_hash, expires_at, created_at
+		 FROM pending_password_resets WHERE token_hash = $1`,
+		tokenHash,
+	).Scan(
+		&pending.ID,
+		&pending.UserID,
+		&pending.TokenHash,
+		&pending.ExpiresAt,
+		&pending.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pending, nil
+}
+
+func (s *userStore) deletePendingPasswordReset(ctx context.Context, id int64) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM pending_password_resets WHERE id = $1`, id)
+	return err
+}
+
 func (s *userStore) createImage(ctx context.Context, imageURL string, date time.Time, partyID *int64, eventID *int64, teamID *int64, homepage bool, notes string, userIDs []int32) (*Image, error) {
 	var image Image
 	err := s.pool.QueryRow(

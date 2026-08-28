@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	"html"
+	"net/url"
 )
 
-func passwordResetContinueURL() string {
-	return appBaseURL() + "/?mode=resetPassword"
+func passwordResetURL(token string) string {
+	return appBaseURL() + "/?reset_password_token=" + url.QueryEscape(token)
 }
 
 func passwordResetEmail(firstName, resetURL string) (string, string) {

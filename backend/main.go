@@ -100,6 +100,7 @@ func main() {
 	mux.HandleFunc("/auth/confirm-signup", server.handleAuthConfirmSignup)
 	mux.HandleFunc("/auth/login", server.handleAuthLogin)
 	mux.HandleFunc("/auth/resend-confirmation", server.handleAuthResendConfirmation)
+	mux.HandleFunc("/auth/reset-password", server.handleAuthResetPassword)
 	mux.HandleFunc("/auth/signup", server.handleAuthSignup)
 	mux.HandleFunc("/auth/session", server.handleAuthSession)
 	mux.HandleFunc("/emails", server.handleEmails)

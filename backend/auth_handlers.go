@@ -40,6 +40,11 @@ type resendConfirmationRequest struct {
 	Email string `json:"email"`
 }
 
+type resetPasswordRequest struct {
+	Token    string `json:"token"`
+	Password string `json:"password"`
+}
+
 func (s *apiServer) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w)
@@ -281,6 +286,69 @@ func (s *apiServer) handleAuthResendConfirmation(w http.ResponseWriter, r *http.
 	}
 
 	writeJSON(w, authSignupPendingResponse{Message: "check your email to confirm your account"})
+}
+
+func (s *apiServer) handleAuthResetPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+
+	var payload resetPasswordRequest
+	if err := readJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, errInvalidBody.Error())
+		return
+	}
+
+	token := strings.TrimSpace(payload.Token)
+	password := payload.Password
+	if token == "" || password == "" {
+		writeError(w, http.StatusBadRequest, "token and password are required")
+		return
+	}
+	if len(password) < 6 {
+		writeError(w, http.StatusBadRequest, "password must be at least 6 characters")
+		return
+	}
+
+	pending, err := s.store.getPendingPasswordResetByTokenHash(r.Context(), pendingSignupTokenHash(token))
+	if err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusBadRequest, "password reset link is invalid")
+			return
+		}
+		log.Error("auth reset password load pending", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to reset password")
+		return
+	}
+	if time.Now().UTC().After(pending.ExpiresAt) {
+		writeError(w, http.StatusBadRequest, "password reset link has expired")
+		return
+	}
+
+	user, err := s.store.getUserByID(r.Context(), pending.UserID)
+	if err != nil {
+		if isNotFound(err) {
+			writeError(w, http.StatusBadRequest, "password reset link is no longer valid")
+			return
+		}
+		log.Error("auth reset password load user", "error", err, "user_id", pending.UserID)
+		writeError(w, http.StatusInternalServerError, "failed to reset password")
+		return
+	}
+
+	if err := s.auth.updateUserPassword(r.Context(), user.FirebaseUID, password); err != nil {
+		log.Error("auth reset password update", "error", err, "user_id", user.ID, "email", user.Email)
+		writeError(w, http.StatusInternalServerError, "failed to reset password")
+		return
+	}
+
+	if err := s.store.deletePendingPasswordReset(r.Context(), pending.ID); err != nil {
+		log.Error("auth reset password cleanup", "error", err, "pending_id", pending.ID)
+	}
+
+	log.Info("password reset completed", "user_id", user.ID, "email", user.Email)
+	writeJSON(w, map[string]string{"message": "password updated"})
 }
 
 func (s *apiServer) handleAuthSession(w http.ResponseWriter, r *http.Request) {

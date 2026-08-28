@@ -60,15 +60,12 @@ func (a *authService) deleteUser(ctx context.Context, uid string) error {
 	return nil
 }
 
-func (a *authService) passwordResetLink(ctx context.Context, email string) (string, error) {
-	link, err := a.client.PasswordResetLinkWithSettings(ctx, email, &auth.ActionCodeSettings{
-		URL:             passwordResetContinueURL(),
-		HandleCodeInApp: false,
-	})
+func (a *authService) updateUserPassword(ctx context.Context, uid, password string) error {
+	_, err := a.client.UpdateUser(ctx, uid, (&auth.UserToUpdate{}).Password(password))
 	if err != nil {
-		return "", fmt.Errorf("create password reset link: %w", err)
+		return fmt.Errorf("update firebase password: %w", err)
 	}
-	return link, nil
+	return nil
 }
 
 func (a *authService) verifyRequestToken(r *http.Request) (*auth.Token, error) {
