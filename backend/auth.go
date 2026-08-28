@@ -62,7 +62,8 @@ func (a *authService) deleteUser(ctx context.Context, uid string) error {
 
 func (a *authService) passwordResetLink(ctx context.Context, email string) (string, error) {
 	link, err := a.client.PasswordResetLinkWithSettings(ctx, email, &auth.ActionCodeSettings{
-		URL: appBaseURL() + "/",
+		URL:             passwordResetContinueURL(),
+		HandleCodeInApp: false,
 	})
 	if err != nil {
 		return "", fmt.Errorf("create password reset link: %w", err)

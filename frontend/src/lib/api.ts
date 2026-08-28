@@ -734,7 +734,7 @@ export function deleteUser(token: string, id: number) {
 }
 
 export function sendUserPasswordReset(token: string, id: number) {
-  return apiFetch<{ message: string }>(`/users/${id}/password-reset`, token, {
+  return apiFetch<{ message: string; delivery?: string; email?: string }>(`/users/${id}/password-reset`, token, {
     method: "POST",
   });
 }

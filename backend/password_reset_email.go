@@ -5,6 +5,10 @@ import (
 	"html"
 )
 
+func passwordResetContinueURL() string {
+	return appBaseURL() + "/?mode=resetPassword"
+}
+
 func passwordResetEmail(firstName, resetURL string) (string, string) {
 	name := html.EscapeString(firstName)
 	link := html.EscapeString(resetURL)

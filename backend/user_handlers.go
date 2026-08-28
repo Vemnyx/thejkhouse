@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -144,20 +146,46 @@ func (s *apiServer) handleUserPasswordReset(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	resetURL, err := s.auth.passwordResetLink(r.Context(), targetUser.Email)
+	delivery, err := s.sendUserPasswordResetEmail(r.Context(), targetUser)
 	if err != nil {
-		log.Error("user password reset link", "error", err, "user_id", id, "email", targetUser.Email)
-		writeError(w, http.StatusInternalServerError, "failed to create password reset link")
+		log.Error("user password reset send", "error", err, "user_id", id, "email", targetUser.Email)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	htmlBody, textBody := passwordResetEmail(targetUser.FirstName, resetURL)
-	if _, err := s.email.send(r.Context(), []string{targetUser.Email}, "Reset your The JK House password", htmlBody, textBody); err != nil {
-		log.Error("user password reset email", "error", err, "user_id", id, "email", targetUser.Email)
-		writeError(w, http.StatusInternalServerError, "failed to send password reset email")
-		return
+	log.Info("password reset email sent", "user_id", id, "email", targetUser.Email, "host_id", currentUser.ID, "delivery", delivery)
+	writeJSON(w, map[string]string{
+		"message":  "password reset email sent",
+		"delivery": delivery,
+		"email":    targetUser.Email,
+	})
+}
+
+func (s *apiServer) sendUserPasswordResetEmail(ctx context.Context, user *User) (string, error) {
+	email := strings.TrimSpace(user.Email)
+	if email == "" {
+		return "", fmt.Errorf("user does not have an email address")
 	}
 
-	log.Info("password reset email sent", "user_id", id, "email", targetUser.Email, "host_id", currentUser.ID)
-	writeJSON(w, map[string]string{"message": "password reset email sent"})
+	continueURL := passwordResetContinueURL()
+	resetURL, linkErr := s.auth.passwordResetLink(ctx, email)
+	if linkErr == nil {
+		htmlBody, textBody := passwordResetEmail(user.FirstName, resetURL)
+		if _, err := s.email.send(ctx, []string{email}, "Reset your The JK House password", htmlBody, textBody); err == nil {
+			return "branded", nil
+		} else {
+			log.Error("branded password reset email", "error", err, "email", email)
+		}
+	} else {
+		log.Error("password reset link", "error", linkErr, "email", email)
+	}
+
+	if err := s.auth.identity.SendPasswordResetOobCode(ctx, email, continueURL); err != nil {
+		if linkErr != nil {
+			return "", fmt.Errorf("failed to create password reset link")
+		}
+		return "", fmt.Errorf("failed to send password reset email")
+	}
+
+	return "firebase", nil
 }

@@ -296,6 +296,8 @@ export default function HostPage() {
   const [previewPartyAttendeesLoading, setPreviewPartyAttendeesLoading] = useState(false);
   const [previewPartyAttendeesError, setPreviewPartyAttendeesError] = useState("");
   const [previewUser, setPreviewUser] = useState<AppUser | null>(null);
+  const [passwordResetTarget, setPasswordResetTarget] = useState<AppUser | null>(null);
+  const [passwordResetError, setPasswordResetError] = useState("");
   const [tagEditImage, setTagEditImage] = useState<ImageRecord | null>(null);
   const [tagEditUserId, setTagEditUserId] = useState("");
   const [tagEditUserIds, setTagEditUserIds] = useState<number[]>([]);
@@ -1581,13 +1583,17 @@ export default function HostPage() {
 
     setError("");
     setUsersSuccess("");
+    setPasswordResetError("");
     setSendingPasswordResetUserId(user.id);
     try {
       const token = await firebaseUser.getIdToken();
-      await sendUserPasswordReset(token, user.id);
-      setUsersSuccess(`Password reset email sent to ${user.email}.`);
+      const response = await sendUserPasswordReset(token, user.id);
+      const sentTo = response.email ?? user.email;
+      setUsersSuccess(`Password reset email sent to ${sentTo}.`);
+      setPasswordResetTarget(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to send password reset email";
+      setPasswordResetError(message);
       setError(message);
     } finally {
       setSendingPasswordResetUserId(null);
@@ -2966,7 +2972,8 @@ export default function HostPage() {
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              void handleSendPasswordReset(user);
+                              setPasswordResetError("");
+                              setPasswordResetTarget(user);
                             }}
                             disabled={sendingPasswordResetUserId === user.id}
                           >
@@ -4590,6 +4597,52 @@ export default function HostPage() {
                     </label>
                   </div>
                 </div>
+              </div>
+            </section>
+          </div>
+        ) : null}
+        {passwordResetTarget ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={() => !sendingPasswordResetUserId && setPasswordResetTarget(null)}>
+            <section
+              className="confirmation-modal gothic-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="password-reset-confirm-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="card-frame" aria-hidden="true">
+                <span className="corner corner-tl" />
+                <span className="corner corner-tr" />
+                <span className="corner corner-bl" />
+                <span className="corner corner-br" />
+              </div>
+
+              <h2 className="host-section-title" id="password-reset-confirm-title">
+                Send Password Reset
+              </h2>
+              <p>
+                Send a password reset link to <strong>{passwordResetTarget.email}</strong> for{" "}
+                {userDisplayName(passwordResetTarget)}?
+              </p>
+              <p>The email goes to that user&apos;s inbox, not yours.</p>
+              {passwordResetError ? <p className="auth-error">{passwordResetError}</p> : null}
+              <div className="confirmation-actions">
+                <button
+                  className="auth-secondary"
+                  type="button"
+                  onClick={() => setPasswordResetTarget(null)}
+                  disabled={sendingPasswordResetUserId === passwordResetTarget.id}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="auth-submit"
+                  type="button"
+                  onClick={() => void handleSendPasswordReset(passwordResetTarget)}
+                  disabled={sendingPasswordResetUserId === passwordResetTarget.id}
+                >
+                  {sendingPasswordResetUserId === passwordResetTarget.id ? "Sending..." : "Send Reset Email"}
+                </button>
               </div>
             </section>
           </div>

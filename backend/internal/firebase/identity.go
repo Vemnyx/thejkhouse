@@ -55,6 +55,46 @@ func (c *IdentityClient) SignUp(ctx context.Context, email, password string) (Au
 	})
 }
 
+// SendPasswordResetOobCode asks Firebase to email a password reset link.
+func (c *IdentityClient) SendPasswordResetOobCode(ctx context.Context, email, continueURL string) error {
+	body := map[string]any{
+		"requestType": "PASSWORD_RESET",
+		"email":       email,
+	}
+	if strings.TrimSpace(continueURL) != "" {
+		body["continueUrl"] = continueURL
+	}
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/accounts:sendOobCode?key=%s", identityToolkitBase, c.apiKey)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("identity toolkit request: %w", err)
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	raw, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	if err != nil {
+		return fmt.Errorf("identity toolkit response: %w", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return mapIdentityError(raw)
+	}
+
+	return nil
+}
+
 func (c *IdentityClient) postAccounts(ctx context.Context, action string, body map[string]any) (AuthSession, error) {
 	payload, err := json.Marshal(body)
 	if err != nil {
