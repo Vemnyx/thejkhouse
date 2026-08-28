@@ -1,5 +1,5 @@
 import { FirebaseApp, initializeApp } from "firebase/app";
-import { Auth, getAuth, signInWithCustomToken } from "firebase/auth";
+import { Auth, confirmPasswordReset, getAuth, signInWithCustomToken } from "firebase/auth";
 
 let app: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
@@ -28,4 +28,9 @@ export async function getAuthInstance(): Promise<Auth> {
 export async function signInWithBackendToken(customToken: string) {
   const auth = await getAuthInstance();
   return signInWithCustomToken(auth, customToken);
+}
+
+export async function confirmPasswordResetWithCode(oobCode: string, newPassword: string) {
+  const auth = await getAuthInstance();
+  return confirmPasswordReset(auth, oobCode, newPassword);
 }

@@ -733,6 +733,12 @@ export function deleteUser(token: string, id: number) {
   });
 }
 
+export function sendUserPasswordReset(token: string, id: number) {
+  return apiFetch<{ message: string }>(`/users/${id}/password-reset`, token, {
+    method: "POST",
+  });
+}
+
 export function uploadImage(token: string, file: File, date: string, options: UploadImageOptions = {}) {
   const formData = new FormData();
   formData.append("image", file);

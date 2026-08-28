@@ -5,7 +5,7 @@ import { ImageDateSelect } from "../components/BirthdaySelect";
 import PartySignupDraftEditor, { type PartySignupDraftItem } from "../components/PartySignupDraftEditor";
 import PartySignupModal from "../components/PartySignupModal";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, createPartySignupItem, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, removePartyAttendee, revisePartySummary, saveMediaFromURL, sendHostEmail, sendPartyInvite, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, createPartySignupItem, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, removePartyAttendee, revisePartySummary, saveMediaFromURL, sendHostEmail, sendPartyInvite, sendUserPasswordReset, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 import { isGifMediaItem, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, searchPartyMedia } from "../lib/googleCseSearch";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
@@ -283,6 +283,8 @@ export default function HostPage() {
   const [inviteError, setInviteError] = useState("");
   const [deletingEventId, setDeletingEventId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [sendingPasswordResetUserId, setSendingPasswordResetUserId] = useState<number | null>(null);
+  const [usersSuccess, setUsersSuccess] = useState("");
   const [deletingAttendeeId, setDeletingAttendeeId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [qrEvent, setQrEvent] = useState<EventRecord | null>(null);
@@ -1556,6 +1558,7 @@ export default function HostPage() {
     }
 
     setError("");
+    setUsersSuccess("");
     setDeletingUserId(user.id);
     try {
       const token = await firebaseUser.getIdToken();
@@ -1568,6 +1571,26 @@ export default function HostPage() {
     } finally {
       setDeletingUserId(null);
       setDeleteTarget(null);
+    }
+  };
+
+  const handleSendPasswordReset = async (user: AppUser) => {
+    if (!firebaseUser || sendingPasswordResetUserId != null) {
+      return;
+    }
+
+    setError("");
+    setUsersSuccess("");
+    setSendingPasswordResetUserId(user.id);
+    try {
+      const token = await firebaseUser.getIdToken();
+      await sendUserPasswordReset(token, user.id);
+      setUsersSuccess(`Password reset email sent to ${user.email}.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to send password reset email";
+      setError(message);
+    } finally {
+      setSendingPasswordResetUserId(null);
     }
   };
 
@@ -2911,6 +2934,7 @@ export default function HostPage() {
           ) : activeTab === "users" ? (
             <section className="host-panel" role="tabpanel">
             {error ? <p className="auth-error">{error}</p> : null}
+            {usersSuccess ? <p className="host-success">{usersSuccess}</p> : null}
             <div className="host-table-wrap">
               <table className="host-table">
                 <thead>
@@ -2936,17 +2960,30 @@ export default function HostPage() {
                       <td>{user.role}</td>
                       <td>{formatDateTime(user.createdAt)}</td>
                       <td>
-                        <button
-                          className="auth-secondary table-action-button"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setDeleteTarget({ type: "user", user });
-                          }}
-                          disabled={deletingUserId === user.id || user.id === appUser?.id}
-                        >
-                          {deletingUserId === user.id ? "Deleting..." : "Delete"}
-                        </button>
+                        <div className="party-row-actions">
+                          <button
+                            className="auth-secondary table-action-button"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleSendPasswordReset(user);
+                            }}
+                            disabled={sendingPasswordResetUserId === user.id}
+                          >
+                            {sendingPasswordResetUserId === user.id ? "Sending..." : "Reset Password"}
+                          </button>
+                          <button
+                            className="auth-secondary table-action-button"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setDeleteTarget({ type: "user", user });
+                            }}
+                            disabled={deletingUserId === user.id || user.id === appUser?.id}
+                          >
+                            {deletingUserId === user.id ? "Deleting..." : "Delete"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

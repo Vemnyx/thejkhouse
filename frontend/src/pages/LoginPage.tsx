@@ -4,6 +4,7 @@ import BirthdaySelect from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
 import { ApiError, ImageRecord, getHomepageImages } from "../lib/api";
+import { confirmPasswordResetWithCode } from "../lib/firebaseApp";
 
 type AuthMode = "login" | "signup";
 
@@ -28,11 +29,18 @@ export default function LoginPage() {
   const [resendingConfirmation, setResendingConfirmation] = useState(false);
   const [introImages, setIntroImages] = useState<ImageRecord[]>([]);
   const [introDismissed, setIntroDismissed] = useState(() =>
-    Boolean(searchParams.get("confirm_signup_token") || searchParams.get("mode") === "signup"),
+    Boolean(
+      searchParams.get("confirm_signup_token") ||
+      searchParams.get("mode") === "signup" ||
+      searchParams.get("mode") === "resetPassword" ||
+      searchParams.get("oobCode"),
+    ),
   );
   const confirmationToken = searchParams.get("confirm_signup_token");
   const inviteMode = searchParams.get("mode");
   const inviteEmail = searchParams.get("email");
+  const resetOobCode = searchParams.get("oobCode");
+  const isResetPassword = searchParams.get("mode") === "resetPassword" && Boolean(resetOobCode);
 
   useEffect(() => {
     if (inviteMode === "signup") {
@@ -42,7 +50,12 @@ export default function LoginPage() {
     if (inviteEmail) {
       setEmail(inviteEmail);
     }
-  }, [inviteEmail, inviteMode]);
+    if (isResetPassword) {
+      setIntroDismissed(true);
+      setError("");
+      setSuccess("");
+    }
+  }, [inviteEmail, inviteMode, isResetPassword]);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +111,37 @@ export default function LoginPage() {
     setConfirmPassword("");
     setBirthday("");
     setShowPassword(false);
+  };
+
+  const handleResetPassword = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!resetOobCode) {
+      setError("This reset link is invalid or has expired.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("passwords do not match");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await confirmPasswordResetWithCode(resetOobCode, password);
+      setPassword("");
+      setConfirmPassword("");
+      setShowPassword(false);
+      setMode("login");
+      setSuccess("Your password has been reset. You can log in with your new password.");
+      navigate("/", { replace: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to reset password";
+      setError(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -199,10 +243,58 @@ export default function LoginPage() {
         </div>
 
         <h1 className="title title-small">
-          {awaitingConfirmation ? "Check your email" : mode === "login" ? "Welcome To The House Of JK" : "Enter The House"}
+          {isResetPassword
+            ? "Reset Your Password"
+            : awaitingConfirmation
+              ? "Check your email"
+              : mode === "login"
+                ? "Welcome To The House Of JK"
+                : "Enter The House"}
         </h1>
 
-        {awaitingConfirmation ? (
+        {isResetPassword ? (
+          <form className="auth-form" onSubmit={handleResetPassword}>
+            <p className="auth-confirmation-message">
+              Choose a new password for your account.
+            </p>
+            <label className="auth-field">
+              <span>New password</span>
+              <input
+                type={passwordInputType}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="new-password"
+                minLength={6}
+                required
+              />
+            </label>
+            <label className="auth-field">
+              <span>Confirm new password</span>
+              <input
+                type={passwordInputType}
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                autoComplete="new-password"
+                minLength={6}
+                required
+              />
+            </label>
+            <label className="auth-password-toggle">
+              <input
+                type="checkbox"
+                checked={showPassword}
+                onChange={(event) => setShowPassword(event.target.checked)}
+              />
+              <span className="toggle-switch" aria-hidden="true" />
+              <span>Show password</span>
+            </label>
+            {error ? <p className="auth-error">{error}</p> : null}
+            {success ? <p className="host-success">{success}</p> : null}
+            <button className="auth-submit" type="submit" disabled={submitting}>
+              {submitting ? "Saving..." : "Save New Password"}
+            </button>
+          </form>
+        ) : awaitingConfirmation ? (
           <div className="auth-confirmation-message">
             <p>
               Check your email for the confirmation link sent to <strong>{email}</strong>.
