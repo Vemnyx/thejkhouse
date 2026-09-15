@@ -45,6 +45,10 @@ type resetPasswordRequest struct {
 	Password string `json:"password"`
 }
 
+type forgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
 func (s *apiServer) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w)
@@ -286,6 +290,54 @@ func (s *apiServer) handleAuthResendConfirmation(w http.ResponseWriter, r *http.
 	}
 
 	writeJSON(w, authSignupPendingResponse{Message: "check your email to confirm your account"})
+}
+
+func (s *apiServer) handleAuthForgotPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+
+	var payload forgotPasswordRequest
+	if err := readJSON(r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, errInvalidBody.Error())
+		return
+	}
+
+	email := strings.TrimSpace(payload.Email)
+	if email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+
+	const okMessage = "If an account exists for that email, a reset link has been sent."
+
+	user, err := s.store.getUserByEmail(r.Context(), email)
+	if err != nil {
+		if isNotFound(err) {
+			log.Info("password reset requested for unknown email", "email", email)
+			writeJSON(w, map[string]string{"message": okMessage})
+			return
+		}
+		log.Error("auth forgot password load user", "error", err, "email", email)
+		writeError(w, http.StatusInternalServerError, "failed to send password reset email")
+		return
+	}
+
+	if s.email == nil {
+		writeError(w, http.StatusServiceUnavailable, "email is not configured")
+		return
+	}
+
+	delivery, emailID, err := s.sendUserPasswordResetEmail(r.Context(), user)
+	if err != nil {
+		log.Error("auth forgot password send", "error", err, "user_id", user.ID, "email", user.Email)
+		writeError(w, http.StatusInternalServerError, "failed to send password reset email")
+		return
+	}
+
+	log.Info("password reset email sent", "user_id", user.ID, "email", user.Email, "delivery", delivery, "email_id", emailID, "source", "forgot-password")
+	writeJSON(w, map[string]string{"message": okMessage})
 }
 
 func (s *apiServer) handleAuthResetPassword(w http.ResponseWriter, r *http.Request) {

@@ -98,6 +98,7 @@ func main() {
 	mux.HandleFunc("/health", server.handleHealth)
 	mux.HandleFunc("/auth/config", server.handleAuthConfig)
 	mux.HandleFunc("/auth/confirm-signup", server.handleAuthConfirmSignup)
+	mux.HandleFunc("/auth/forgot-password", server.handleAuthForgotPassword)
 	mux.HandleFunc("/auth/login", server.handleAuthLogin)
 	mux.HandleFunc("/auth/resend-confirmation", server.handleAuthResendConfirmation)
 	mux.HandleFunc("/auth/reset-password", server.handleAuthResetPassword)

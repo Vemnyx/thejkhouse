@@ -3,10 +3,10 @@ import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import BirthdaySelect from "../components/BirthdaySelect";
 import BouncingImages from "../components/BouncingImages";
 import { useAuth } from "../context/AuthContext";
-import { ApiError, ImageRecord, getHomepageImages, resetPasswordWithToken } from "../lib/api";
+import { ApiError, ImageRecord, getHomepageImages, requestPasswordReset, resetPasswordWithToken } from "../lib/api";
 import { confirmPasswordResetWithCode } from "../lib/firebaseApp";
 
-type AuthMode = "login" | "signup";
+type AuthMode = "login" | "signup" | "forgot";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [confirmationTokenAttempted, setConfirmationTokenAttempted] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resendingConfirmation, setResendingConfirmation] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
   const [introImages, setIntroImages] = useState<ImageRecord[]>([]);
   const [introDismissed, setIntroDismissed] = useState(() =>
     Boolean(
@@ -110,6 +111,7 @@ export default function LoginPage() {
     setError("");
     setSuccess("");
     setAwaitingConfirmation(false);
+    setForgotSent(false);
     setConfirmPassword("");
     setBirthday("");
     setShowPassword(false);
@@ -144,6 +146,24 @@ export default function LoginPage() {
       navigate("/", { replace: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : "failed to reset password";
+      setError(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+
+    setSubmitting(true);
+    try {
+      await requestPasswordReset(email.trim());
+      setForgotSent(true);
+      setSuccess("If an account exists for that email, a reset link has been sent.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to send password reset email";
       setError(message);
     } finally {
       setSubmitting(false);
@@ -253,9 +273,11 @@ export default function LoginPage() {
             ? "Reset Your Password"
             : awaitingConfirmation
               ? "Check your email"
-              : mode === "login"
-                ? "Welcome To The House Of JK"
-                : "Enter The House"}
+              : mode === "forgot"
+                ? "Forgot Password"
+                : mode === "login"
+                  ? "Welcome To The House Of JK"
+                  : "Enter The House"}
         </h1>
 
         {isResetPassword ? (
@@ -322,6 +344,49 @@ export default function LoginPage() {
               Back to Log In
             </button>
           </div>
+        ) : mode === "forgot" ? (
+          forgotSent ? (
+            <div className="auth-confirmation-message">
+              <p>
+                If an account exists for <strong>{email}</strong>, a reset link is on its way from
+                host@thejkhouse.com.
+              </p>
+              <p>Open that email and choose a new password.</p>
+              {error ? <p className="auth-error">{error}</p> : null}
+              {success ? <p className="host-success">{success}</p> : null}
+              <button className="auth-submit" type="button" onClick={() => switchMode("login")}>
+                Back to Log In
+              </button>
+            </div>
+          ) : (
+            <form className="auth-form" onSubmit={handleForgotPassword}>
+              <p className="auth-confirmation-message">
+                Enter your account email and we&apos;ll send a link to reset your password.
+              </p>
+              <label className="auth-field">
+                <span>Email</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </label>
+              {error ? <p className="auth-error">{error}</p> : null}
+              <button className="auth-submit" type="submit" disabled={submitting}>
+                {submitting ? "Sending..." : "Send Reset Link"}
+              </button>
+              <button
+                className="auth-secondary"
+                type="button"
+                onClick={() => switchMode("login")}
+                disabled={submitting}
+              >
+                Back to Log In
+              </button>
+            </form>
+          )
         ) : (
         <form className="auth-form" onSubmit={handleSubmit}>
           {mode === "signup" ? (
@@ -373,6 +438,17 @@ export default function LoginPage() {
               required
             />
           </label>
+
+          {mode === "login" ? (
+            <button
+              className="auth-forgot-link"
+              type="button"
+              onClick={() => switchMode("forgot")}
+              disabled={submitting || confirmingSignup}
+            >
+              Forgot password?
+            </button>
+          ) : null}
 
           {mode === "signup" ? (
             <>

@@ -145,6 +145,31 @@ func (s *userStore) getUserByID(ctx context.Context, id int64) (*User, error) {
 	return &user, nil
 }
 
+func (s *userStore) getUserByEmail(ctx context.Context, email string) (*User, error) {
+	var user User
+	err := s.pool.QueryRow(
+		ctx,
+		`SELECT id, firebase_uid, email, first_name, last_name, birthday, avatar_url, role, created_at
+		 FROM users WHERE lower(email) = lower($1)`,
+		email,
+	).Scan(
+		&user.ID,
+		&user.FirebaseUID,
+		&user.Email,
+		&user.FirstName,
+		&user.LastName,
+		&user.Birthday,
+		&user.AvatarURL,
+		&user.Role,
+		&user.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
 func (s *userStore) listUsers(ctx context.Context) ([]User, error) {
 	rows, err := s.pool.Query(
 		ctx,

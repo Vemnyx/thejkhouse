@@ -452,6 +452,13 @@ export function resendSignupConfirmation(email: string) {
   });
 }
 
+export function requestPasswordReset(email: string) {
+  return publicFetch<{ message: string }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
 export function resetPasswordWithToken(token: string, password: string) {
   return publicFetch<{ message: string }>("/auth/reset-password", {
     method: "POST",

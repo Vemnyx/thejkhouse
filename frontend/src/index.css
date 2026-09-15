@@ -299,6 +299,31 @@ body {
   margin-top: 1.5rem;
 }
 
+.auth-forgot-link {
+  justify-self: start;
+  margin-top: -0.35rem;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--gold);
+  font: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+
+.auth-forgot-link:hover:not(:disabled),
+.auth-forgot-link:focus-visible {
+  color: var(--rose-pale);
+}
+
+.auth-forgot-link:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
 .auth-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
