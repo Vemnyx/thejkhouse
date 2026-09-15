@@ -8,6 +8,7 @@ import {
   addPartyAttendee,
   listPartyAttendees,
 } from "../lib/api";
+import { formatPartyDateTime } from "../lib/partyTime";
 import PartyCalendarButton from "./PartyCalendarButton";
 
 const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519";
@@ -537,8 +538,5 @@ function rsvpStatusLabel(status: PartyRsvpStatus) {
 }
 
 function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatPartyDateTime(value);
 }

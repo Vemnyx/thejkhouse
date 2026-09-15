@@ -15,6 +15,7 @@ import {
   partyRouteIdentifier,
   partyThemeStyle,
 } from "../lib/api";
+import { formatPartyDateTime } from "../lib/partyTime";
 
 const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519";
 
@@ -213,7 +214,7 @@ export default function PartyPage() {
               <section className="party-detail-meta" aria-label="When and where">
                 <article>
                   <span>When</span>
-                  <strong>{formatPartyDateTime(party.date)}</strong>
+                  <strong>{formatPartyDateTime(party.date, { dateStyle: "full" })}</strong>
                 </article>
                 <article>
                   <span>Where</span>
@@ -386,11 +387,4 @@ function avatarColorFromUserId(userId: number): string {
   const b = 72 + ((n >>> 16) & 0x7f);
 
   return `#${[r, g, b].map((value) => value.toString(16).padStart(2, "0")).join("")}`;
-}
-
-function formatPartyDateTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "full",
-    timeStyle: "short",
-  }).format(new Date(value));
 }

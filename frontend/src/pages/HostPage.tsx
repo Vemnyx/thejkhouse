@@ -7,6 +7,12 @@ import PartySignupModal from "../components/PartySignupModal";
 import { useAuth } from "../context/AuthContext";
 import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, createPartySignupItem, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, removePartyAttendee, revisePartySummary, saveMediaFromURL, sendHostEmail, sendPartyInvite, sendUserPasswordReset, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 import { isGifMediaItem, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, searchPartyMedia } from "../lib/googleCseSearch";
+import {
+  formatPartyDateTime as formatPartyInstant,
+  formatPartyDateTimeParts,
+  partyDateTimeToISO,
+  timePartsFromISO,
+} from "../lib/partyTime";
 
 type HostTab = "images" | "parties" | "events" | "homepage" | "users" | "email";
 type PartyView = "list" | "create" | "edit";
@@ -107,50 +113,13 @@ function dateFromInputValue(value: string) {
   return new Date(year, month - 1, day);
 }
 
-function formatPartyDate(value: string) {
-  if (!value) {
-    return "No date selected";
-  }
-
-  return dateFromInputValue(value).toLocaleDateString(undefined, {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 function formatPartyDateTime(value: string, hour: string, minute: string, period: string) {
-  if (!value) {
-    return "Select a date";
-  }
-
-  return `${formatPartyDate(value)} at ${hour}:${minute} ${period}`;
-}
-
-function partyDateTimeToISO(value: string, hour: string, minute: string, period: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  const baseHour = Number(hour) % 12;
-  const hour24 = period === "PM" ? baseHour + 12 : baseHour;
-  return new Date(year, month - 1, day, hour24, Number(minute), 0, 0).toISOString();
+  return formatPartyDateTimeParts(value, hour, minute, period);
 }
 
 function dateOnlyToISO(value: string) {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day, 0, 0, 0, 0).toISOString();
-}
-
-function timePartsFromISO(value: string) {
-  const date = new Date(value);
-  const hours = date.getHours();
-  const period = hours >= 12 ? "PM" : "AM";
-  const hour = String(hours % 12 || 12);
-  const minute = String(date.getMinutes()).padStart(2, "0");
-  return {
-    date: toDateInputValue(date),
-    hour,
-    minute: partyMinutes.includes(minute) ? minute : "00",
-    period: period as (typeof partyPeriods)[number],
-  };
 }
 
 export default function HostPage() {
@@ -2507,7 +2476,7 @@ export default function HostPage() {
                         {parties.map((party) => (
                           <tr className="clickable-row" key={party.id} onClick={() => void openPartyAttendeesModal(party)}>
                             <td>{party.label}</td>
-                            <td>{formatDateTime(party.date)}</td>
+                            <td>{formatPartyInstant(party.date)}</td>
                             <td className="party-row-actions">
                               <button
                                 className="auth-secondary table-action-button"
@@ -3662,6 +3631,7 @@ export default function HostPage() {
                   x
                 </button>
               </div>
+              <p className="dashboard-copy">Times are saved as Eastern Time (US).</p>
 
               <div className="party-calendar-controls">
                 <label>
@@ -4317,7 +4287,7 @@ export default function HostPage() {
                 </button>
               </div>
 
-              <p className="dashboard-copy">{formatDateTime(previewParty.date)}</p>
+              <p className="dashboard-copy">{formatPartyInstant(previewParty.date)}</p>
 
               {previewPartyAttendeesLoading ? <p className="dashboard-copy">Loading attendees...</p> : null}
               {previewPartyAttendeesError ? <p className="auth-error">{previewPartyAttendeesError}</p> : null}
@@ -4498,7 +4468,7 @@ export default function HostPage() {
                   <div className="party-invite-confirm-meta">
                     <article>
                       <span>When</span>
-                      <strong>{formatDateTime(inviteTarget.date)}</strong>
+                      <strong>{formatPartyInstant(inviteTarget.date)}</strong>
                     </article>
                     <article>
                       <span>Where</span>

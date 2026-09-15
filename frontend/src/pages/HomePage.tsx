@@ -5,6 +5,7 @@ import BouncingImages from "../components/BouncingImages";
 import PartyRsvpModal from "../components/PartyRsvpModal";
 import { useAuth } from "../context/AuthContext";
 import { AppUser, EventRecord, HomepageContent, ImageRecord, PartyRecord, eventRouteIdentifier, eventTypeLabels, getHomepage, listEvents, listImages, listParties, listUsers, partyRouteIdentifier, partyThemeStyle, uploadImage } from "../lib/api";
+import { formatPartyDateTime } from "../lib/partyTime";
 
 type MainTab = "home" | "parties" | "photos" | "events";
 type MainView = MainTab | "settings";
@@ -714,7 +715,7 @@ export default function HomePage() {
                             onClick={() => setExpandedPartyId(expanded ? null : party.id)}
                           >
                             <span>{party.label}</span>
-                            <span>{formatDateTime(party.date)}</span>
+                            <span>{formatPartyDateTime(party.date)}</span>
                           </button>
                           {expanded ? (
                             <div className="party-accordion-details">
