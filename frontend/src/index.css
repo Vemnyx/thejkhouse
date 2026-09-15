@@ -2171,6 +2171,8 @@ body {
   z-index: 1;
   display: grid;
   gap: 1.75rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .party-detail-card.party-themed .party-detail-view,
@@ -2189,17 +2191,22 @@ body {
   flex-wrap: nowrap;
   align-items: center;
   gap: 1rem 1.5rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .party-detail-header h1 {
   margin: 0;
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   max-width: 100%;
   color: var(--party-theme-primary, var(--rose-pale));
   font-family: var(--party-theme-font, var(--decorative-font));
   font-size: clamp(1.25rem, 2.8vw, 1.85rem);
   letter-spacing: 0.08em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .party-detail-meta {
@@ -3061,12 +3068,13 @@ body {
 }
 
 .party-form-header {
-  align-items: center;
+  align-items: flex-start;
 }
 
 .party-form-title-input {
-  width: auto;
-  min-width: 6ch;
+  flex: 1 1 0;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   margin: 0;
   padding: 0;
@@ -3080,6 +3088,11 @@ body {
   font-weight: 400;
   letter-spacing: 0.08em;
   line-height: 1.2;
+  resize: none;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
   field-sizing: content;
 }
 
@@ -4300,6 +4313,11 @@ body {
   margin: 0;
   color: color-mix(in srgb, var(--party-theme-primary, var(--ink)) 40%, #f4f0fa);
   line-height: 1.65;
+}
+
+.party-invite-confirm-test-note {
+  color: color-mix(in srgb, var(--party-theme-accent, var(--gold)) 70%, #f4f0fa) !important;
+  font-size: 0.92rem;
 }
 
 .party-invite-confirm-meta {

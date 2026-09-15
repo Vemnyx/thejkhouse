@@ -890,30 +890,43 @@ func (s *apiServer) sendPartyInviteTest(party Party) (int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	greetingName := "Jake"
 	users, err := s.store.listUsers(ctx)
-	if err == nil {
-		for _, user := range users {
-			if strings.EqualFold(strings.TrimSpace(user.Email), partyInviteTestEmail) {
-				if name := strings.TrimSpace(user.FirstName); name != "" {
-					greetingName = name
-				}
-				break
-			}
-		}
-	}
-
-	subject := partyCreatedInviteSubject(party)
-	htmlBody, textBody := partyInviteEmail(party, greetingName, partyInviteCTA{
-		Label: "RSVP",
-		URL:   partyRsvpURL(party),
-	})
-	emailID, err := s.email.send(ctx, []string{partyInviteTestEmail}, subject, htmlBody, textBody)
 	if err != nil {
 		return 0, err
 	}
-	log.Info("party invite test sent", "email_id", emailID, "party_id", party.ID, "to", partyInviteTestEmail)
-	return 1, nil
+
+	subject := partyCreatedInviteSubject(party)
+	cta := partyInviteCTA{
+		Label: "RSVP",
+		URL:   partyRsvpURL(party),
+	}
+
+	sent := 0
+	for _, user := range users {
+		if user.Role != RoleHost {
+			continue
+		}
+		to := strings.TrimSpace(user.Email)
+		if to == "" {
+			continue
+		}
+		if _, err := mail.ParseAddress(to); err != nil {
+			continue
+		}
+
+		htmlBody, textBody := partyInviteEmail(party, user.FirstName, cta)
+		emailID, err := s.email.send(ctx, []string{to}, subject, htmlBody, textBody)
+		if err != nil {
+			log.Error("party invite test send", "error", err, "party_id", party.ID, "to", to)
+			continue
+		}
+		sent++
+		log.Info("party invite test sent", "email_id", emailID, "party_id", party.ID, "to", to)
+	}
+	if sent == 0 {
+		return 0, fmt.Errorf("no host emails available for test invite")
+	}
+	return sent, nil
 }
 
 func (s *apiServer) sendPartyInvites(party Party) (int, error) {

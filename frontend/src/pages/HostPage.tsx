@@ -549,6 +549,10 @@ export default function HostPage() {
     () => users.filter((user) => user.email.trim()).length,
     [users],
   );
+  const hostInviteRecipientCount = useMemo(
+    () => users.filter((user) => user.role === "host" && user.email.trim()).length,
+    [users],
+  );
 
   if (appUser?.role !== "host") {
     return <Navigate to="/" replace />;
@@ -2581,12 +2585,18 @@ export default function HostPage() {
                   </div>
 
                   <header className="party-detail-header party-form-header">
-                    <input
+                    <textarea
                       className="party-form-title-input"
                       value={partyLabelValue}
-                      onChange={(event) => setPartyLabelValue(event.target.value)}
+                      onChange={(event) => setPartyLabelValue(event.target.value.replace(/\n/g, " "))}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                        }
+                      }}
                       placeholder="Title"
                       aria-label="Party title"
+                      rows={1}
                       required
                     />
                     <section className="party-detail-meta" aria-label="When and where">
@@ -4465,7 +4475,9 @@ export default function HostPage() {
                   <p className="party-invite-confirm-title">{inviteTarget.label}</p>
                   <p>
                     {inviteSentTest
-                      ? "A test invite was sent to programmerjake95@gmail.com."
+                      ? inviteSentCount === 1
+                        ? "A test invite was sent to 1 host email."
+                        : `Test invites were sent to ${inviteSentCount} host emails.`
                       : inviteSentCount === 1
                         ? "The invite is on its way to 1 guest."
                         : `Invites are on their way to ${inviteSentCount} guests.`}
@@ -4497,6 +4509,12 @@ export default function HostPage() {
                     This emails every registered guest from host@thejkhouse.com with an RSVP link
                     {inviteRecipientCount > 0
                       ? ` (${inviteRecipientCount} ${inviteRecipientCount === 1 ? "person" : "people"}).`
+                      : "."}
+                  </p>
+                  <p className="party-invite-confirm-test-note">
+                    Send Test delivers the same invite only to host emails
+                    {hostInviteRecipientCount > 0
+                      ? ` (${hostInviteRecipientCount} ${hostInviteRecipientCount === 1 ? "host" : "hosts"}).`
                       : "."}
                   </p>
                   {inviteError ? <p className="auth-error">{inviteError}</p> : null}
