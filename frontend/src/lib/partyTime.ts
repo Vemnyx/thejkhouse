@@ -1,3 +1,5 @@
+import type { AppUser } from "./api";
+
 export const PARTY_TIME_ZONE = "America/New_York";
 
 type PartyTimeParts = {
@@ -6,6 +8,64 @@ type PartyTimeParts = {
   minute: string;
   period: "AM" | "PM";
 };
+
+export type PartyBirthdayPerson = {
+  id: number;
+  name: string;
+  day: number;
+  dateLabel: string;
+};
+
+function birthdayMonthDay(birthday: string): { month: number; day: number } | null {
+  const match = birthday.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+  return { month: Number(match[2]), day: Number(match[3]) };
+}
+
+export function partyMonthLabel(partyDate: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: PARTY_TIME_ZONE,
+    month: "long",
+  }).format(new Date(partyDate));
+}
+
+export function birthdayPeopleForPartyMonth(partyDate: string, users: AppUser[]): PartyBirthdayPerson[] {
+  const monthParts = partsMap(new Date(partyDate), {
+    timeZone: PARTY_TIME_ZONE,
+    month: "numeric",
+  });
+  const partyMonth = Number(monthParts.month);
+  if (!partyMonth) {
+    return [];
+  }
+
+  const monthName = partyMonthLabel(partyDate);
+  return users
+    .flatMap((user) => {
+      if (!user.birthday) {
+        return [];
+      }
+      const parts = birthdayMonthDay(user.birthday);
+      if (!parts || parts.month !== partyMonth) {
+        return [];
+      }
+      const name = [user.firstName, user.lastName].map((part) => part.trim()).filter(Boolean).join(" ") || user.email.trim();
+      if (!name) {
+        return [];
+      }
+      return [
+        {
+          id: user.id,
+          name,
+          day: parts.day,
+          dateLabel: `${monthName} ${parts.day}`,
+        },
+      ];
+    })
+    .sort((a, b) => a.day - b.day || a.name.localeCompare(b.name));
+}
 
 function pad2(value: number) {
   return String(value).padStart(2, "0");

@@ -60,7 +60,37 @@ func formatPartyInviteWhen(date time.Time) string {
 	return date.In(partyInviteLocation()).Format("Monday, January 2, 2006 at 3:04 PM")
 }
 
-func partyInviteEmail(party Party, greetingName string, cta partyInviteCTA) (string, string) {
+func partyInviteBirthdayBlock(people []partyBirthdayPerson, partyDate time.Time, accent, primaryBorderSoft string) (string, string) {
+	if len(people) == 0 {
+		return "", ""
+	}
+
+	monthName := partyMonthName(partyDate)
+	var rows strings.Builder
+	var textLines []string
+	for _, person := range people {
+		dayLabel := fmt.Sprintf("%s %d", monthName, person.Day)
+		rows.WriteString(fmt.Sprintf(`
+          <tr>
+            <td style="padding:6px 0;color:#f8ecee;font-size:15px;line-height:1.45;">%s</td>
+            <td style="padding:6px 0;color:%s;font-size:13px;line-height:1.45;text-align:right;white-space:nowrap;">%s</td>
+          </tr>`, html.EscapeString(person.Name), html.EscapeString(accent), html.EscapeString(dayLabel)))
+		textLines = append(textLines, fmt.Sprintf("- %s (%s)", person.Name, dayLabel))
+	}
+
+	htmlBlock := fmt.Sprintf(`
+        <div style="margin:22px 0 0;border:1px solid %s;border-radius:14px;background:rgba(3,3,3,.22);padding:14px 16px;text-align:left;">
+          <p style="margin:0 0 10px;color:%s;font-size:11px;letter-spacing:.14em;text-transform:uppercase;">Birthdays in %s</p>
+          <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+            %s
+          </table>
+        </div>`, primaryBorderSoft, html.EscapeString(accent), html.EscapeString(monthName), rows.String())
+
+	textBlock := fmt.Sprintf("Birthdays in %s:\n%s", monthName, strings.Join(textLines, "\n"))
+	return htmlBlock, textBlock
+}
+
+func partyInviteEmail(party Party, greetingName string, cta partyInviteCTA, birthdayPeople []partyBirthdayPerson) (string, string) {
 	name := strings.TrimSpace(greetingName)
 	if name == "" {
 		name = "there"
@@ -113,6 +143,8 @@ func partyInviteEmail(party Party, greetingName string, cta partyInviteCTA) (str
         </p>`, html.EscapeString(party.PartifulURL), escapedAccent)
 	}
 
+	birthdayHTML, birthdayText := partyInviteBirthdayBlock(birthdayPeople, party.Date, accent, primaryBorderSoft)
+
 	htmlBody := fmt.Sprintf(`<!doctype html>
 <html>
   <head>
@@ -146,6 +178,7 @@ func partyInviteEmail(party Party, greetingName string, cta partyInviteCTA) (str
         </table>
         %s
         %s
+        %s
         <div style="margin-top:28px;">
           <a href="%s" style="display:block;box-sizing:border-box;width:100%%;padding:16px 22px;border:1px solid %s;border-radius:14px;background:linear-gradient(180deg,%s,%s);color:#f8ecee;text-decoration:none;font-size:13px;font-weight:bold;letter-spacing:.14em;text-transform:uppercase;text-align:center;">%s</a>
         </div>
@@ -172,6 +205,7 @@ func partyInviteEmail(party Party, greetingName string, cta partyInviteCTA) (str
 		escapedWhere,
 		summaryBlock,
 		partifulBlock,
+		birthdayHTML,
 		escapedCTAURL,
 		primaryBorderCTA,
 		primaryCTATop,
@@ -179,16 +213,22 @@ func partyInviteEmail(party Party, greetingName string, cta partyInviteCTA) (str
 		escapedCTALabel,
 	)
 
-	textBody := fmt.Sprintf(
-		"Hi %s, you're invited!\n\nWhen: %s\nWhere: %s\n\n%s\n\n%s\n\n%s: %s\n",
-		name,
-		formatPartyInviteWhen(party.Date),
-		partyVenueAddress,
+	textParts := []string{
+		fmt.Sprintf("Hi %s, you're invited!", name),
+		"",
+		fmt.Sprintf("When: %s", formatPartyInviteWhen(party.Date)),
+		fmt.Sprintf("Where: %s", partyVenueAddress),
+		"",
 		party.Label,
-		strings.TrimSpace(party.Summary),
-		cta.Label,
-		cta.URL,
-	)
+	}
+	if summary := strings.TrimSpace(party.Summary); summary != "" {
+		textParts = append(textParts, "", summary)
+	}
+	if birthdayText != "" {
+		textParts = append(textParts, "", birthdayText)
+	}
+	textParts = append(textParts, "", fmt.Sprintf("%s: %s", cta.Label, cta.URL), "")
+	textBody := strings.Join(textParts, "\n")
 
 	return htmlBody, textBody
 }

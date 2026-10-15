@@ -900,6 +900,7 @@ func (s *apiServer) sendPartyInviteTest(party Party) (int, error) {
 		Label: "RSVP",
 		URL:   partyRsvpURL(party),
 	}
+	birthdayPeople := birthdayPeopleForPartyMonth(users, party.Date)
 
 	sent := 0
 	for _, user := range users {
@@ -914,7 +915,7 @@ func (s *apiServer) sendPartyInviteTest(party Party) (int, error) {
 			continue
 		}
 
-		htmlBody, textBody := partyInviteEmail(party, user.FirstName, cta)
+		htmlBody, textBody := partyInviteEmail(party, user.FirstName, cta, birthdayPeople)
 		emailID, err := s.email.send(ctx, []string{to}, subject, htmlBody, textBody)
 		if err != nil {
 			log.Error("party invite test send", "error", err, "party_id", party.ID, "to", to)
@@ -947,6 +948,7 @@ func (s *apiServer) sendPartyInvites(party Party) (int, error) {
 		Label: "RSVP",
 		URL:   partyRsvpURL(party),
 	}
+	birthdayPeople := birthdayPeopleForPartyMonth(users, party.Date)
 
 	sent := 0
 	for _, user := range users {
@@ -958,7 +960,7 @@ func (s *apiServer) sendPartyInvites(party Party) (int, error) {
 			continue
 		}
 
-		htmlBody, textBody := partyInviteEmail(party, user.FirstName, cta)
+		htmlBody, textBody := partyInviteEmail(party, user.FirstName, cta, birthdayPeople)
 		emailID, err := s.email.send(ctx, []string{to}, subject, htmlBody, textBody)
 		if err != nil {
 			log.Error("party invite send", "error", err, "party_id", party.ID, "to", to)
@@ -983,10 +985,15 @@ func (s *apiServer) sendPartyPlusOneInvite(party Party, firstName, email string)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	birthdayPeople := []partyBirthdayPerson{}
+	if users, err := s.store.listUsers(ctx); err == nil {
+		birthdayPeople = birthdayPeopleForPartyMonth(users, party.Date)
+	}
+
 	htmlBody, textBody := partyInviteEmail(party, firstName, partyInviteCTA{
 		Label: "Create Account",
 		URL:   partySignupURL(to),
-	})
+	}, birthdayPeople)
 	emailID, err := s.email.send(ctx, []string{to}, partyPlusOneInviteSubject(party), htmlBody, textBody)
 	if err != nil {
 		log.Error("party plus-one invite send", "error", err, "party_id", party.ID, "to", to)

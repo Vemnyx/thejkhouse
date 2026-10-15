@@ -15,7 +15,7 @@ import {
   partyRouteIdentifier,
   partyThemeStyle,
 } from "../lib/api";
-import { formatPartyDateTime } from "../lib/partyTime";
+import { birthdayPeopleForPartyMonth, formatPartyDateTime, partyMonthLabel } from "../lib/partyTime";
 
 const partyVenueAddress = "1116 Rosepine Dr, Cary, NC 27519";
 
@@ -165,6 +165,13 @@ export default function PartyPage() {
     return attendees.find((attendee) => attendee.userId === appUser.id) ?? null;
   }, [appUser, attendees]);
 
+  const birthdayPeople = useMemo(() => {
+    if (!party) {
+      return [];
+    }
+    return birthdayPeopleForPartyMonth(party.date, users);
+  }, [party, users]);
+
   const canShowRsvpButton = Boolean(party && !party.partifulUrl && new Date(party.date).getTime() > Date.now());
   const themeStyle = party ? partyThemeStyle(party) : undefined;
 
@@ -236,6 +243,22 @@ export default function PartyPage() {
             <div className="party-detail-body">
               <div className="party-detail-main">
                 {party.summary ? <p className="party-detail-summary">{party.summary}</p> : null}
+
+                {birthdayPeople.length > 0 ? (
+                  <section className="party-birthday-section" aria-label={`Birthdays in ${partyMonthLabel(party.date)}`}>
+                    <div className="party-attendee-header">
+                      <h2>Birthdays in {partyMonthLabel(party.date)}</h2>
+                    </div>
+                    <ul className="party-birthday-list">
+                      {birthdayPeople.map((person) => (
+                        <li className="party-birthday-row" key={person.id}>
+                          <span className="party-birthday-name">{person.name}</span>
+                          <span className="party-birthday-date">{person.dateLabel}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
 
                 <section className="party-detail-extras" aria-label="Party extras">
                   <div className="party-detail-extra">
