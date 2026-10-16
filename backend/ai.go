@@ -143,7 +143,7 @@ func (c *aiClient) generateHTML(ctx context.Context, blockType string, instructi
 
 func (c *aiClient) revisePartySummary(ctx context.Context, title, summary string) (string, error) {
 	prompt := buildPartySummaryPrompt(title, summary)
-	result, err := c.runPrompt(ctx, "Revise JK House party summary", prompt)
+	result, err := c.runPrompt(ctx, "Write JK House party summary", prompt)
 	if err != nil {
 		if errors.Is(err, errAIRunTimeout) {
 			return "", newPublicAIError("The AI revision took too long. Try again with a shorter summary.", err)
@@ -318,29 +318,40 @@ func buildPartySummaryPrompt(title, summary string) string {
 		title = "Untitled party"
 	}
 	if summary == "" {
-		summary = "(empty — write one short, plain invitation from the party title only. Do not invent colors, décor, theme, or extra plans.)"
+		summary = "(empty — the host did not leave notes. Write a short invitation from the party title only. Do not invent colors, décor, contests, food, times, or other plans.)"
 	}
 
-	return fmt.Sprintf(`You are helping The JK House host lightly revise a party invitation summary.
+	return fmt.Sprintf(`You are writing the party page summary for a JK House party.
 
-Vamp up the draft the host already wrote. Make it a bit clearer, warmer, and more inviting, while staying close to their wording and tone. Do not overdo it. The result should still sound like a person wrote it, not a marketing blurb.
+Use the host notes as the facts. Write a fresh summary from them. Do not lightly edit the notes in place, and do not copy their wording when a warmer version fits.
+
+Match the length and feeling of this example. It is a voice and shape sample only. Do not reuse its pride theme, contest, goody bags, food rules, or door time unless the host notes say those things:
+
+We are celebrating pride month with an optional costume theme and a guest-voted contest. Everyone attending gets a pride-themed goody bag, with an extra trinket for guests who arrive in costume.
+
+Contest categories are Best Overall, Funniest, Most Creative, and Best Couple. Prizes are TBD, bragging rights are locked in, and dramatic entrances are absolutely encouraged.
+
+Please support the party by signing up to bring refreshments. As always: BYOMoMS - Bring Your Own Meat or Meat Substitute.
+
+Doors open at 7pm. Hope to see y'all there!
+
+That feeling means: a few short paragraphs, specific and practical, casual, a little playful, and easy to read out loud. About that length. Not a marketing blurb, and not a pile of atmosphere.
 
 Rules:
 - Do not edit files.
-- Return only the revised summary as plain text.
+- Return only the summary as plain text.
 - Do not include markdown fences, titles, labels, bullet lists, or explanations.
 - Do not include HTML tags.
-- Keep about the same length as the draft, plus one short closing note. One or two short paragraphs is enough unless the draft is already longer.
-- Keep every concrete detail from the draft (what to bring, dress notes, timing, food, activities). Do not invent new facts.
-- Do not add colors, palettes, décor, or theme language unless the draft already says it.
-- Do not repeat the party title, and do not describe the house style, aesthetic, or mood unless the draft already does.
-- Prefer small wording improvements over a full rewrite. If a sentence already works, leave it mostly alone.
-- Always end with one short, casual note that guests can sign up to bring something from the list, add an item of their own, or donate to the party fund. Match this tone, and vary the wording so it does not read like a copied template: "Most of you already know the drill. If this is your first time, or the first time you've read this: sign up to bring something from the list, add an item of your own, or donate to the party fund." If the draft already says this, keep a single version of it instead of repeating it.
+- Use only facts from the party title and host notes. Do not invent contests, prizes, costumes, food rules, times, or other plans.
+- Do not add colors, palettes, décor, or theme language unless the notes already mention them.
+- Keep practical details the host included, such as what to bring, dress notes, timing, food, and activities.
+- Write in first person plural, like the example ("We are...", "Hope to see y'all there!"), when it fits.
+- Include one short paragraph somewhere in the summary, not necessarily at the end, in this spirit, varied a little so it does not sound pasted in: "Most of you already know the drill. If this is your first time, or the first time you've read this: sign up to bring something from the list, add an item of your own, or donate to the party fund." Include all three options: bring something from the list, add an item of your own, and donate to the party fund. Place it where it reads naturally with the other details. If the notes already say this, keep a single version.
 
-Party title (context only, do not repeat it in the summary):
+Party title:
 %s
 
-Current summary draft:
+Host notes:
 %s`, title, summary)
 }
 
