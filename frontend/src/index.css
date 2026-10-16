@@ -2447,21 +2447,52 @@ body {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.45rem;
+  gap: 0.75rem;
 }
 
 .party-birthday-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.party-birthday-person {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.party-birthday-avatar {
+  width: 4.25rem;
+  height: 4.25rem;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid color-mix(in srgb, var(--party-theme-primary, var(--rose-glow)) 28%, transparent);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--party-theme-background, #000) 45%, transparent);
+  flex-shrink: 0;
+}
+
+.party-birthday-avatar-fallback {
+  display: grid;
+  place-items: center;
+  color: #f8ecee;
+  font-family: var(--party-theme-font, var(--decorative-font));
+  font-size: 1.45rem;
+  letter-spacing: 0.04em;
+}
+
+.party-birthday-copy {
+  display: grid;
+  gap: 0.2rem;
   min-width: 0;
 }
 
 .party-birthday-name {
   color: color-mix(in srgb, var(--party-theme-primary, var(--ink)) 45%, #f4f0fa);
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.35;
   min-width: 0;
 }
 
@@ -2469,7 +2500,6 @@ body {
   color: var(--party-theme-accent, var(--gold));
   font-size: 0.82rem;
   letter-spacing: 0.04em;
-  white-space: nowrap;
 }
 
 .party-attendee-section {

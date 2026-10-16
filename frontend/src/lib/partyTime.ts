@@ -12,6 +12,8 @@ type PartyTimeParts = {
 export type PartyBirthdayPerson = {
   id: number;
   name: string;
+  firstName: string;
+  avatarUrl: string | null;
   day: number;
   dateLabel: string;
 };
@@ -59,6 +61,8 @@ export function birthdayPeopleForPartyMonth(partyDate: string, users: AppUser[])
         {
           id: user.id,
           name,
+          firstName: user.firstName.trim(),
+          avatarUrl: user.avatarUrl,
           day: parts.day,
           dateLabel: `${monthName} ${parts.day}`,
         },

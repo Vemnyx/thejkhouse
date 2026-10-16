@@ -244,22 +244,6 @@ export default function PartyPage() {
               <div className="party-detail-main">
                 {party.summary ? <p className="party-detail-summary">{party.summary}</p> : null}
 
-                {birthdayPeople.length > 0 ? (
-                  <section className="party-birthday-section" aria-label={`Birthdays in ${partyMonthLabel(party.date)}`}>
-                    <div className="party-attendee-header">
-                      <h2>Birthdays in {partyMonthLabel(party.date)}</h2>
-                    </div>
-                    <ul className="party-birthday-list">
-                      {birthdayPeople.map((person) => (
-                        <li className="party-birthday-row" key={person.id}>
-                          <span className="party-birthday-name">{person.name}</span>
-                          <span className="party-birthday-date">{person.dateLabel}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                ) : null}
-
                 <section className="party-detail-extras" aria-label="Party extras">
                   <div className="party-detail-extra">
                     <button
@@ -329,6 +313,27 @@ export default function PartyPage() {
                     </ul>
                   )}
                 </section>
+
+                {birthdayPeople.length > 0 ? (
+                  <section className="party-birthday-section" aria-label={`Birthdays in ${partyMonthLabel(party.date)}`}>
+                    <div className="party-attendee-header">
+                      <h2>Birthdays in {partyMonthLabel(party.date)}</h2>
+                    </div>
+                    <ul className="party-birthday-list">
+                      {birthdayPeople.map((person) => (
+                        <li className="party-birthday-row" key={person.id}>
+                          <BirthdayPerson
+                            name={person.name}
+                            firstName={person.firstName}
+                            avatarUrl={person.avatarUrl}
+                            colorId={person.id}
+                            dateLabel={person.dateLabel}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
               </aside>
             </div>
           </section>
@@ -395,6 +400,42 @@ function AttendeeAvatar({
         {label}
       </span>
     </span>
+  );
+}
+
+function BirthdayPerson({
+  name,
+  firstName,
+  avatarUrl,
+  colorId,
+  dateLabel,
+}: {
+  name: string;
+  firstName: string;
+  avatarUrl: string | null;
+  colorId: number;
+  dateLabel: string;
+}) {
+  const initial = (firstName || name).trim().charAt(0).toUpperCase() || "?";
+
+  return (
+    <div className="party-birthday-person">
+      {avatarUrl ? (
+        <img className="party-birthday-avatar" src={avatarUrl} alt="" />
+      ) : (
+        <span
+          className="party-birthday-avatar party-birthday-avatar-fallback"
+          style={{ backgroundColor: avatarColorFromUserId(colorId) }}
+          aria-hidden="true"
+        >
+          {initial}
+        </span>
+      )}
+      <div className="party-birthday-copy">
+        <span className="party-birthday-name">{name}</span>
+        <span className="party-birthday-date">{dateLabel}</span>
+      </div>
+    </div>
   );
 }
 
