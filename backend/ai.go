@@ -318,23 +318,26 @@ func buildPartySummaryPrompt(title, summary string) string {
 		title = "Untitled party"
 	}
 	if summary == "" {
-		summary = "(empty — write a fresh summary from the party title)"
+		summary = "(empty — write one short, plain invitation from the party title only. Do not invent colors, décor, theme, or extra plans.)"
 	}
 
-	return fmt.Sprintf(`You are helping The JK House host revise a party invitation summary.
+	return fmt.Sprintf(`You are helping The JK House host lightly revise a party invitation summary.
 
-The JK House is a stylish private house party venue with a gothic / rose-and-gold aesthetic. Write inviting, vivid, concise copy that fits that vibe without being cheesy.
+Vamp up the draft the host already wrote. Make it a bit clearer, warmer, and more inviting, while staying close to their wording and tone. Do not overdo it. The result should still sound like a person wrote it, not a marketing blurb.
 
 Rules:
 - Do not edit files.
 - Return only the revised summary as plain text.
 - Do not include markdown fences, titles, labels, bullet lists, or explanations.
 - Do not include HTML tags.
-- Keep it roughly 2-5 short paragraphs or a tight paragraph block suitable for a party page summary.
-- Preserve any concrete details from the draft (dress code, BYOB, theme, timing notes) unless they conflict.
-- Improve clarity, flow, and atmosphere.
+- Keep about the same length as the draft, plus one short closing note. One or two short paragraphs is enough unless the draft is already longer.
+- Keep every concrete detail from the draft (what to bring, dress notes, timing, food, activities). Do not invent new facts.
+- Do not add colors, palettes, décor, or theme language unless the draft already says it.
+- Do not repeat the party title, and do not describe the house style, aesthetic, or mood unless the draft already does.
+- Prefer small wording improvements over a full rewrite. If a sentence already works, leave it mostly alone.
+- Always end with one short, casual note that guests can sign up to bring something from the list, add an item of their own, or donate to the party fund. Match this tone, and vary the wording so it does not read like a copied template: "Most of you already know the drill. If this is your first time, or the first time you've read this: sign up to bring something from the list, add an item of your own, or donate to the party fund." If the draft already says this, keep a single version of it instead of repeating it.
 
-Party title:
+Party title (context only, do not repeat it in the summary):
 %s
 
 Current summary draft:
