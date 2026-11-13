@@ -515,6 +515,15 @@ export function saveMediaFromURL(token: string, url: string) {
   });
 }
 
+export function uploadPartyMedia(token: string, file: File) {
+  const formData = new FormData();
+  formData.append("image", file);
+  return apiFetch<{ imageUrl: string }>("/media/upload", token, {
+    method: "POST",
+    body: formData,
+  });
+}
+
 export function createParty(token: string, payload: CreatePartyPayload) {
   return apiFetch<PartyRecord>("/parties", token, {
     method: "POST",

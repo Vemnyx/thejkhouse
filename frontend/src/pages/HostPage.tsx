@@ -6,7 +6,7 @@ import PartyBirthdaySection from "../components/PartyBirthdaySection";
 import PartySignupDraftEditor, { type PartySignupDraftItem } from "../components/PartySignupDraftEditor";
 import PartySignupModal from "../components/PartySignupModal";
 import { useAuth } from "../context/AuthContext";
-import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, createPartySignupItem, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, removePartyAttendee, revisePartySummary, saveMediaFromURL, sendHostEmail, sendPartyInvite, sendUserPasswordReset, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
+import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, createPartySignupItem, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, removePartyAttendee, revisePartySummary, saveMediaFromURL, uploadPartyMedia, sendHostEmail, sendPartyInvite, sendUserPasswordReset, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 import { isGifMediaItem, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, searchPartyMedia } from "../lib/googleCseSearch";
 import {
   birthdayPeopleForPartyMonth,
@@ -138,6 +138,7 @@ export default function HostPage() {
   const cropDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const partyMediaSearchTimeoutRef = useRef<number | null>(null);
   const partyMediaSearchGenRef = useRef(0);
+  const partyMediaFileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = useState<HostTab>("images");
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [imageFilter, setImageFilter] = useState<ImageFilter>("all");
@@ -197,6 +198,7 @@ export default function HostPage() {
   const [partyMediaShowSpinner, setPartyMediaShowSpinner] = useState(false);
   const [partyMediaSaving, setPartyMediaSaving] = useState(false);
   const [partyMediaError, setPartyMediaError] = useState("");
+  const [draggingPartyMedia, setDraggingPartyMedia] = useState(false);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [eventType, setEventType] = useState<EventType>("0");
   const [eventLabel, setEventLabel] = useState("");
@@ -775,10 +777,6 @@ export default function HostPage() {
       setError("party date is required");
       return;
     }
-    if (!partyMediaUrl.trim()) {
-      setError("party media is required");
-      return;
-    }
     if (!partySummary.trim()) {
       setError("party summary is required");
       return;
@@ -850,10 +848,6 @@ export default function HostPage() {
       return;
     }
     if (partySetupStep === "media") {
-      if (!partyMediaUrl.trim()) {
-        setError("party media is required");
-        return;
-      }
       goToPartySetupStep("summary");
       return;
     }
@@ -1814,10 +1808,6 @@ export default function HostPage() {
       setError("party date is required");
       return;
     }
-    if (!partyMediaUrl.trim()) {
-      setError("party media is required");
-      return;
-    }
 
     setSavingParty(true);
     try {
@@ -1955,6 +1945,62 @@ export default function HostPage() {
       setPartyMediaSaving(false);
     }
   };
+
+  const handleUploadPartyMediaFile = async (file: File | null) => {
+    if (!file || !firebaseUser || partyMediaSaving) {
+      return;
+    }
+
+    setPartyMediaError("");
+    setPartyMediaSaving(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const saved = await uploadPartyMedia(token, file);
+      setPartyMediaUrl(saved.imageUrl);
+      if (partyMediaModalOpen) {
+        setPartyMediaModalOpen(false);
+      }
+      setPartyMediaResults([]);
+      setPartyMediaQuery("");
+      setPartyMediaType("image");
+      setError("");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "failed to upload media";
+      setPartyMediaError(message);
+    } finally {
+      setPartyMediaSaving(false);
+      setDraggingPartyMedia(false);
+    }
+  };
+
+  const renderPartyMediaUpload = (hint: string) => (
+    <div
+      className={draggingPartyMedia ? "party-media-upload drop-zone dragging" : "party-media-upload drop-zone"}
+      onDragOver={(event) => {
+        event.preventDefault();
+        if (!partyMediaSaving) {
+          setDraggingPartyMedia(true);
+        }
+      }}
+      onDragLeave={() => setDraggingPartyMedia(false)}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDraggingPartyMedia(false);
+        const file = event.dataTransfer.files?.[0] ?? null;
+        void handleUploadPartyMediaFile(file);
+      }}
+    >
+      <p>{hint}</p>
+      <button
+        className="auth-secondary"
+        type="button"
+        onClick={() => partyMediaFileInputRef.current?.click()}
+        disabled={partyMediaSaving}
+      >
+        {partyMediaSaving ? "Uploading..." : "Choose File"}
+      </button>
+    </div>
+  );
 
   const handleGenerateHTMLDraft = async () => {
     setError("");
@@ -2635,17 +2681,22 @@ export default function HostPage() {
                       <div className="auth-field party-media-field">
                         <span>Party media</span>
                         {partyMediaUrl ? (
-                          <button
-                            className="party-media-preview-button party-form-media-button"
-                            type="button"
-                            onClick={openPartyMediaModal}
-                            aria-label="Replace party media"
-                          >
-                            <img src={partyMediaUrl} alt="Selected party media" className="party-media-preview party-form-media-preview" />
-                          </button>
+                          <>
+                            <button
+                              className="party-media-preview-button party-form-media-button"
+                              type="button"
+                              onClick={openPartyMediaModal}
+                              aria-label="Replace party media"
+                            >
+                              <img src={partyMediaUrl} alt="Selected party media" className="party-media-preview party-form-media-preview" />
+                            </button>
+                            <button className="auth-secondary" type="button" onClick={() => setPartyMediaUrl("")}>
+                              Remove media
+                            </button>
+                          </>
                         ) : (
                           <button className="auth-secondary party-form-media-empty" type="button" onClick={openPartyMediaModal}>
-                            Select Image or GIF
+                            Select or upload media
                           </button>
                         )}
                       </div>
@@ -3126,10 +3177,11 @@ export default function HostPage() {
                     <div className="party-setup-media-selected">
                       <img src={partyMediaUrl} alt="Selected party media" />
                       <button className="auth-secondary" type="button" onClick={() => setPartyMediaUrl("")} disabled={partyMediaSaving}>
-                        Choose different media
+                        Remove media
                       </button>
                     </div>
                   ) : null}
+                  {renderPartyMediaUpload("Drop an image or GIF here, or choose a file. You can also search below, or skip this step.")}
                   <div className="party-media-search">
                     <label className="auth-field">
                       <input
@@ -3209,7 +3261,7 @@ export default function HostPage() {
                       ))}
                     </div>
                   ) : null}
-                  {partyMediaSaving ? <p className="dashboard-copy">Saving selected media to storage...</p> : null}
+                  {partyMediaSaving ? <p className="dashboard-copy">Saving media...</p> : null}
                 </div>
               ) : null}
 
@@ -3405,7 +3457,6 @@ export default function HostPage() {
                     revisingPartySummary ||
                     suggestingPartyTheme ||
                     (partySetupStep === "details" && (!partyLabelValue.trim() || !partyDate)) ||
-                    (partySetupStep === "media" && !partyMediaUrl.trim()) ||
                     (partySetupStep === "summary" && !partySummary.trim())
                   }
                 >
@@ -3536,6 +3587,18 @@ export default function HostPage() {
             <div id={PARTY_MEDIA_CSE_HOST_ID} className="party-media-cse-host" aria-hidden="true" />
           ) : null}
 
+          <input
+            ref={partyMediaFileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              event.target.value = "";
+              void handleUploadPartyMediaFile(file);
+            }}
+          />
+
           {partyMediaModalOpen ? (
           <div className="modal-backdrop" role="presentation" onMouseDown={closePartyMediaModal}>
             <section
@@ -3548,6 +3611,8 @@ export default function HostPage() {
               <button className="modal-close party-media-modal-close" type="button" onClick={closePartyMediaModal} aria-label="Close media picker">
                 x
               </button>
+
+              {renderPartyMediaUpload("Drop an image or GIF here, or choose a file. You can also search below.")}
 
               <div className="party-media-search">
                 <label className="auth-field">
@@ -3628,7 +3693,7 @@ export default function HostPage() {
                   ))}
                 </div>
               ) : null}
-              {partyMediaSaving ? <p className="dashboard-copy">Saving selected media to storage...</p> : null}
+              {partyMediaSaving ? <p className="dashboard-copy">Saving media...</p> : null}
             </section>
           </div>
         ) : null}

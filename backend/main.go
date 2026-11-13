@@ -113,6 +113,7 @@ func main() {
 	mux.HandleFunc("/images/", server.handleImageByID)
 	mux.HandleFunc("/media/search", server.handleMediaSearch)
 	mux.HandleFunc("/media/from-url", server.handleMediaFromURL)
+	mux.HandleFunc("/media/upload", server.handleMediaUpload)
 	mux.HandleFunc("/parties", server.handleParties)
 	mux.HandleFunc("/parties/", server.handlePartyByID)
 	mux.HandleFunc("/users", server.handleUsers)
