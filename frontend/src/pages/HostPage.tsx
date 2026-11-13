@@ -517,6 +517,15 @@ export default function HostPage() {
     () => previewPartyAttendees.filter((attendee) => attendee.plusOneOf == null),
     [previewPartyAttendees],
   );
+  const previewPartyBirthdays = useMemo(() => {
+    if (!previewParty) {
+      return { monthLabel: "", people: [] };
+    }
+    return {
+      monthLabel: partyMonthLabel(previewParty.date),
+      people: birthdayPeopleForPartyMonth(previewParty.date, users),
+    };
+  }, [previewParty, users]);
   const inviteRecipientCount = useMemo(
     () => users.filter((user) => user.email.trim()).length,
     [users],
@@ -4384,6 +4393,11 @@ export default function HostPage() {
                   </ul>
                 )
               ) : null}
+
+              <PartyBirthdaySection
+                monthLabel={previewPartyBirthdays.monthLabel}
+                people={previewPartyBirthdays.people}
+              />
             </section>
           </div>
         ) : null}

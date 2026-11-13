@@ -3930,6 +3930,11 @@ body {
   overflow-y: auto;
 }
 
+.party-attendees-modal .party-birthday-section {
+  margin-top: 1.25rem;
+  text-align: left;
+}
+
 .party-attendees-host-list {
   list-style: none;
   margin: 0.75rem 0 0;
