@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import PartyBirthdaySection from "../components/PartyBirthdaySection";
 import PartyCalendarButton from "../components/PartyCalendarButton";
 import PartyRsvpModal from "../components/PartyRsvpModal";
 import PartySignupModal from "../components/PartySignupModal";
@@ -314,26 +315,7 @@ export default function PartyPage() {
                   )}
                 </section>
 
-                {birthdayPeople.length > 0 ? (
-                  <section className="party-birthday-section" aria-label={`Birthdays in ${partyMonthLabel(party.date)}`}>
-                    <div className="party-attendee-header">
-                      <h2>Birthdays in {partyMonthLabel(party.date)}</h2>
-                    </div>
-                    <ul className="party-birthday-list">
-                      {birthdayPeople.map((person) => (
-                        <li className="party-birthday-row" key={person.id}>
-                          <BirthdayPerson
-                            name={person.name}
-                            firstName={person.firstName}
-                            avatarUrl={person.avatarUrl}
-                            colorId={person.id}
-                            dateLabel={person.dateLabel}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                ) : null}
+                <PartyBirthdaySection monthLabel={partyMonthLabel(party.date)} people={birthdayPeople} />
               </aside>
             </div>
           </section>
@@ -400,42 +382,6 @@ function AttendeeAvatar({
         {label}
       </span>
     </span>
-  );
-}
-
-function BirthdayPerson({
-  name,
-  firstName,
-  avatarUrl,
-  colorId,
-  dateLabel,
-}: {
-  name: string;
-  firstName: string;
-  avatarUrl: string | null;
-  colorId: number;
-  dateLabel: string;
-}) {
-  const initial = (firstName || name).trim().charAt(0).toUpperCase() || "?";
-
-  return (
-    <div className="party-birthday-person">
-      {avatarUrl ? (
-        <img className="party-birthday-avatar" src={avatarUrl} alt="" />
-      ) : (
-        <span
-          className="party-birthday-avatar party-birthday-avatar-fallback"
-          style={{ backgroundColor: avatarColorFromUserId(colorId) }}
-          aria-hidden="true"
-        >
-          {initial}
-        </span>
-      )}
-      <div className="party-birthday-copy">
-        <span className="party-birthday-name">{name}</span>
-        <span className="party-birthday-date">{dateLabel}</span>
-      </div>
-    </div>
   );
 }
 

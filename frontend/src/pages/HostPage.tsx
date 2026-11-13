@@ -2,15 +2,18 @@ import { type Dispatch, type DragEvent, type FormEvent, type PointerEvent, type 
 import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
+import PartyBirthdaySection from "../components/PartyBirthdaySection";
 import PartySignupDraftEditor, { type PartySignupDraftItem } from "../components/PartySignupDraftEditor";
 import PartySignupModal from "../components/PartySignupModal";
 import { useAuth } from "../context/AuthContext";
 import { AppUser, BracketParticipant, DEFAULT_PARTY_THEME_ACCENT, DEFAULT_PARTY_THEME_BACKGROUND, DEFAULT_PARTY_THEME_FONT, DEFAULT_PARTY_THEME_PRIMARY, EventDetail, EventRecord, EventTeamRecord, EventType, EventUserRecord, ImageRecord, MediaSearchItem, MediaSearchType, PARTY_THEME_FONTS, PartyAttendeeRecord, PartyRecord, completeEvent, createEvent, createEventContestant, createParty, createPartySignupItem, deleteEvent, deleteEventContestant, deleteImage, deleteParty, deleteUser, eventRouteIdentifier, eventTypeLabels, generateHTMLDraft, getEventDetail, getHomepage, listEvents, listImages, listParties, listPartyAttendees, listUsers, normalizePartyThemeFont, normalizePartyThemeHex, partyThemeFontFamily, partyThemeStyle, removePartyAttendee, revisePartySummary, saveMediaFromURL, sendHostEmail, sendPartyInvite, sendUserPasswordReset, startBracketEvent, startEvent, suggestPartyTheme, updateEventMetadata, updateHomepage, updateImageEventAssignment, updateImageHomepage, updateImageTags, updateParty, uploadAIImage, uploadImage } from "../lib/api";
 import { isGifMediaItem, PARTY_MEDIA_CSE_HOST_ID, resetPartyMediaSearchElement, searchPartyMedia } from "../lib/googleCseSearch";
 import {
+  birthdayPeopleForPartyMonth,
   formatPartyDateTime as formatPartyInstant,
   formatPartyDateTimeParts,
   partyDateTimeToISO,
+  partyMonthLabel,
   timePartsFromISO,
 } from "../lib/partyTime";
 
@@ -522,6 +525,16 @@ export default function HostPage() {
     () => users.filter((user) => user.role === "host" && user.email.trim()).length,
     [users],
   );
+  const partyPreviewBirthdays = useMemo(() => {
+    if (!partyDate) {
+      return { monthLabel: "", people: [] };
+    }
+    const iso = partyDateTimeToISO(partyDate, partyHour, partyMinute, partyPeriod);
+    return {
+      monthLabel: partyMonthLabel(iso),
+      people: birthdayPeopleForPartyMonth(iso, users),
+    };
+  }, [partyDate, partyHour, partyMinute, partyPeriod, users]);
 
   if (appUser?.role !== "host") {
     return <Navigate to="/" replace />;
@@ -2638,6 +2651,8 @@ export default function HostPage() {
                             : "Guest avatars will appear here after people RSVP."}
                         </p>
                       </section>
+
+                      <PartyBirthdaySection monthLabel={partyPreviewBirthdays.monthLabel} people={partyPreviewBirthdays.people} />
                     </aside>
                   </div>
 
