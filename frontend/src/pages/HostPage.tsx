@@ -1,4 +1,4 @@
-import { type Dispatch, type DragEvent, type FormEvent, type PointerEvent, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type Dispatch, type DragEvent, type FormEvent, type PointerEvent, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ImageDateSelect } from "../components/BirthdaySelect";
@@ -138,7 +138,6 @@ export default function HostPage() {
   const cropDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const partyMediaSearchTimeoutRef = useRef<number | null>(null);
   const partyMediaSearchGenRef = useRef(0);
-  const partyMediaFileInputRef = useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = useState<HostTab>("images");
   const [images, setImages] = useState<ImageRecord[]>([]);
   const [imageFilter, setImageFilter] = useState<ImageFilter>("all");
@@ -1973,9 +1972,15 @@ export default function HostPage() {
     }
   };
 
+  const onPartyMediaFileSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+    void handleUploadPartyMediaFile(file);
+  };
+
   const renderPartyMediaUpload = (hint: string) => (
     <div
-      className={draggingPartyMedia ? "party-media-upload drop-zone dragging" : "party-media-upload drop-zone"}
+      className={draggingPartyMedia ? "party-media-upload dragging" : "party-media-upload"}
       onDragOver={(event) => {
         event.preventDefault();
         if (!partyMediaSaving) {
@@ -1990,15 +1995,17 @@ export default function HostPage() {
         void handleUploadPartyMediaFile(file);
       }}
     >
-      <p>{hint}</p>
-      <button
-        className="auth-secondary"
-        type="button"
-        onClick={() => partyMediaFileInputRef.current?.click()}
-        disabled={partyMediaSaving}
-      >
-        {partyMediaSaving ? "Uploading..." : "Choose File"}
-      </button>
+      <p className="party-media-upload-title">Upload your own image or GIF</p>
+      <label className={partyMediaSaving ? "auth-submit party-media-upload-button disabled" : "auth-submit party-media-upload-button"}>
+        {partyMediaSaving ? "Uploading..." : "Upload from your device"}
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          disabled={partyMediaSaving}
+          onChange={onPartyMediaFileSelected}
+        />
+      </label>
+      <p className="party-media-upload-hint">{hint}</p>
     </div>
   );
 
@@ -2681,24 +2688,33 @@ export default function HostPage() {
                       <div className="auth-field party-media-field">
                         <span>Party media</span>
                         {partyMediaUrl ? (
-                          <>
-                            <button
-                              className="party-media-preview-button party-form-media-button"
-                              type="button"
-                              onClick={openPartyMediaModal}
-                              aria-label="Replace party media"
-                            >
-                              <img src={partyMediaUrl} alt="Selected party media" className="party-media-preview party-form-media-preview" />
-                            </button>
-                            <button className="auth-secondary" type="button" onClick={() => setPartyMediaUrl("")}>
-                              Remove media
-                            </button>
-                          </>
+                          <button
+                            className="party-media-preview-button party-form-media-button"
+                            type="button"
+                            onClick={openPartyMediaModal}
+                            aria-label="Replace party media"
+                          >
+                            <img src={partyMediaUrl} alt="Selected party media" className="party-media-preview party-form-media-preview" />
+                          </button>
                         ) : (
                           <button className="auth-secondary party-form-media-empty" type="button" onClick={openPartyMediaModal}>
-                            Select or upload media
+                            Search images or GIFs
                           </button>
                         )}
+                        <label className={partyMediaSaving ? "auth-submit party-media-upload-button disabled" : "auth-submit party-media-upload-button"}>
+                          {partyMediaSaving ? "Uploading..." : "Upload image or GIF"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            disabled={partyMediaSaving}
+                            onChange={onPartyMediaFileSelected}
+                          />
+                        </label>
+                        {partyMediaUrl ? (
+                          <button className="auth-secondary" type="button" onClick={() => setPartyMediaUrl("")} disabled={partyMediaSaving}>
+                            Remove media
+                          </button>
+                        ) : null}
                       </div>
 
                       <section className="party-attendee-section party-form-attending" aria-label="Attending">
@@ -3181,7 +3197,7 @@ export default function HostPage() {
                       </button>
                     </div>
                   ) : null}
-                  {renderPartyMediaUpload("Drop an image or GIF here, or choose a file. You can also search below, or skip this step.")}
+                  {renderPartyMediaUpload("You can also drop a file here, search below, or skip this step.")}
                   <div className="party-media-search">
                     <label className="auth-field">
                       <input
@@ -3587,18 +3603,6 @@ export default function HostPage() {
             <div id={PARTY_MEDIA_CSE_HOST_ID} className="party-media-cse-host" aria-hidden="true" />
           ) : null}
 
-          <input
-            ref={partyMediaFileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
-            hidden
-            onChange={(event) => {
-              const file = event.target.files?.[0] ?? null;
-              event.target.value = "";
-              void handleUploadPartyMediaFile(file);
-            }}
-          />
-
           {partyMediaModalOpen ? (
           <div className="modal-backdrop" role="presentation" onMouseDown={closePartyMediaModal}>
             <section
@@ -3612,7 +3616,7 @@ export default function HostPage() {
                 x
               </button>
 
-              {renderPartyMediaUpload("Drop an image or GIF here, or choose a file. You can also search below.")}
+              {renderPartyMediaUpload("You can also drop a file here, or search below.")}
 
               <div className="party-media-search">
                 <label className="auth-field">
